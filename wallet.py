@@ -26,9 +26,6 @@ class Investment(db.Model):
     def __repr__(self):
         return f'<Investment {self.id}>'
 
-def initialize_database():
-    db.create_all()
-
 def process_file(file_path):
     app.logger.debug(f'Processing file: {file_path}')
     if file_path.endswith('.csv'):
@@ -45,8 +42,8 @@ def process_file(file_path):
 def insert_data_into_db(df):
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
-        if not Investment.query.filter_by(data=row['Data'], movimentacao=row['Movimentação'],
-                                          produto=row['Produto'], instituicao=row['Instituição']).first():
+        if not Investment.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
+                                          produto=row['Produto'], instituicao=row['Instituição'], quantidade=row['Quantidade']).first():
             new_entry = Investment(
                 entrada_saida=row['Entrada/Saída'],
                 data=row['Data'],
@@ -82,29 +79,20 @@ def home():
 def view_table():
     app.logger.debug('Rendering view table.')
 
-    # Mapeamento dos nomes dos campos do formulário para os nomes das colunas na tabela
-    column_map = {
-        'Quantidade': Investment.quantidade,
-        'Preço unitário': Investment.preco_unitario,
-        'Valor da Operação': Investment.valor_operacao,
-        'Entrada/Saída': Investment.entrada_saida,
-        'Data': Investment.data,
-        'Movimentação': Investment.movimentacao,
-        'Produto': Investment.produto,
-        'Instituição': Investment.instituicao
-    }
-
     query = Investment.query.order_by(Investment.data.asc())
 
     if request.method == 'POST':
         filters = request.form.to_dict()
         for key, value in filters.items():
-            if value and key in column_map:
-                column = column_map[key]
-                if key in ['Quantidade', 'Preço unitário', 'Valor da Operação']:
-                    query = query.filter(column == value)
-                else:
-                    query = query.filter(column.like(f'%{value}%'))
+            if value:
+                column = getattr(Investment, key, None)
+                if column is not None:
+                    if isinstance(column.type, db.Float):
+                        # Filtragem para campos numéricos
+                        query = query.filter(column == float(value))
+                    else:
+                        # Filtragem para campos textuais e de data
+                        query = query.filter(column.like(f'%{value}%'))
 
     result = query.all()
     # Convertendo o resultado para um DataFrame do pandas
@@ -115,5 +103,6 @@ def view_table():
 
 if __name__ == '__main__':
     with app.app_context():
-        initialize_database()
+        db.create_all()
+        
     app.run(debug=True)

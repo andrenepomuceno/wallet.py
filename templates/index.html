@@ -1,18 +1,13 @@
 <!doctype html>
 <html>
 <head>
-    <title>Wallet - Upload CSV</title>
-    <script type="text/javascript">
-        function submitForm() {
-            document.getElementById("uploadForm").submit();
-        }
-    </script>
+    <title>wallet.py</title>
 </head>
 <body>
-    <h1>Upload your investment CSV</h1>
+    <h1>Upload your investment movements CSV/XLSX (CEI/B3)</h1>
     <form id="uploadForm" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" onchange="submitForm()">
-        <input type="submit" value="Upload" style="display: none;">
+        <input type="file" name="file">
+        <input type="submit" value="Upload">
     </form>
     {% if message %}
         <p>{{ message }}</p>
