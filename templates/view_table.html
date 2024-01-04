@@ -14,6 +14,12 @@
         .data-table {
             margin-top: 20px;
         }
+        #filterForm {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -23,34 +29,37 @@
         <!-- Botão para Mostrar/Ocultar o Formulário de Filtro -->
         <button type="button" class="btn btn-info mb-3" onclick="toggleFilters()">Mostrar/Ocultar Filtros</button>
 
-        <!-- Formulário de Filtro -->
-        <form method="post" action="/view" class="form-inline mt-2 mb-4" id="filterForm" style="display: none;">
-            <label for="entrada_saida" class="filter-label">Entrada/Saída:</label>
-            <input type="text" id="entrada_saida" name="Entrada/Saída" class="form-control filter-input">
-            
-            <label for="data" class="filter-label">Data:</label>
-            <input type="text" id="data" name="Data" class="form-control filter-input">
-            
-            <label for="movimentacao" class="filter-label">Movimentação:</label>
-            <input type="text" id="movimentacao" name="Movimentação" class="form-control filter-input">
-            
-            <label for="produto" class="filter-label">Produto:</label>
-            <input type="text" id="produto" name="Produto" class="form-control filter-input">
-            
-            <label for="instituicao" class="filter-label">Instituição:</label>
-            <input type="text" id="instituicao" name="Instituição" class="form-control filter-input">
-            
-            <label for="quantidade" class="filter-label">Quantidade:</label>
-            <input type="number" id="quantidade" name="Quantidade" class="form-control filter-input">
-            
-            <label for="preco_unitario" class="filter-label">Preço Unitário:</label>
-            <input type="number" id="preco_unitario" name="Preço unitário" class="form-control filter-input">
-            
-            <label for="valor_operacao" class="filter-label">Valor da Operação:</label>
-            <input type="number" id="valor_operacao" name="Valor da Operação" class="form-control filter-input">
-            
-            <button type="submit" class="btn btn-primary">Filtrar</button>
-        </form>
+        <!-- Formulário de Filtro em um Container -->
+        <div class="container" id="filterForm" style="display: none;">
+            <form method="post" action="/view" class="form-inline">
+                <!-- Campos do formulário aqui... -->
+                <label for="entrada_saida" class="filter-label">Entrada/Saída:</label>
+                <input type="text" id="entrada_saida" name="Entrada/Saída" class="form-control filter-input">
+                
+                <label for="data" class="filter-label">Data:</label>
+                <input type="text" id="data" name="Data" class="form-control filter-input">
+                
+                <label for="movimentacao" class="filter-label">Movimentação:</label>
+                <input type="text" id="movimentacao" name="Movimentação" class="form-control filter-input">
+                
+                <label for="produto" class="filter-label">Produto:</label>
+                <input type="text" id="produto" name="Produto" class="form-control filter-input">
+                
+                <label for="instituicao" class="filter-label">Instituição:</label>
+                <input type="text" id="instituicao" name="Instituição" class="form-control filter-input">
+                
+                <label for="quantidade" class="filter-label">Quantidade:</label>
+                <input type="number" id="quantidade" name="Quantidade" class="form-control filter-input">
+                
+                <label for="preco_unitario" class="filter-label">Preço Unitário:</label>
+                <input type="number" id="preco_unitario" name="Preço unitário" class="form-control filter-input">
+                
+                <label for="valor_operacao" class="filter-label">Valor da Operação:</label>
+                <input type="number" id="valor_operacao" name="Valor da Operação" class="form-control filter-input">
+                
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+            </form>
+        </div>    
 
         <!-- Tabela de Dados -->
         <div class="data-table">
