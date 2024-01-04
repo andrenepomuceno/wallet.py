@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+    <title>Wallet - Data Table</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        .filter-label {
+            margin-right: 10px;
+        }
+        .filter-input {
+            margin-right: 20px;
+            margin-bottom: 20px;
+        }
+        .data-table {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Investment Data</h1>
+
+        <!-- Botão para Mostrar/Ocultar o Formulário de Filtro -->
+        <button type="button" class="btn btn-info mb-3" onclick="toggleFilters()">Mostrar/Ocultar Filtros</button>
+
+        <!-- Formulário de Filtro -->
+        <form method="post" action="/view" class="form-inline mt-2 mb-4" id="filterForm" style="display: none;">
+            <label for="entrada_saida" class="filter-label">Entrada/Saída:</label>
+            <input type="text" id="entrada_saida" name="Entrada/Saída" class="form-control filter-input">
+            
+            <label for="data" class="filter-label">Data:</label>
+            <input type="text" id="data" name="Data" class="form-control filter-input">
+            
+            <label for="movimentacao" class="filter-label">Movimentação:</label>
+            <input type="text" id="movimentacao" name="Movimentação" class="form-control filter-input">
+            
+            <label for="produto" class="filter-label">Produto:</label>
+            <input type="text" id="produto" name="Produto" class="form-control filter-input">
+            
+            <label for="instituicao" class="filter-label">Instituição:</label>
+            <input type="text" id="instituicao" name="Instituição" class="form-control filter-input">
+            
+            <label for="quantidade" class="filter-label">Quantidade:</label>
+            <input type="number" id="quantidade" name="Quantidade" class="form-control filter-input">
+            
+            <label for="preco_unitario" class="filter-label">Preço Unitário:</label>
+            <input type="number" id="preco_unitario" name="Preço unitário" class="form-control filter-input">
+            
+            <label for="valor_operacao" class="filter-label">Valor da Operação:</label>
+            <input type="number" id="valor_operacao" name="Valor da Operação" class="form-control filter-input">
+            
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
+
+        <!-- Tabela de Dados -->
+        <div class="data-table">
+            {% for table in tables %}
+                {{ table|safe }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        function toggleFilters() {
+            var filterForm = document.getElementById("filterForm");
+            if (filterForm.style.display === "none") {
+                filterForm.style.display = "block";
+            } else {
+                filterForm.style.display = "none";
+            }
+        }
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</body>
+</html>
