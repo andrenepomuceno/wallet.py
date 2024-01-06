@@ -183,7 +183,7 @@ def view_asset_request(request, asset):
     ]
     incomes_sum = incomes['Valor da Operação'].sum()
 
-    dataframes['incomes'] = incomes
+    dataframes['incomes'] = incomes[['Data', 'Movimentação', 'Valor da Operação']]
     asset_info['incomes_sum'] = incomes_sum
 
     rents = credit.loc[

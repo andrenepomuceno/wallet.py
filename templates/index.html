@@ -1,9 +1,5 @@
-<!doctype html>
-<html>
-<head>
-    <title>wallet.py</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
     <h1>File Upload</h1>
 
     <h2>Movimentação CEI/B3 (CSV/XLSX)</h2>
@@ -22,5 +18,4 @@
     {% if message %}
         <p>{{ message }}</p>
     {% endif %}
-</body>
-</html>
+{% endblock %}
