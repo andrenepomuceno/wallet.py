@@ -183,7 +183,7 @@ def view_asset_request(request, asset):
     ]
     incomes_sum = incomes['Valor da Operação'].sum()
 
-    dataframes['incomes'] = incomes[['Data', 'Movimentação', 'Valor da Operação']]
+    dataframes['incomes'] = incomes[['Data', 'Valor da Operação', 'Movimentação']]
     asset_info['incomes_sum'] = incomes_sum
 
     rents = credit.loc[
@@ -207,26 +207,48 @@ def view_asset_request(request, asset):
     app.logger.debug('Analyzing rents...')
     rented = 0
     finished_rents = 0
-    for _, row in rents.iterrows():
-        quantity = row['Quantidade']
-        start = row['Data']
+    for _, rent_row in rents.iterrows():
+        quantity = rent_row['Quantidade']
+        start = rent_row['Data']
 
         #print(f'Searching rent {quantity} {start}')
-        rent_sell = sells.loc[(sells['Quantidade'] == quantity) & (sells['Data'] == start)]
+        rent_sell = sells.loc[(sells['Quantidade'] == quantity) & (sells['Data'] == start) & (sells['Movimentação'] == "Transferência - Liquidação")]
         rent_sell_len = len(rent_sell)
         if rent_sell_len > 0:
             if rent_sell_len > 1:
                 print("Warning! More than 1 rent_sell found for the same date and quantity.")
             # print(rent_sell.to_string())
-            rent_buy = buys.loc[(buys['Quantidade'] == quantity) & (buys['Data'] >= start)]
+            rent_buy = buys.loc[(buys['Quantidade'] == quantity) & (buys['Data'] >= start) & (buys['Movimentação'] == "Transferência - Liquidação")]
             rent_buy_len = len(rent_buy)
             if rent_buy_len > 0:
                 end = rent_buy.iloc[0]['Data']
                 print(f'Rent of {quantity} started on {start} and ended on {end}. Duration: {end - start}')
                 finished_rents += 1
             else:
-                print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
-                rented += quantity
+                # try again, looking for fractioned deposits
+                rent_buy_frac = buys.loc[(buys['Quantidade'] < quantity) & (buys['Data'] >= start) & (buys['Movimentação'] == "Transferência - Liquidação")]
+                rent_buy_frac_len = len(rent_buy_frac)
+                if rent_buy_frac_len > 0:
+                    sum = 0
+                    # first_date = rent_buy.iloc[0]['Data']
+                    for _, rent_buy_frac_row in rent_buy_frac.iterrows():
+                        sum += rent_buy_frac_row['Quantidade']
+                        if sum == quantity:
+                            end = rent_buy_frac_row['Data']
+                            print(f'Rent of {quantity} started on {start} and ended on {end} (fractioned). Duration: {end - start}')
+                            finished_rents += 1
+                            break
+                        elif sum > quantity:
+                            print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
+                            rented += quantity
+                            break
+                        else:
+                            continue
+                else:
+                    print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
+                    rented += quantity
+        else:
+            print(f'Warning! Rent not found for {start} {quantity}.')
 
     asset_info['rented'] = rented
     asset_info['finished_rents'] = finished_rents
