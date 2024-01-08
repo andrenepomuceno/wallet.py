@@ -3,18 +3,36 @@
     <h1>Asset Data for "{{ info['name'] }}"</h1>
 
     <h2>Information</h2>
+    <p>Ticker: {{ info['ticker'] }}</p>
     <p>Position: {{ info['position_sum'] }} ({{ info['rented'] }} rented)</p>
-    <p>Incomes: {{ info['incomes_sum'] }}</p>
+    <p>Incomes: {{ info['wages_sum'] }}</p>
     <p>Rent Incomes: {{ info['rents_income_sum'] }}</p>
-    <p>First buy: {{ info['first_buy'] }}</p>
-    <p>Age: {{ info['age'] }} days</p>
+    <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
 
-    <h2>Buy/Sell Events</h2>
-    <p>TODO</p>
-
-    <h2>Income Events</h2>
+    <h2>Buys</h2>
     <div class="table table-striped mt-3">
-        {% for row in income_events %}
+        {% for row in buys_events %}
+            {{ row|safe }}
+        {% endfor %}
+    </div>
+
+    <h2>Sells</h2>
+    <div class="table table-striped mt-3">
+        {% for row in sells_events %}
+            {{ row|safe }}
+        {% endfor %}
+    </div>
+
+    <h2>Wages</h2>
+    <div class="table table-striped mt-3">
+        {% for row in wages_events %}
+            {{ row|safe }}
+        {% endfor %}
+    </div>
+
+    <h2>All</h2>
+    <div class="table table-striped mt-3">
+        {% for row in all_events %}
             {{ row|safe }}
         {% endfor %}
     </div>

@@ -105,18 +105,24 @@ def view_request(request):
     if len(df) == 0:
         return df
     
-    df['Produto_Parsed'] = df['Produto'].str.extract(r'^([A-Z0-9]{4}|Tesouro Selic [0-9]+)', expand=False)
+    df['Produto_Parsed'] = df['Produto'].str.extract(r'^([A-Z0-9]{4}|[a-zA-Z0-9 .]+)', expand=False)
     df['Produto_Parsed'].fillna('', inplace=True)
     print(df['Produto_Parsed'].value_counts())
     #print(df['Produto'].value_counts())
 
-    df['Ticker'] = df['Produto'].str.extract(r'^([A-Z0-9]{4}[0-9]{1,2}|Tesouro Selic [0-9]+)', expand=False)
-    df['Ticker'].fillna('', inplace=True)
+    df['Ticker'] = parseTicker(df['Produto'])
 
-    grouped = df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída'])
-    print(grouped.value_counts())
+    #grouped = df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída'])
+    #print(grouped.value_counts())
+
+    print(df['Movimentação'].value_counts())
 
     return df
+
+def parseTicker(column):
+    result = column.str.extract(r'^([A-Z0-9]{4}[0-9]{1,2}|[a-zA-Z0-9 .]+)', expand=False)
+    result.fillna('', inplace=True)
+    return result
 
 def view_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
@@ -125,7 +131,6 @@ def view_asset_request(request, asset):
     dataframes = {}
 
     asset_info['name'] = asset
-    asset_info['ticker'] = asset
 
     query = Investment.query.filter(Investment.produto.like(f'%{asset}%')).order_by(Investment.data.asc())
     result = query.all()
@@ -136,11 +141,16 @@ def view_asset_request(request, asset):
     df['Data'] = pd.to_datetime(df['Data'])
     dataframes['all'] = df
 
-    grouped = df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída'])
-    print(grouped.value_counts())
+    print(df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída']).value_counts())
+
+    df['Ticker'] = parseTicker(df['Produto'])
+    asset_info['ticker'] = df['Ticker'].value_counts().index[0]
 
     credit = df.loc[df['Entrada/Saída'] == "Credito"]
+    dataframes['credit'] = credit
+
     debit = df.loc[df['Entrada/Saída'] == "Debito"]
+    dataframes['debit'] = debit
 
     buys = credit.loc[
         (
@@ -153,6 +163,7 @@ def view_asset_request(request, asset):
             | (credit['Movimentação'] == "Atualização")
         )
     ]
+    dataframes['buys'] = buys
     buys_sum = buys['Quantidade'].sum()
     first_buy = buys.iloc[0]['Data']
     age = pd.to_datetime("today") - first_buy
@@ -168,30 +179,49 @@ def view_asset_request(request, asset):
             # | (credit['Movimentação'] == "Transferência")
         )
     ]
+    dataframes['sells'] = sells
     sells_sum = sells['Quantidade'].sum()
     position = buys_sum - sells_sum
 
     asset_info['sells_sum'] = sells_sum
     asset_info['position'] = position
 
-    incomes = credit.loc[
+    wages = credit.loc[
         ((credit['Movimentação'] == "Dividendo") 
          | (credit['Movimentação'] == "Juros Sobre Capital Próprio") 
          | (credit['Movimentação'] == "Reembolso") 
          | (credit['Movimentação'] == "Rendimento")
          | (credit['Movimentação'] == "Leilão de Fração"))
     ]
-    incomes_sum = incomes['Valor da Operação'].sum()
+    wages_sum = wages['Valor da Operação'].sum()
 
-    dataframes['incomes'] = incomes[['Data', 'Valor da Operação', 'Movimentação']]
-    asset_info['incomes_sum'] = incomes_sum
+    dataframes['wages'] = wages[['Data', 'Valor da Operação', 'Movimentação']]
+    asset_info['wages_sum'] = wages_sum
 
-    rents = credit.loc[
-        ((credit['Movimentação'] == "Empréstimo"))
-        # & ((credit['Quantidade'] > 0))
-        # & ((credit['Preço unitário'] == 0))
-        & ((credit['Valor da Operação'] == 0))
-    ]
+    print('--- Buys ---')
+    print(buys.to_string())
+    print('--- Sells ---')
+    print(sells.to_string())
+    print('--- Wages ---')
+    print(wages.to_string())
+    
+    analyse_rents(asset_info, dataframes)
+    rented = asset_info['rented']
+
+    asset_info['position_sum'] = position + rented
+
+    print(asset_info)
+
+    asset_info['dataframes'] = dataframes
+
+    return asset_info
+
+def analyse_rents(asset_info, dataframes):
+    app.logger.debug('Analyzing rents...')
+
+    credit = dataframes['credit']
+    sells = dataframes['sells']
+    buys = dataframes['buys']
 
     rents_income = credit.loc[
         ((credit['Movimentação'] == "Empréstimo"))
@@ -201,10 +231,20 @@ def view_asset_request(request, asset):
     ]
     # print(rents_payments.to_string())
     rents_income_sum = rents_income['Valor da Operação'].sum()
-
     asset_info['rents_income_sum'] = rents_income_sum
 
-    app.logger.debug('Analyzing rents...')
+    rents = credit.loc[
+        ((credit['Movimentação'] == "Empréstimo"))
+        # & ((credit['Quantidade'] > 0))
+        # & ((credit['Preço unitário'] == 0))
+        & ((credit['Valor da Operação'] == 0))
+    ]
+    rents = rents.groupby(['Data'], as_index=False).agg({'Quantidade': 'sum'})
+    dataframes['rents'] = rents
+
+    print('--- Rents ---')
+    print(rents.to_string())
+
     rented = 0
     finished_rents = 0
     for _, rent_row in rents.iterrows():
@@ -212,61 +252,68 @@ def view_asset_request(request, asset):
         start = rent_row['Data']
 
         #print(f'Searching rent {quantity} {start}')
-        rent_sell = sells.loc[(sells['Quantidade'] == quantity) & (sells['Data'] == start) & (sells['Movimentação'] == "Transferência - Liquidação")]
+        rent_sell = sells.loc[(
+            sells['Quantidade'] <= quantity) 
+            & (sells['Data'] >= start)
+            & (sells['Data'] < start + pd.Timedelta(days=7))
+            & (sells['Movimentação'] == "Transferência - Liquidação")
+        ]
         rent_sell_len = len(rent_sell)
         if rent_sell_len > 0:
             if rent_sell_len > 1:
-                print("Warning! More than 1 rent_sell found for the same date and quantity.")
+                print(f"Warning! More than 1 rent_sell found for the same date {start} and quantity {quantity}.")
             # print(rent_sell.to_string())
-            rent_buy = buys.loc[(buys['Quantidade'] == quantity) & (buys['Data'] >= start) & (buys['Movimentação'] == "Transferência - Liquidação")]
-            rent_buy_len = len(rent_buy)
-            if rent_buy_len > 0:
-                end = rent_buy.iloc[0]['Data']
-                print(f'Rent of {quantity} started on {start} and ended on {end}. Duration: {end - start}')
-                finished_rents += 1
-            else:
-                # try again, looking for fractioned deposits
-                rent_buy_frac = buys.loc[(buys['Quantidade'] < quantity) & (buys['Data'] >= start) & (buys['Movimentação'] == "Transferência - Liquidação")]
-                rent_buy_frac_len = len(rent_buy_frac)
-                if rent_buy_frac_len > 0:
-                    sum = 0
-                    # first_date = rent_buy.iloc[0]['Data']
-                    for _, rent_buy_frac_row in rent_buy_frac.iterrows():
-                        sum += rent_buy_frac_row['Quantidade']
-                        if sum == quantity:
-                            end = rent_buy_frac_row['Data']
-                            print(f'Rent of {quantity} started on {start} and ended on {end} (fractioned). Duration: {end - start}')
-                            finished_rents += 1
-                            break
-                        elif sum > quantity:
+            
+            rent_sell_sum = 0
+            for _, rent_sell_row in rent_sell.iterrows():
+                rent_sell_sum += rent_sell_row['Quantidade']
+                if rent_sell_sum == quantity:
+                    quantity = rent_sell_sum
+                    
+                    rent_buy = buys.loc[(
+                        buys['Quantidade'] == quantity) 
+                        & (buys['Data'] >= start) 
+                        & (buys['Movimentação'] == "Transferência - Liquidação")]
+                    rent_buy_len = len(rent_buy)
+                    if rent_buy_len > 0:
+                        end = rent_buy.iloc[0]['Data']
+                        print(f'Rent of {quantity} started on {start} and ended on {end}. Duration: {end - start}')
+                        finished_rents += 1
+                    else:
+                        # try again, looking for fractioned deposits
+                        rent_buy_frac = buys.loc[(buys['Quantidade'] < quantity) & (buys['Data'] >= start) & (buys['Movimentação'] == "Transferência - Liquidação")]
+                        rent_buy_frac_len = len(rent_buy_frac)
+                        if rent_buy_frac_len > 0:
+                            sum = 0
+                            # first_date = rent_buy.iloc[0]['Data']
+                            for _, rent_buy_frac_row in rent_buy_frac.iterrows():
+                                sum += rent_buy_frac_row['Quantidade']
+                                if sum == quantity:
+                                    end = rent_buy_frac_row['Data']
+                                    print(f'Rent of {quantity} started on {start} and ended on {end} (fractioned). Duration: {end - start}')
+                                    finished_rents += 1
+                                    break
+                                elif sum > quantity:
+                                    print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
+                                    rented += quantity
+                                    break
+                                else:
+                                    continue
+                        else:
                             print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
                             rented += quantity
-                            break
-                        else:
-                            continue
+                    
+                    break
+                elif rent_sell_sum > quantity:
+                    print(f'Warning! Rent not found for {start} {quantity}.')
+                    break
                 else:
-                    print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
-                    rented += quantity
+                    continue
         else:
             print(f'Warning! Rent not found for {start} {quantity}.')
 
     asset_info['rented'] = rented
     asset_info['finished_rents'] = finished_rents
-    asset_info['position_sum'] = position + rented
-
-    print('--- Buys ---')
-    print(buys.to_string())
-    print('--- Sells ---')
-    print(sells.to_string())
-    print('--- Incomes ---')
-    print(incomes.to_string())
-    print('--- Rents ---')
-    print(rents.to_string())
-    print(asset_info)
-
-    asset_info['dataframes'] = dataframes
-
-    return asset_info
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -295,8 +342,20 @@ def view_table():
 def view_asset(asset=None):
     asset_info = view_asset_request(request, asset)
     dataframes = asset_info['dataframes']
-    incomes_df = dataframes['incomes']
-    return render_template('view_asset.html', info=asset_info, income_events=[incomes_df.to_html(classes='pandas-dataframe')])
+    wages = dataframes['wages']
+    all_events = dataframes['all']
+    buys_events = dataframes['buys']
+    sells_events = dataframes['sells']
+    return render_template(
+        'view_asset.html', info=asset_info, 
+        wages_events=[wages.to_html(classes='pandas-dataframe')],
+        all_events=[all_events[['Data','Entrada/Saída','Movimentação', 'Quantidade', 
+                                'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')],
+        buys_events=[buys_events[['Data','Entrada/Saída','Movimentação', 'Quantidade', 
+                                'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')],
+        sells_events=[sells_events[['Data','Entrada/Saída','Movimentação', 'Quantidade', 
+                                'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')]
+    )
 
 if __name__ == '__main__':
     with app.app_context():
