@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
@@ -223,94 +225,134 @@ def analyse_rents(asset_info, dataframes):
     sells = dataframes['sells']
     buys = dataframes['buys']
 
-    rents_income = credit.loc[
-        ((credit['Movimentação'] == "Empréstimo"))
-        # & ((credit['Quantidade'] > 0))
-        # & ((credit['Preço unitário'] == 0))
-        & ((credit['Valor da Operação'] > 0))
-    ]
-    # print(rents_payments.to_string())
-    rents_income_sum = rents_income['Valor da Operação'].sum()
-    asset_info['rents_income_sum'] = rents_income_sum
-
     rents = credit.loc[
         ((credit['Movimentação'] == "Empréstimo"))
         # & ((credit['Quantidade'] > 0))
         # & ((credit['Preço unitário'] == 0))
-        & ((credit['Valor da Operação'] == 0))
+        # & ((credit['Valor da Operação'] == 0))
     ]
-    rents = rents.groupby(['Data'], as_index=False).agg({'Quantidade': 'sum'})
+    rents = rents.groupby(['Data'], as_index=False).agg({'Quantidade': 'sum', 'Valor da Operação': 'sum'})
     dataframes['rents'] = rents
 
     print('--- Rents ---')
     print(rents.to_string())
 
+    rents_income_sum = rents['Valor da Operação'].sum()
+    asset_info['rents_income_sum'] = rents_income_sum
+
     rented = 0
     finished_rents = 0
+    rents_not_found = 0
     for _, rent_row in rents.iterrows():
         quantity = rent_row['Quantidade']
         start = rent_row['Data']
+        op_value = rent_row['Valor da Operação']
+
+        print(f'\nAnalyzing start = {start} quant = {quantity} value = {op_value}')
+        print(f'Rented = {rented}')
+
+        if op_value > 0:
+            print(f'Rent payment, skipping...')
+            continue
 
         #print(f'Searching rent {quantity} {start}')
-        rent_sell = sells.loc[(
+        rent_liquidation = sells.loc[(
             sells['Quantidade'] <= quantity) 
             & (sells['Data'] >= start)
             & (sells['Data'] < start + pd.Timedelta(days=7))
             & (sells['Movimentação'] == "Transferência - Liquidação")
+            # & (sells['Preço unitário'] == 0)
+            # & (sells['Valor da Operação'] == 0)
         ]
-        rent_sell_len = len(rent_sell)
-        if rent_sell_len > 0:
-            if rent_sell_len > 1:
-                print(f"Warning! More than 1 rent_sell found for the same date {start} and quantity {quantity}.")
-            # print(rent_sell.to_string())
+        rent_liquidation_len = len(rent_liquidation)
+
+        if rent_liquidation_len == 0:
+            print("Warning! Rent liquidation not found!")
+            rents_not_found += 1
+            continue
             
-            rent_sell_sum = 0
-            for _, rent_sell_row in rent_sell.iterrows():
-                rent_sell_sum += rent_sell_row['Quantidade']
-                if rent_sell_sum == quantity:
-                    quantity = rent_sell_sum
-                    
-                    rent_buy = buys.loc[(
-                        buys['Quantidade'] == quantity) 
-                        & (buys['Data'] >= start) 
-                        & (buys['Movimentação'] == "Transferência - Liquidação")]
-                    rent_buy_len = len(rent_buy)
-                    if rent_buy_len > 0:
-                        end = rent_buy.iloc[0]['Data']
-                        print(f'Rent of {quantity} started on {start} and ended on {end}. Duration: {end - start}')
-                        finished_rents += 1
-                    else:
-                        # try again, looking for fractioned deposits
-                        rent_buy_frac = buys.loc[(buys['Quantidade'] < quantity) & (buys['Data'] >= start) & (buys['Movimentação'] == "Transferência - Liquidação")]
-                        rent_buy_frac_len = len(rent_buy_frac)
-                        if rent_buy_frac_len > 0:
-                            sum = 0
-                            # first_date = rent_buy.iloc[0]['Data']
-                            for _, rent_buy_frac_row in rent_buy_frac.iterrows():
-                                sum += rent_buy_frac_row['Quantidade']
-                                if sum == quantity:
-                                    end = rent_buy_frac_row['Data']
-                                    print(f'Rent of {quantity} started on {start} and ended on {end} (fractioned). Duration: {end - start}')
-                                    finished_rents += 1
-                                    break
-                                elif sum > quantity:
-                                    print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
-                                    rented += quantity
-                                    break
-                                else:
-                                    continue
-                        else:
-                            print(f'Rent of {quantity} started on {start} and is not finished yet. Duration: {pd.to_datetime("today") - start}')
-                            rented += quantity
-                    
-                    break
-                elif rent_sell_sum > quantity:
-                    print(f'Warning! Rent not found for {start} {quantity}.')
-                    break
-                else:
-                    continue
+        rent_liquidation = rent_liquidation[['Data','Quantidade']]
+        print(f'rent_liquidation=\n{rent_liquidation.to_string()}')
+
+        liquidation_sum = 0
+        iterations = 0
+        for _, liquidation_row in rent_liquidation.iterrows():
+            liquidation_sum += liquidation_row['Quantidade']
+            iterations += 1
+            if liquidation_sum == quantity:
+                print(f'Rent liquidated with {iterations} iterations')
+                break
+            elif liquidation_sum > quantity:
+                print(f'Warning! rent_sell_sum > quantity')
+                break
+        
+        if liquidation_sum != quantity:
+            print(f'Warning! Rent liquidation not found! (fractions)')
+            rents_not_found += 1
+            continue
+
+        rented += liquidation_sum
+
+        rent_refund = buys.loc[(
+            (buys['Quantidade'] == quantity) 
+            & (buys['Data'] >= start)
+            & (buys['Movimentação'] == "Transferência - Liquidação")
+        )]
+        rent_refund_len = len(rent_refund)
+
+        if rent_refund_len > 0:
+            rent_refund = rent_refund[['Data','Quantidade']]
+            print(f'rent_refund=\n{rent_refund.to_string()}')    
+
+            print("Exact rent refund found! Getting head...")
+            head = rent_refund.iloc[0]
+            refund_date = head['Data']
+
+            print(f"Refund date: {refund_date}")
+            print(f"Duration: {refund_date - start}")
+
+            rented -= head['Quantidade']
+            finished_rents += 1
+
+            continue
         else:
-            print(f'Warning! Rent not found for {start} {quantity}.')
+            print("Warning! Exact rent refund not found! Trying fractions...")
+
+        rent_refund_frac = buys.loc[(
+            (buys['Quantidade'] < quantity) 
+            & (buys['Data'] >= start)
+            & (buys['Movimentação'] == "Transferência - Liquidação")
+        )]
+        rent_refund_frac_len = len(rent_refund_frac)
+
+        if rent_refund_frac_len == 0:
+            print("Warning! Fractioned rent refund not found! Still in rent?...")
+            continue
+
+        rent_refund_frac = rent_refund_frac[['Data','Quantidade']]
+        print(f'rent_refund_frac=\n{rent_refund_frac.to_string()}')
+
+        refund_sum = 0
+        iterations = 0
+        for _, refund_row in rent_refund_frac.iterrows():
+            refund_sum += refund_row['Quantidade']
+            iterations += 1
+            if refund_sum == quantity:
+                print(f'Rent refunded with {iterations} iterations')
+                refund_date = refund_row['Data']
+
+                print(f"Refund date: {refund_date}")
+                print(f"Duration: {refund_date - start}")
+
+                rented -= quantity
+                finished_rents += 1
+                break
+            elif refund_sum > quantity:
+                print(f'Warning! rent_sell_sum > quantity')
+                break
+                
+        if refund_sum != quantity:
+            print("Warning! Fractioned rent refund not found! Still in rent?...")
 
     asset_info['rented'] = rented
     asset_info['finished_rents'] = finished_rents
