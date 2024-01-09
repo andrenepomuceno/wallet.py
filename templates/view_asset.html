@@ -22,7 +22,7 @@
             {{ row|safe }}
         {% endfor %}
     </div>
-    <p>Buys Total: {{ info['currency'] }} {{ info['total_buy'] }}</p>
+    <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
 
     <h2>Sells</h2>
     <div class="table table-striped mt-3">
@@ -30,7 +30,7 @@
             {{ row|safe }}
         {% endfor %}
     </div>
-    <p>Sells Total: {{ info['currency'] }} {{ info['total_sell'] }}</p>
+    <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
 
     <h2>Wages</h2>
     <div class="table table-striped mt-3">
