@@ -14,7 +14,19 @@ O Wallet App é uma aplicação web desenvolvida em Flask para gerenciar e anali
 - Flask
 - SQLAlchemy
 - Pandas
+- Yahoo Finance
 
 ## Configuração do Ambiente
 
-### Instalação
+```shell
+cd wallet.js
+
+python3 -m venv venv
+source venv/bin/activate
+
+pip3 install -r requirements.txt
+
+./wallet.js
+```
+
+Então acesse a página inicial em `http://localhost:5000`
