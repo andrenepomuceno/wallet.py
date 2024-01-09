@@ -100,6 +100,14 @@ def parse_ticker(column):
     result.fillna('', inplace=True)
     return result
 
+def converter_preco_para_float(preco_str):
+    preco_str = preco_str.replace("R$", "").strip()
+    preco_str = preco_str.replace(".", "").replace(",", ".")
+    try:
+        return float(preco_str)
+    except ValueError:
+        return None
+
 def view_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
 
@@ -165,14 +173,6 @@ def view_asset_request(request, asset):
     rents_wages_sum = rents_wage['Valor da Operação'].sum()
     asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
 
-    dict = {
-        "Tesouro Selic 2027": {
-            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2027/',
-            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-        }
-    }
-    # print(scrape_data('https://taxas-tesouro.com/resgatar/tesouro-selic-2027/', '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'))
-
     query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
     result = query.all()
     negotiation = b3_negotiation_sql_to_df(result)
@@ -236,9 +236,35 @@ def view_asset_request(request, asset):
         dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
                                                           'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
         # return asset_info
+    
+    scrap_dict = {
+        "Tesouro Selic 2024": {
+            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2024/',
+            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+        },
+        "Tesouro Selic 2025": {
+            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2025/',
+            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+        },
+        "Tesouro Selic 2027": {
+            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2027/',
+            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+        },
+        "Tesouro Selic 2029": {
+            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
+            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+        }
+    }
+
+    if ticker in scrap_dict:
+        app.logger.info(f'Scraping data for {ticker}')
+        scrap_info = scrap_dict[ticker]
+        last_close_price = converter_preco_para_float(scrape_data(scrap_info['url'], scrap_info['xpath'])[0])
+        asset_info['last_close_price'] = round(last_close_price, 2)
 
     if first_buy is not None:
         asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
+
     if age is not None:
         asset_info['age'] = age.days
 
@@ -321,7 +347,7 @@ def view_consolidate_request(request):
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
         
-    consolidate.sort_values(by='rentability', inplace=True, ascending=False)
+    consolidate.sort_values(by='rentability_by_year', inplace=True, ascending=False)
         
     ret['consolidate'] = consolidate[['name','ticker','currency','last_close_price',
                                       'position_sum','position_total','buy_avg_price',
