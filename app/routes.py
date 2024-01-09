@@ -66,6 +66,6 @@ def view_asset(asset=None):
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
-    result = view_consolidate_request(request)
-    df = result['consolidate']
-    return render_template('view_consolidate.html', tables=[df.to_html(classes='pandas-dataframe')])
+    info = view_consolidate_request(request)
+    df = info['consolidate']
+    return render_template('view_consolidate.html', info=info, tables=[df.to_html(classes='pandas-dataframe')])

@@ -313,20 +313,25 @@ def view_consolidate_request(request):
     movimentation['Ticker'] = parse_ticker(movimentation['Produto'])
 
     products = movimentation['Produto_Parsed'].value_counts().to_frame()
-
-    asset_list = []
-    
     for index, product in products.iterrows():
         asset_info = view_asset_request(request, product.name)
-
-        # asset_info['dataframes'] = ''
         new_row = pd.DataFrame([asset_info])
         consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
         
-    ret['consolidate'] = consolidate[['name','ticker','currency','last_close_price','position_sum','position_total','buy_avg_price','total_cost','wages_sum','rents_wage_sum','liquid_cost','rentability','rentability_by_year']]
+    consolidate.sort_values(by='rentability', inplace=True, ascending=False)
+        
+    ret['consolidate'] = consolidate[['name','ticker','currency','last_close_price',
+                                      'position_sum','position_total','buy_avg_price',
+                                      'total_cost','wages_sum','rents_wage_sum','liquid_cost',
+                                      'rentability','rentability_by_year']]
+    
+    ret['total_cost_sum'] = consolidate['total_cost'].sum()
+    ret['total_wages_sum'] = consolidate['wages_sum'].sum()
+    ret['total_rents_wage_sum'] = consolidate['rents_wage_sum'].sum()
+    ret['position_total_sum'] = consolidate['position_total'].sum()
 
     return ret
 
