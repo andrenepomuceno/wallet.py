@@ -17,6 +17,15 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] (%(filename)s:%(funcName)s():%(lineno)d) %(message)s'
 )
 
+# ENTRADA_SAIDA = 'Entrada/Saída'    
+# DATA = 'Data'
+# MOVIMENTACAO = 'Movimentação'
+# PRODUTO = 'Produto'
+# INSTITUICAO = 'Instituição'
+# QUANTIDADE = 'Quantidade'
+# PRECO_UNITARIO = 'Preço unitário'
+# VALOR_OPERACAO = 'Valor da Operação'
+
 class B3_Movimentation(db.Model): # TODO rename to B3_Movimentations
     id = db.Column(db.Integer, primary_key=True)
     entrada_saida = db.Column(db.String)
@@ -30,15 +39,6 @@ class B3_Movimentation(db.Model): # TODO rename to B3_Movimentations
 
     def __repr__(self):
         return f'<B3_Movimentation {self.id}>'
-
-# ENTRADA_SAIDA = 'Entrada/Saída'    
-# DATA = 'Data'
-# MOVIMENTACAO = 'Movimentação'
-# PRODUTO = 'Produto'
-# INSTITUICAO = 'Instituição'
-# QUANTIDADE = 'Quantidade'
-# PRECO_UNITARIO = 'Preço unitário'
-# VALOR_OPERACAO = 'Valor da Operação'
     
 class B3_Negotiation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -134,6 +134,7 @@ def b3_movimentation_sql_to_df(result):
                         d.instituicao, d.quantidade, d.preco_unitario, d.valor_operacao) for d in result], 
                       columns=['Entrada/Saída', 'Data', 'Movimentação', 'Produto',
                                'Instituição', 'Quantidade', 'Preço unitário', 'Valor da Operação'])
+    df['Data'] = pd.to_datetime(df['Data'])
     return df
 
 def b3_negotiation_sql_to_df(result):
@@ -143,6 +144,7 @@ def b3_negotiation_sql_to_df(result):
                       columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
                                'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
                                'Valor'])
+    df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'])
     return df
 
 def view_movimentation_request(request):
@@ -206,57 +208,42 @@ def view_asset_request(request, asset):
 
     query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
     result = query.all()
-    df = b3_movimentation_sql_to_df(result)
-    if len(df) == 0:
+    movimentation = b3_movimentation_sql_to_df(result)
+    if len(movimentation) == 0:
         return asset_info
-    
-    df['Data'] = pd.to_datetime(df['Data'])
-    dataframes['all'] = df
+    dataframes['movimentation'] = movimentation
 
-    print(df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída']).value_counts())
+    movimentation['Ticker'] = parseTicker(movimentation['Produto'])
+    ticker = movimentation['Ticker'].value_counts().index[0]
+    asset_info['ticker'] = ticker
 
-    df['Ticker'] = parseTicker(df['Produto'])
-    asset_info['ticker'] = df['Ticker'].value_counts().index[0]
+    credit = movimentation.loc[movimentation['Entrada/Saída'] == "Credito"]
+    debit = movimentation.loc[movimentation['Entrada/Saída'] == "Debito"]
 
-    credit = df.loc[df['Entrada/Saída'] == "Credito"]
-    dataframes['credit'] = credit
-
-    debit = df.loc[df['Entrada/Saída'] == "Debito"]
-    dataframes['debit'] = debit
+    buys_sum = 0
+    sells_sum = 0
 
     buys = credit.loc[
         (
             (credit['Movimentação'] == "Compra")
-            | (credit['Movimentação'] == "Transferência - Liquidação")
-            # | (credit['Movimentação'] == "Transferência") 
             | (credit['Movimentação'] == "Desdobro") 
-            # | (credit['Movimentação'] == "Recibo de Subscrição")
             | (credit['Movimentação'] == "Bonificação em Ativos")
             | (credit['Movimentação'] == "Atualização")
         )
     ]
     dataframes['buys'] = buys
-    buys_sum = buys['Quantidade'].sum()
-    first_buy = buys.iloc[0]['Data']
-    age = pd.to_datetime("today") - first_buy
-
-    asset_info['buys_sum'] = buys_sum
-    asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
-    asset_info['age'] = age.days
+    if len(buys) > 0:
+        buys_sum += buys['Quantidade'].sum()
+        first_buy = buys.iloc[0]['Data']
+        age = pd.to_datetime("today") - first_buy
 
     sells = debit.loc[
         (
             (debit['Movimentação'] == "Venda")
-            | (debit['Movimentação'] == "Transferência - Liquidação")
-            # | (credit['Movimentação'] == "Transferência")
         )
     ]
     dataframes['sells'] = sells
-    sells_sum = sells['Quantidade'].sum()
-    position = buys_sum - sells_sum
-
-    asset_info['sells_sum'] = sells_sum
-    asset_info['position'] = position
+    sells_sum += sells['Quantidade'].sum()
 
     wages = credit.loc[
         ((credit['Movimentação'] == "Dividendo") 
@@ -267,34 +254,76 @@ def view_asset_request(request, asset):
     ]
     wages_sum = wages['Valor da Operação'].sum()
 
-    dataframes['wages'] = wages[['Data', 'Valor da Operação', 'Movimentação']]
+    dataframes['wages'] = wages
     asset_info['wages_sum'] = wages_sum
 
-    print('--- Buys ---')
-    print(buys.to_string())
-    print('--- Sells ---')
-    print(sells.to_string())
-    print('--- Wages ---')
-    print(wages.to_string())
-    
-    analyse_rents2(asset_info, dataframes)
-    rented = asset_info['rented']
+    rents_wage = credit.loc[(
+        (credit['Movimentação'] == "Empréstimo")
+        & (credit['Valor da Operação'] > 0)
+    )]
+    rents_wages_sum = rents_wage['Valor da Operação'].sum()
+    asset_info['rents_wage_sum'] = rents_wages_sum
 
-    sells_remove_list = asset_info['sells_remove_list']
-    if len(sells_remove_list) > 0:
-        # print(sells_remove_list)
-        sells.drop(sells_remove_list, inplace=True)
-    buys_remove_list = asset_info['buys_remove_list']
-    if len(buys_remove_list) > 0:
-        # print(buys_remove_list)
-        buys.drop(buys_remove_list, inplace=True)
+    query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
+    result = query.all()
+    negotiation = b3_negotiation_sql_to_df(result)
+    if len(negotiation) > 0:
+        dataframes['negotiation'] = negotiation
+
+        negotiation_buys = negotiation.loc[
+            (
+                (negotiation['Tipo de Movimentação'] == "Compra")
+            )
+        ]
+        dataframes['negotitation_buys'] = negotiation_buys
+        buys_sum += negotiation_buys['Quantidade'].sum()
+
+        first_buy = negotiation_buys.iloc[0]['Data do Negócio']
+        age = pd.to_datetime("today") - first_buy
+
+        negotiation_sells = negotiation.loc[
+            (
+                (negotiation['Tipo de Movimentação'] == "Venda")
+            )
+        ]
+        dataframes['negotitation_sells'] = negotiation_sells
+        sells_sum += negotiation_sells['Quantidade'].sum()
+
+        def consolidate(movimentation, negotiation):
+            df1 = movimentation[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
+
+            df2 = negotiation
+            df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação"}, inplace=True)
+            df2["Movimentação"] = "Compra"
+            df2 = df2[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
+
+            return pd.concat([df1, df2], ignore_index=True)
+
+        dataframes['buys'] = consolidate(buys, negotiation_buys)
+        dataframes['sells'] = consolidate(sells, negotiation_sells)
+    else:
+        print('Warning! Negotiation data not found!')
+        dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
+                                                          'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
+        # return asset_info
+
+    asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
+    asset_info['age'] = age.days
+
+    asset_info['buys_sum'] = buys_sum
+    asset_info['sells_sum'] = sells_sum
+
+    position = buys_sum - sells_sum
+    asset_info['position'] = position
+
+    asset_info['rented'] = 0
+    rented = asset_info['rented']
 
     asset_info['position_sum'] = position + rented
 
     print(asset_info)
 
     asset_info['dataframes'] = dataframes
-
     return asset_info
 
 def analyse_rents(asset_info, dataframes):
@@ -496,17 +525,23 @@ def view_asset(asset=None):
     asset_info = view_asset_request(request, asset)
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
-    all_events = dataframes['all']
+    all_events = dataframes['movimentation']
+    all_negotiation = dataframes['negotiation']
     buys_events = dataframes['buys']
     sells_events = dataframes['sells']
+    # negotiation_buys = dataframes['negotiation_buys']
+    # negotiation_sells = dataframes['negotiation_sells']
     return render_template(
         'view_asset.html', info=asset_info, 
-        wages_events=[wages.to_html(classes='pandas-dataframe')],
+        buys_events=[buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')],
+        sells_events=[sells_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')],
+        wages_events=[wages[['Data', 'Valor da Operação', 'Movimentação']].to_html(classes='pandas-dataframe')],
+
+        # negotiation_buys=[negotiation_buys[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')],
+        # negotiation_sells=[negotiation_sells[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')]
+
+        all_negotiation=[all_negotiation[['Data do Negócio','Tipo de Movimentação','Quantidade','Preço','Valor']].to_html()],
         all_events=[all_events[['Data','Entrada/Saída','Movimentação', 'Quantidade', 
-                                'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')],
-        buys_events=[buys_events[['Data','Entrada/Saída','Movimentação', 'Quantidade', 
-                                'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')],
-        sells_events=[sells_events[['Data','Entrada/Saída','Movimentação', 'Quantidade', 
                                 'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')]
     )
 

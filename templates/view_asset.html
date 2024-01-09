@@ -6,7 +6,7 @@
     <p>Ticker: {{ info['ticker'] }}</p>
     <p>Position: {{ info['position_sum'] }} ({{ info['rented'] }} rented)</p>
     <p>Wages: {{ info['wages_sum'] }}</p>
-    <p>Rent Incomes: {{ info['rents_income_sum'] }}</p>
+    <p>Rent Wages: {{ info['rents_wage_sum'] }}</p>
     <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
 
     <h2>Buys</h2>
@@ -30,7 +30,14 @@
         {% endfor %}
     </div>
 
-    <h2>All</h2>
+    <h2>All Negotiation</h2>
+    <div class="table table-striped mt-3">
+        {% for row in all_negotiation %}
+            {{ row|safe }}
+        {% endfor %}
+    </div>
+
+    <h2>All Movimentations</h2>
     <div class="table table-striped mt-3">
         {% for row in all_events %}
             {{ row|safe }}
