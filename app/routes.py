@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for
 
 import os
 from app import app
-from app.models import process_b3_movimentation, process_b3_negotiation
+from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract
 from app.utils.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
 
 @app.route('/', methods=['GET', 'POST'])
@@ -24,6 +24,9 @@ def home():
         elif filetype == 'B3 Negotiation':
             process_b3_negotiation(filepath)
             return redirect(url_for('view_negotiation'))
+        elif filetype == 'Avenue Extract':
+            process_avenue_extract(filepath)
+            return redirect(url_for('view_extract'))
         else:
             return render_template('index.html', message='Filetype not supported.')
         
@@ -97,3 +100,10 @@ def view_consolidate():
                                         'rents_wage_sum': 'Rent Wages',
                                         'liquid_cost': 'Liquid Cost'
                                     }).to_html(classes='pandas-dataframe', escape=False, index=False))
+
+@app.route('/extract', methods=['GET', 'POST'])
+def view_extract():
+    df = view_extract_request(request)
+    return render_template('view_extract.html', tables=[df.to_html(classes='pandas-dataframe')])
+
+

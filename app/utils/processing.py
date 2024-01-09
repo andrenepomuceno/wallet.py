@@ -386,6 +386,8 @@ def view_consolidate_request(request):
 
     return ret
 
+def view_extract_request(request):
+    app.logger.info(f'view_extract_request')
 
 
 

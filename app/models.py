@@ -112,3 +112,6 @@ def process_b3_negotiation(file_path):
     db.session.commit()
 
     return df
+
+def process_avenue_extract(file_path):
+    app.logger.info(f'Processing Avenue Extract file: {file_path}')
