@@ -17,7 +17,7 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] (%(filename)s:%(funcName)s():%(lineno)d) %(message)s'
 )
 
-class Investment(db.Model):
+class B3_Movimentation(db.Model): # TODO rename to B3_Movimentations
     id = db.Column(db.Integer, primary_key=True)
     entrada_saida = db.Column(db.String)
     data = db.Column(db.String)
@@ -29,7 +29,7 @@ class Investment(db.Model):
     valor_operacao = db.Column(db.Float)
 
     def __repr__(self):
-        return f'<Investment {self.id}>'
+        return f'<B3_Movimentation {self.id}>'
 
 # ENTRADA_SAIDA = 'Entrada/Saída'    
 # DATA = 'Data'
@@ -39,8 +39,23 @@ class Investment(db.Model):
 # QUANTIDADE = 'Quantidade'
 # PRECO_UNITARIO = 'Preço unitário'
 # VALOR_OPERACAO = 'Valor da Operação'
+    
+class B3_Negotiation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.String)
+    tipo = db.Column(db.String)
+    mercado = db.Column(db.String)
+    prazo = db.Column(db.String)
+    instituicao = db.Column(db.String)
+    codigo = db.Column(db.String)
+    quantidade = db.Column(db.Float)
+    preco = db.Column(db.Float)
+    valor = db.Column(db.Float)
 
-def process_file(file_path):
+    def __repr__(self):
+        return f'<B3_Negotiation {self.id}>'
+
+def process_b3_movimentation(file_path):
     app.logger.info(f'Processing file: {file_path}')
     
     if file_path.endswith('.csv'):
@@ -54,16 +69,12 @@ def process_file(file_path):
     df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
     df['Produto'] = df['Produto'].str.strip()
 
-    return df
-
-def insert_data_into_db(df):
     app.logger.info('Inserting data into database...')
-
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
-        if not Investment.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
+        if not B3_Movimentation.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
                                           produto=row['Produto'], instituicao=row['Instituição'], quantidade=row['Quantidade']).first():
-            new_entry = Investment(
+            new_entry = B3_Movimentation(
                 entrada_saida=row['Entrada/Saída'],
                 data=row['Data'],
                 movimentacao=row['Movimentação'],
@@ -76,24 +87,75 @@ def insert_data_into_db(df):
             db.session.add(new_entry)
     db.session.commit()
 
-def query_to_dataframe(result):
+    return df
+
+def process_b3_negotiation(file_path):
+    app.logger.info(f'Processing B3 Negotiation file: {file_path}')
+    
+    if file_path.endswith('.xlsx'):
+        df = pd.read_excel(file_path)
+
+    df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
+    df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
+    df['Preço'] = pd.to_numeric(df['Preço'], errors='coerce').fillna(0.0)
+    df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
+
+    app.logger.info('Inserting data into database...')
+    for _, row in df.iterrows():
+        if not B3_Negotiation.query.filter_by(
+            data=row['Data do Negócio'],                                  
+            tipo=row['Tipo de Movimentação'],
+            mercado=row['Mercado'],
+            prazo=row['Prazo/Vencimento'],
+            instituicao=row['Instituição'],
+            codigo=row['Código de Negociação'],
+            quantidade=row['Quantidade'],
+            preco=row['Preço'],
+            valor=row['Valor']
+        ).first():
+            new_entry = B3_Negotiation(
+                data=row['Data do Negócio'],
+                tipo=row['Tipo de Movimentação'],
+                mercado=row['Mercado'],
+                prazo=row['Prazo/Vencimento'],
+                instituicao=row['Instituição'],
+                codigo=row['Código de Negociação'],
+                quantidade=row['Quantidade'],
+                preco=row['Preço'],
+                valor=row['Valor']
+            )
+            db.session.add(new_entry)
+    db.session.commit()
+
+    return df
+
+def b3_movimentation_sql_to_df(result):
     df = pd.DataFrame([(d.entrada_saida, d.data, d.movimentacao, d.produto, 
                         d.instituicao, d.quantidade, d.preco_unitario, d.valor_operacao) for d in result], 
                       columns=['Entrada/Saída', 'Data', 'Movimentação', 'Produto',
                                'Instituição', 'Quantidade', 'Preço unitário', 'Valor da Operação'])
     return df
 
-def view_request(request):
-    app.logger.info('Precessing view request.')
+def b3_negotiation_sql_to_df(result):
+    df = pd.DataFrame([(d.data, d.tipo, d.mercado, d.prazo, 
+                        d.instituicao, d.codigo, d.quantidade, d.preco,
+                        d.valor) for d in result], 
+                      columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
+                               'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
+                               'Valor'])
+    return df
+
+def view_movimentation_request(request):
+    app.logger.info('view_movimentation_request')
 
     df = pd.DataFrame()
-    query = Investment.query.order_by(Investment.data.asc())
+    query = B3_Movimentation.query.order_by(B3_Movimentation.data.asc())
 
     if request.method == 'POST':
         filters = request.form.to_dict()
         for key, value in filters.items():
             if value:
-                column = getattr(Investment, key, None)
+                column = getattr(B3_Movimentation, key, None)
                 if column is not None:
                     if isinstance(column.type, db.Float):
                         # Filtragem para campos numéricos
@@ -103,7 +165,7 @@ def view_request(request):
                         query = query.filter(column.like(f'%{value}%'))
 
     result = query.all()
-    df = query_to_dataframe(result)
+    df = b3_movimentation_sql_to_df(result)
     if len(df) == 0:
         return df
     
@@ -121,6 +183,14 @@ def view_request(request):
 
     return df
 
+def view_negotiation_request(request):
+    app.logger.info('view_negotiation_request')
+
+    query = B3_Negotiation.query.order_by(B3_Negotiation.data.asc())
+    result = query.all()
+    df = b3_negotiation_sql_to_df(result)
+    return df
+
 def parseTicker(column):
     result = column.str.extract(r'^([A-Z0-9]{4}[0-9]{1,2}|[a-zA-Z0-9 .]+)', expand=False)
     result.fillna('', inplace=True)
@@ -134,9 +204,9 @@ def view_asset_request(request, asset):
 
     asset_info['name'] = asset
 
-    query = Investment.query.filter(Investment.produto.like(f'%{asset}%')).order_by(Investment.data.asc())
+    query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
     result = query.all()
-    df = query_to_dataframe(result)
+    df = b3_movimentation_sql_to_df(result)
     if len(df) == 0:
         return asset_info
     
@@ -207,8 +277,17 @@ def view_asset_request(request, asset):
     print('--- Wages ---')
     print(wages.to_string())
     
-    analyse_rents(asset_info, dataframes)
+    analyse_rents2(asset_info, dataframes)
     rented = asset_info['rented']
+
+    sells_remove_list = asset_info['sells_remove_list']
+    if len(sells_remove_list) > 0:
+        # print(sells_remove_list)
+        sells.drop(sells_remove_list, inplace=True)
+    buys_remove_list = asset_info['buys_remove_list']
+    if len(buys_remove_list) > 0:
+        # print(buys_remove_list)
+        buys.drop(buys_remove_list, inplace=True)
 
     asset_info['position_sum'] = position + rented
 
@@ -231,6 +310,9 @@ def analyse_rents(asset_info, dataframes):
         # & ((credit['Preço unitário'] == 0))
         # & ((credit['Valor da Operação'] == 0))
     ]
+
+    # dados corrompidos na tabela de rent3, quantidade = 48 onde deveria ser 24
+    # bug em abev3, quantidade = 249, varias movimentações nos dias 2022-12-02
     rents = rents.groupby(['Data'], as_index=False).agg({'Quantidade': 'sum', 'Valor da Operação': 'sum'})
     dataframes['rents'] = rents
 
@@ -243,6 +325,8 @@ def analyse_rents(asset_info, dataframes):
     rented = 0
     finished_rents = 0
     rents_not_found = 0
+    sells_remove_list = []
+    buys_remove_list = []
     for _, rent_row in rents.iterrows():
         quantity = rent_row['Quantidade']
         start = rent_row['Data']
@@ -276,11 +360,14 @@ def analyse_rents(asset_info, dataframes):
 
         liquidation_sum = 0
         iterations = 0
-        for _, liquidation_row in rent_liquidation.iterrows():
+        rent_liquidation_list = []
+        for idx, liquidation_row in rent_liquidation.iterrows():
             liquidation_sum += liquidation_row['Quantidade']
             iterations += 1
+            rent_liquidation_list.append(idx)
             if liquidation_sum == quantity:
                 print(f'Rent liquidated with {iterations} iterations')
+                sells_remove_list += rent_liquidation_list
                 break
             elif liquidation_sum > quantity:
                 print(f'Warning! rent_sell_sum > quantity')
@@ -300,6 +387,7 @@ def analyse_rents(asset_info, dataframes):
         )]
         rent_refund_len = len(rent_refund)
 
+        rent_refund_list = []
         if rent_refund_len > 0:
             rent_refund = rent_refund[['Data','Quantidade']]
             print(f'rent_refund=\n{rent_refund.to_string()}')    
@@ -313,6 +401,9 @@ def analyse_rents(asset_info, dataframes):
 
             rented -= head['Quantidade']
             finished_rents += 1
+
+            rent_refund_list.append(rent_refund.index[0])
+            buys_remove_list += rent_refund_list
 
             continue
         else:
@@ -334,9 +425,12 @@ def analyse_rents(asset_info, dataframes):
 
         refund_sum = 0
         iterations = 0
-        for _, refund_row in rent_refund_frac.iterrows():
+        for idx, refund_row in rent_refund_frac.iterrows():
             refund_sum += refund_row['Quantidade']
             iterations += 1
+
+            rent_refund_list.append(idx)
+
             if refund_sum == quantity:
                 print(f'Rent refunded with {iterations} iterations')
                 refund_date = refund_row['Data']
@@ -346,6 +440,10 @@ def analyse_rents(asset_info, dataframes):
 
                 rented -= quantity
                 finished_rents += 1
+
+                buys_remove_list += rent_refund_list
+
+                sells
                 break
             elif refund_sum > quantity:
                 print(f'Warning! rent_sell_sum > quantity')
@@ -356,29 +454,42 @@ def analyse_rents(asset_info, dataframes):
 
     asset_info['rented'] = rented
     asset_info['finished_rents'] = finished_rents
+    asset_info['sells_remove_list'] = sells_remove_list
+    asset_info['buys_remove_list'] = buys_remove_list
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
     if request.method == 'POST':
         file = request.files['file']
-        if file:
-            filepath = os.path.join('uploads', file.filename)
-            file.save(filepath)
-            app.logger.debug(f'File {file.filename} saved at {filepath}.')
+        filetype = request.form['filetype']
 
-            df = process_file(filepath)
-            insert_data_into_db(df)
+        if not file:
+            return render_template('index.html', message='No file provided for upload.')
+        
+        filepath = os.path.join('uploads', file.filename)
+        file.save(filepath)
+        app.logger.debug(f'File {file.filename} saved at {filepath}.')
 
-            return redirect(url_for('view_table'))
+        if filetype == 'B3 Movimentation':
+            process_b3_movimentation(filepath)
+            return redirect(url_for('view_movimentation'))
+        elif filetype == 'B3 Negotiation':
+            process_b3_negotiation(filepath)
+            return redirect(url_for('view_negotiation'))
         else:
-            app.logger.debug('No file provided for upload.')
-
+            return render_template('index.html', message='Filetype not supported.')
+        
     return render_template('index.html', message='')
 
-@app.route('/view', methods=['GET', 'POST'])
-def view_table():
-    df = view_request(request)
-    return render_template('view_table.html', tables=[df.to_html(classes='pandas-dataframe')])
+@app.route('/movimentation', methods=['GET', 'POST'])
+def view_movimentation():
+    df = view_movimentation_request(request)
+    return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')])
+
+@app.route('/negotiation', methods=['GET', 'POST'])
+def view_negotiation():
+    df = view_negotiation_request(request)
+    return render_template('view_negotiation.html', tables=[df.to_html(classes='pandas-dataframe')])
 
 @app.route('/view/<asset>', methods=['GET'])
 def view_asset(asset=None):
