@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
 import os
 import logging
+import yfinance as yf
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
@@ -176,12 +177,12 @@ def view_movimentation_request(request):
     print(df['Produto_Parsed'].value_counts())
     #print(df['Produto'].value_counts())
 
-    df['Ticker'] = parseTicker(df['Produto'])
+    df['Ticker'] = parse_ticker(df['Produto'])
 
-    #grouped = df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída'])
-    #print(grouped.value_counts())
+    grouped = df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída'])
+    print(grouped.value_counts())
 
-    print(df['Movimentação'].value_counts())
+    # print(df['Movimentação'].value_counts())
 
     return df
 
@@ -193,10 +194,15 @@ def view_negotiation_request(request):
     df = b3_negotiation_sql_to_df(result)
     return df
 
-def parseTicker(column):
+def parse_ticker(column):
     result = column.str.extract(r'^([A-Z0-9]{4}[0-9]{1,2}|[a-zA-Z0-9 .]+)', expand=False)
     result.fillna('', inplace=True)
     return result
+
+def get_last_close_price(ticker):
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="1d")
+    return hist['Close'].iloc[-1]
 
 def view_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
@@ -213,15 +219,12 @@ def view_asset_request(request, asset):
         return asset_info
     dataframes['movimentation'] = movimentation
 
-    movimentation['Ticker'] = parseTicker(movimentation['Produto'])
+    movimentation['Ticker'] = parse_ticker(movimentation['Produto'])
     ticker = movimentation['Ticker'].value_counts().index[0]
     asset_info['ticker'] = ticker
 
     credit = movimentation.loc[movimentation['Entrada/Saída'] == "Credito"]
     debit = movimentation.loc[movimentation['Entrada/Saída'] == "Debito"]
-
-    buys_sum = 0
-    sells_sum = 0
 
     buys = credit.loc[
         (
@@ -233,7 +236,6 @@ def view_asset_request(request, asset):
     ]
     dataframes['buys'] = buys
     if len(buys) > 0:
-        buys_sum += buys['Quantidade'].sum()
         first_buy = buys.iloc[0]['Data']
         age = pd.to_datetime("today") - first_buy
 
@@ -243,7 +245,6 @@ def view_asset_request(request, asset):
         )
     ]
     dataframes['sells'] = sells
-    sells_sum += sells['Quantidade'].sum()
 
     wages = credit.loc[
         ((credit['Movimentação'] == "Dividendo") 
@@ -276,7 +277,6 @@ def view_asset_request(request, asset):
             )
         ]
         dataframes['negotitation_buys'] = negotiation_buys
-        buys_sum += negotiation_buys['Quantidade'].sum()
 
         first_buy = negotiation_buys.iloc[0]['Data do Negócio']
         age = pd.to_datetime("today") - first_buy
@@ -287,7 +287,6 @@ def view_asset_request(request, asset):
             )
         ]
         dataframes['negotitation_sells'] = negotiation_sells
-        sells_sum += negotiation_sells['Quantidade'].sum()
 
         def consolidate(movimentation, negotiation):
             df1 = movimentation[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
@@ -297,10 +296,15 @@ def view_asset_request(request, asset):
             df2["Movimentação"] = "Compra"
             df2 = df2[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
 
-            return pd.concat([df1, df2], ignore_index=True)
+            df_merged = pd.concat([df1, df2], ignore_index=True)
+            df_merged.sort_values(by='Data', inplace=True)
 
-        dataframes['buys'] = consolidate(buys, negotiation_buys)
-        dataframes['sells'] = consolidate(sells, negotiation_sells)
+            return df_merged
+
+        buys = consolidate(buys, negotiation_buys)
+        dataframes['buys'] = buys
+        sells = consolidate(sells, negotiation_sells)
+        dataframes['sells'] = sells
     else:
         print('Warning! Negotiation data not found!')
         dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
@@ -310,7 +314,17 @@ def view_asset_request(request, asset):
     asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
     asset_info['age'] = age.days
 
+    buys_sum = buys['Quantidade'].sum()
     asset_info['buys_sum'] = buys_sum
+
+    buys_wsum = (buys['Quantidade'] * buys['Preço unitário']).sum()
+    buys_quantity = buys['Quantidade'].sum()
+    buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
+    asset_info['buy_avg_price'] = buy_avg_price
+
+    asset_info['close_price'] = get_last_close_price(ticker + '.SA')
+
+    sells_sum = sells['Quantidade'].sum()
     asset_info['sells_sum'] = sells_sum
 
     position = buys_sum - sells_sum
@@ -523,6 +537,7 @@ def view_negotiation():
 @app.route('/view/<asset>', methods=['GET'])
 def view_asset(asset=None):
     asset_info = view_asset_request(request, asset)
+
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
     all_events = dataframes['movimentation']
