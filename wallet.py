@@ -200,9 +200,12 @@ def parse_ticker(column):
     return result
 
 def get_last_close_price(ticker):
-    stock = yf.Ticker(ticker)
+    stock = yf.Ticker(ticker + ".SA")
     hist = stock.history(period="1d")
-    return hist['Close'].iloc[-1]
+    if not hist.empty:
+        return hist['Close'].iloc[-1]
+    else:
+        return None
 
 def view_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
@@ -268,6 +271,7 @@ def view_asset_request(request, asset):
     query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
     result = query.all()
     negotiation = b3_negotiation_sql_to_df(result)
+    last_close_price = None
     if len(negotiation) > 0:
         dataframes['negotiation'] = negotiation
 
@@ -291,7 +295,7 @@ def view_asset_request(request, asset):
         def consolidate(movimentation, negotiation):
             df1 = movimentation[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
 
-            df2 = negotiation
+            df2 = negotiation.copy()
             df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação"}, inplace=True)
             df2["Movimentação"] = "Compra"
             df2 = df2[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
@@ -305,6 +309,9 @@ def view_asset_request(request, asset):
         dataframes['buys'] = buys
         sells = consolidate(sells, negotiation_sells)
         dataframes['sells'] = sells
+
+        last_close_price = get_last_close_price(ticker)
+        asset_info['last_close_price'] = last_close_price
     else:
         print('Warning! Negotiation data not found!')
         dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
@@ -322,7 +329,8 @@ def view_asset_request(request, asset):
     buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
     asset_info['buy_avg_price'] = buy_avg_price
 
-    asset_info['close_price'] = get_last_close_price(ticker + '.SA')
+    if last_close_price != None:
+        asset_info['rentability'] = (last_close_price/buy_avg_price - 1) * 100
 
     sells_sum = sells['Quantidade'].sum()
     asset_info['sells_sum'] = sells_sum
