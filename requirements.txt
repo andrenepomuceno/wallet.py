@@ -1,8 +1,10 @@
 Flask
 SQLAlchemy
 Flask-SQLAlchemy
+Flask-WTF
 openpyxl
 pandas
 yfinance
+yfinance_cache
 lxml
 requests

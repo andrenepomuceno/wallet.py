@@ -1,11 +1,5 @@
-from flask_sqlalchemy import SQLAlchemy
-from app import app
-
+from app import app, db
 import pandas as pd
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
 # ENTRADA_SAIDA = 'Entrada/Saída'    
 # DATA = 'Data'

@@ -1,2 +1,4 @@
 uploads
-wallet.db
+instance
+venv
+__pycache__
