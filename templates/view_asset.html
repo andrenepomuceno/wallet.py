@@ -4,12 +4,17 @@
 
     <h2>Information</h2>
     <p>Ticker: {{ info['ticker'] }}</p>
+    <p>Last Close Price: {{ info['currency'] }} {{ info['last_close_price'] }}</p>
+    <p>Buy Average Price: {{ info['currency'] }} {{ info['buy_avg_price'] }}</p>
+    <!-- <p>Currency: {{ info['currency'] }}</p> -->
     <p>Position: {{ info['position_sum'] }} ({{ info['rented'] }} rented)</p>
-    <p>Wages: {{ info['wages_sum'] }}</p>
-    <p>Rent Wages: {{ info['rents_wage_sum'] }}</p>
+    <p>Position: {{ info['currency'] }} {{ info['position_total'] }}</p>
+    <p>Total Cost: {{ info['currency'] }} {{ info['total_cost'] }}</p>
+    <!-- <p>Sells: {{ info['currency'] }} {{ info['total_sell'] }}</p> -->
+    <p>Wages: {{ info['currency'] }} {{ info['wages_sum'] }}</p>
+    <p>Rent Wages: {{ info['currency'] }} {{ info['rents_wage_sum'] }}</p>
+    <p>Liquid Cost: {{ info['currency'] }} {{ info['liquid_cost'] }}</p>
     <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
-    <p>Buy Average Price: {{ info['buy_avg_price'] }}</p>
-    <p>Close Price: {{ info['last_close_price'] }}</p>
     <p>Rentabiliy: {{ info['rentability'] }} %</p>
 
     <h2>Buys</h2>

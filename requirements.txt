@@ -4,3 +4,5 @@ Flask-SQLAlchemy
 openpyxl
 pandas
 yfinance
+lxml
+requests

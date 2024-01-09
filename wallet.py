@@ -6,6 +6,20 @@ import pandas as pd
 import os
 import logging
 import yfinance as yf
+import requests
+from lxml import html
+
+def scrape_data(url, xpath):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        tree = html.fromstring(response.content)
+        elements = tree.xpath(xpath)
+        return [element.text_content().strip() for element in elements]
+    except requests.RequestException as e:
+        return [f"Erro ao acessar a URL: {e}"]
+    except Exception as e:
+        return [f"Erro ao realizar o scraping: {e}"]
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
@@ -199,14 +213,6 @@ def parse_ticker(column):
     result.fillna('', inplace=True)
     return result
 
-def get_last_close_price(ticker):
-    stock = yf.Ticker(ticker + ".SA")
-    hist = stock.history(period="1d")
-    if not hist.empty:
-        return hist['Close'].iloc[-1]
-    else:
-        return None
-
 def view_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
 
@@ -214,6 +220,7 @@ def view_asset_request(request, asset):
     dataframes = {}
 
     asset_info['name'] = asset
+    asset_info['currency'] = 'BRL'
 
     query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
     result = query.all()
@@ -259,14 +266,22 @@ def view_asset_request(request, asset):
     wages_sum = wages['Valor da Operação'].sum()
 
     dataframes['wages'] = wages
-    asset_info['wages_sum'] = wages_sum
+    asset_info['wages_sum'] = round(wages_sum, 2)
 
     rents_wage = credit.loc[(
         (credit['Movimentação'] == "Empréstimo")
         & (credit['Valor da Operação'] > 0)
     )]
     rents_wages_sum = rents_wage['Valor da Operação'].sum()
-    asset_info['rents_wage_sum'] = rents_wages_sum
+    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
+
+    dict = {
+        "Tesouro Selic 2027": {
+            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2027/',
+            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+        }
+    }
+    # print(scrape_data('https://taxas-tesouro.com/resgatar/tesouro-selic-2027/', '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'))
 
     query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
     result = query.all()
@@ -292,12 +307,12 @@ def view_asset_request(request, asset):
         ]
         dataframes['negotitation_sells'] = negotiation_sells
 
-        def consolidate(movimentation, negotiation):
+        def consolidate(movimentation, negotiation, tipo):
             df1 = movimentation[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
 
             df2 = negotiation.copy()
             df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação"}, inplace=True)
-            df2["Movimentação"] = "Compra"
+            df2["Movimentação"] = tipo
             df2 = df2[["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação"]]
 
             df_merged = pd.concat([df1, df2], ignore_index=True)
@@ -305,13 +320,22 @@ def view_asset_request(request, asset):
 
             return df_merged
 
-        buys = consolidate(buys, negotiation_buys)
+        buys = consolidate(buys, negotiation_buys, 'Compra')
         dataframes['buys'] = buys
-        sells = consolidate(sells, negotiation_sells)
+        sells = consolidate(sells, negotiation_sells, 'Venda')
         dataframes['sells'] = sells
 
-        last_close_price = get_last_close_price(ticker)
-        asset_info['last_close_price'] = last_close_price
+        stock = yf.Ticker(ticker + ".SA")
+        hist = stock.history(period="1d")
+        if not hist.empty:
+            last_close_price = hist['Close'].iloc[-1]
+            asset_info['last_close_price'] = round(last_close_price, 2)
+        # try:
+        #     currency = stock.info['currency']
+        #     asset_info['currency'] = currency
+        # except KeyError:
+        #     pass
+
     else:
         print('Warning! Negotiation data not found!')
         dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
@@ -324,16 +348,22 @@ def view_asset_request(request, asset):
     buys_sum = buys['Quantidade'].sum()
     asset_info['buys_sum'] = buys_sum
 
+    total_sell = sells['Valor da Operação'].sum()
+    asset_info['total_sell'] = total_sell
+
+    total_cost = buys['Valor da Operação'].sum() - total_sell
+    asset_info['total_cost'] = round(total_cost, 2)
+
+    liquid_cost = total_cost - wages_sum - rents_wages_sum
+    asset_info['liquid_cost'] = round(liquid_cost, 2)
+
     buys_wsum = (buys['Quantidade'] * buys['Preço unitário']).sum()
     buys_quantity = buys['Quantidade'].sum()
     buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price'] = buy_avg_price
-
-    if last_close_price != None:
-        asset_info['rentability'] = (last_close_price/buy_avg_price - 1) * 100
+    asset_info['buy_avg_price'] = round(buy_avg_price, 2)
 
     sells_sum = sells['Quantidade'].sum()
-    asset_info['sells_sum'] = sells_sum
+    asset_info['sells_sum'] = round(sells_sum, 2)
 
     position = buys_sum - sells_sum
     asset_info['position'] = position
@@ -341,7 +371,16 @@ def view_asset_request(request, asset):
     asset_info['rented'] = 0
     rented = asset_info['rented']
 
-    asset_info['position_sum'] = position + rented
+    position_sum = round(position + rented, 2)
+    asset_info['position_sum'] = position_sum
+
+    if last_close_price != None:
+        position_total = position_sum * last_close_price
+        asset_info['position_total'] = round(position_total, 2)
+
+        rentabiliy = position_total/liquid_cost
+        asset_info['rentability'] = round((rentabiliy - 1) * 100, 2)
+        
 
     print(asset_info)
 
