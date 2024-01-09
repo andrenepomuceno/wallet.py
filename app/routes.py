@@ -69,11 +69,31 @@ def view_consolidate():
     info = view_consolidate_request(request)
     consolidate = info['consolidate']
     old = info['old']
-    return render_template('view_consolidate.html', info=info, 
-                           consolidate=consolidate[['url','currency','last_close_price',
-                                                    'position_sum','position_total','buy_avg_price',
+    return render_template('view_consolidate.html', info=info,
+                           consolidate=consolidate[['url','currency','last_close_price','position_sum','position_total','buy_avg_price',
                                                     'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                                                    'rentability','rentability_by_year']].to_html(classes='pandas-dataframe', escape=False, index=False), 
-                           old=old[['url','currency',
-                                    'position_sum','buy_avg_price',
-                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost']].to_html(classes='pandas-dataframe', escape=False, index=False))
+                                                    'rentability','rentability_by_year']].rename(columns={
+                                                        'url': 'Name',
+                                                        'currency': 'Currency',
+                                                        'last_close_price': 'Close Price',
+                                                        'position_sum': "Position",
+                                                        'position_total': 'Position',
+                                                        'buy_avg_price': 'Avg Price',
+                                                        'total_cost': 'Total Cost',
+                                                        'wages_sum': 'Wages',
+                                                        'rents_wage_sum': 'Rent Wages',
+                                                        'liquid_cost': 'Liquid Cost',
+                                                        'rentability': 'Rentability',
+                                                        'rentability_by_year': 'Rentability/year'
+                                                    }).to_html(classes='pandas-dataframe', escape=False, index=False), 
+                           old=old[['url','currency','position_sum','buy_avg_price',
+                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost']].rename(columns={
+                                        'url': 'Name',
+                                        'currency': 'Currency',
+                                        'position_sum': "Position",
+                                        'buy_avg_price': 'Avg Price',
+                                        'total_cost': 'Total Cost',
+                                        'wages_sum': 'Wages',
+                                        'rents_wage_sum': 'Rent Wages',
+                                        'liquid_cost': 'Liquid Cost'
+                                    }).to_html(classes='pandas-dataframe', escape=False, index=False))

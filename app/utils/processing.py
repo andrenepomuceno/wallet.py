@@ -379,10 +379,10 @@ def view_consolidate_request(request):
     old = old.sort_values(by='liquid_cost', ascending=True)
     ret['old'] = old
     
-    ret['total_cost_sum'] = consolidate['total_cost'].sum()
-    ret['total_wages_sum'] = consolidate['wages_sum'].sum()
-    ret['total_rents_wage_sum'] = consolidate['rents_wage_sum'].sum()
-    ret['position_total_sum'] = consolidate['position_total'].sum()
+    ret['total_cost_sum'] = round(consolidate['total_cost'].sum(), 2)
+    ret['total_wages_sum'] = round(consolidate['wages_sum'].sum(), 2)
+    ret['total_rents_wage_sum'] = round(consolidate['rents_wage_sum'].sum(), 2)
+    ret['position_total_sum'] = round(consolidate['position_total'].sum(), 2)
 
     return ret
 
