@@ -2,11 +2,29 @@ import pandas as pd
 import yfinance_cache as yf
 import requests
 from lxml import html
+import re
 
 from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation
 
-import re
+scrap_dict = {
+    # "Tesouro Selic 2024": {
+    #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2024/',
+    #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+    # },
+    # "Tesouro Selic 2025": {
+    #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2025/',
+    #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+    # },
+    # "Tesouro Selic 2027": {
+    #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2027/',
+    #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+    # },
+    "Tesouro Selic 2029": {
+        'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
+        'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
+    }
+}
 
 def is_valid_ticker(ticker):
     pattern = r'[A-Z0-9]{4}(3|4|11)$'
@@ -100,13 +118,27 @@ def parse_ticker(column):
     result.fillna('', inplace=True)
     return result
 
-def converter_preco_para_float(preco_str):
+def price_to_float(preco_str):
     preco_str = preco_str.replace("R$", "").strip()
     preco_str = preco_str.replace(".", "").replace(",", ".")
     try:
         return float(preco_str)
     except ValueError:
         return None
+    
+def consolidate_buysell(movimentation, negotiation, tipo):
+    columns = ["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação", "Produto"]
+    df1 = movimentation[columns]
+
+    df2 = negotiation.copy()
+    df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação", "Código de Negociação": "Produto"}, inplace=True)
+    df2["Movimentação"] = tipo
+    df2 = df2[columns]
+
+    df_merged = pd.concat([df1, df2], ignore_index=True)
+    df_merged.sort_values(by='Data', inplace=True)
+
+    return df_merged
 
 def view_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
@@ -124,7 +156,9 @@ def view_asset_request(request, asset):
     result = query.all()
     movimentation = b3_movimentation_sql_to_df(result)
     if len(movimentation) == 0:
+        app.logger.warning(f'Movimentation data not found for {asset}')
         return asset_info
+    
     dataframes['movimentation'] = movimentation
 
     movimentation['Ticker'] = parse_ticker(movimentation['Produto'])
@@ -198,25 +232,27 @@ def view_asset_request(request, asset):
         ]
         dataframes['negotitation_sells'] = negotiation_sells
 
-        def consolidate(movimentation, negotiation, tipo):
-            columns = ["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação", "Produto"]
-            df1 = movimentation[columns]
-
-            df2 = negotiation.copy()
-            df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação", "Código de Negociação": "Produto"}, inplace=True)
-            df2["Movimentação"] = tipo
-            df2 = df2[columns]
-
-            df_merged = pd.concat([df1, df2], ignore_index=True)
-            df_merged.sort_values(by='Data', inplace=True)
-
-            return df_merged
-
-        buys = consolidate(buys, negotiation_buys, 'Compra')
+        buys = consolidate_buysell(buys, negotiation_buys, 'Compra')
         dataframes['buys'] = buys
-        sells = consolidate(sells, negotiation_sells, 'Venda')
+        sells = consolidate_buysell(sells, negotiation_sells, 'Venda')
         dataframes['sells'] = sells
 
+    else:
+        app.logger.warning(f'Warning! Negotiation data not found for {asset}!')
+        dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
+                                                          'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
+        # return asset_info
+
+    buys_quantity_sum = buys['Quantidade'].sum()
+    asset_info['buys_quantity_sum'] = buys_quantity_sum
+
+    sells_sum = sells['Quantidade'].sum()
+    asset_info['sells_sum'] = round(sells_sum, 2)
+
+    position = buys_quantity_sum - sells_sum
+    asset_info['position'] = position
+
+    if position > 0:
         if is_valid_ticker(ticker) and (ticker != 'VVAR3'):
             # maybe check if position > 0
             try:
@@ -230,37 +266,16 @@ def view_asset_request(request, asset):
                 asset_info['currency'] = currency
             except:
                 pass
-
-    else:
-        app.logger.warning('Warning! Negotiation data not found!')
-        dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
-                                                          'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
-        # return asset_info
-    
-    scrap_dict = {
-        "Tesouro Selic 2024": {
-            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2024/',
-            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-        },
-        "Tesouro Selic 2025": {
-            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2025/',
-            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-        },
-        "Tesouro Selic 2027": {
-            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2027/',
-            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-        },
-        "Tesouro Selic 2029": {
-            'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
-            'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-        }
-    }
-
-    if ticker in scrap_dict:
-        app.logger.info(f'Scraping data for {ticker}')
-        scrap_info = scrap_dict[ticker]
-        last_close_price = converter_preco_para_float(scrape_data(scrap_info['url'], scrap_info['xpath'])[0])
-        asset_info['last_close_price'] = round(last_close_price, 2)
+        elif ticker in scrap_dict:
+            app.logger.info(f'Scraping data for {ticker}')
+            scrap_info = scrap_dict[ticker]
+            if 'cache' in scrap_info:
+                last_close_price = scrap_info['cache']
+            else:
+                scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
+                last_close_price = price_to_float(scraped[0])
+                scrap_info['cache'] = last_close_price
+            asset_info['last_close_price'] = round(last_close_price, 2)
 
     if first_buy is not None:
         asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
@@ -268,14 +283,11 @@ def view_asset_request(request, asset):
     if age is not None:
         asset_info['age'] = age.days
 
-    buys_quantity_sum = buys['Quantidade'].sum()
-    asset_info['buys_quantity_sum'] = buys_quantity_sum
+    buys_value_sum = buys['Valor da Operação'].sum()
+    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
 
     sells_value_sum = sells['Valor da Operação'].sum()
     asset_info['sells_value_sum'] = sells_value_sum
-
-    buys_value_sum = buys['Valor da Operação'].sum()
-    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
 
     total_cost = buys_value_sum - sells_value_sum
     asset_info['total_cost'] = round(total_cost, 2)
@@ -294,19 +306,13 @@ def view_asset_request(request, asset):
     if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
         app.logger.warning("Warning! buys_wsum inconsistency!")
 
-    sells_sum = sells['Quantidade'].sum()
-    asset_info['sells_sum'] = round(sells_sum, 2)
-
-    position = buys_quantity_sum - sells_sum
-    asset_info['position'] = position
-
     asset_info['rented'] = 0
     rented = asset_info['rented']
 
     position_sum = round(position + rented, 2)
     asset_info['position_sum'] = position_sum
 
-    if last_close_price != None:
+    if last_close_price != None and position_sum > 0:
         position_total = position_sum * last_close_price
         asset_info['position_total'] = round(position_total, 2)
 
@@ -317,8 +323,13 @@ def view_asset_request(request, asset):
         if age is not None:
             by_year = round(rentabiliy/(age.days/365), 2)
             asset_info['rentability_by_year'] = by_year
+    
+    else:
+        asset_info['position_total'] = 0
+        asset_info['rentability'] = -100
+        asset_info['rentability_by_year'] = -100
 
-    print(asset_info)
+    app.logger.debug(asset_info)
 
     asset_info['dataframes'] = dataframes
     return asset_info
@@ -347,12 +358,14 @@ def view_consolidate_request(request):
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
         
-    consolidate.sort_values(by='rentability_by_year', inplace=True, ascending=False)
-        
-    ret['consolidate'] = consolidate[['name','ticker','currency','last_close_price',
+    consolidate = consolidate.sort_values(by='rentability', ascending=False)
+    consolidate = consolidate[['name','ticker','currency','last_close_price',
                                       'position_sum','position_total','buy_avg_price',
                                       'total_cost','wages_sum','rents_wage_sum','liquid_cost',
                                       'rentability','rentability_by_year']]
+        
+    ret['consolidate'] = consolidate.loc[consolidate['position_sum'] > 0]
+    ret['old'] = consolidate.loc[consolidate['position_sum'] <= 0].sort_values(by='liquid_cost', ascending=True)
     
     ret['total_cost_sum'] = consolidate['total_cost'].sum()
     ret['total_wages_sum'] = consolidate['wages_sum'].sum()

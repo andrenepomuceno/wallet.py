@@ -61,11 +61,12 @@ def view_asset(asset=None):
         # negotiation_sells=[negotiation_sells[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')]
 
         all_negotiation=all_negotiation[['Data do Negócio','Tipo de Movimentação','Quantidade','Preço','Valor']].to_html(),
-        all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação']].to_html(classes='pandas-dataframe')
+        all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
     )
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
     info = view_consolidate_request(request)
-    df = info['consolidate']
-    return render_template('view_consolidate.html', info=info, tables=[df.to_html(classes='pandas-dataframe')])
+    consolidate = info['consolidate']
+    old = info['old']
+    return render_template('view_consolidate.html', info=info, consolidate=consolidate.to_html(classes='pandas-dataframe'), old=old.to_html(classes='pandas-dataframe'))

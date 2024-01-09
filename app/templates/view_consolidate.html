@@ -6,8 +6,11 @@
     <p>total_wages_sum: {{ info['total_wages_sum'] }}</p>
     <p>total_rents_wage_sum: {{ info['total_rents_wage_sum'] }}</p>
     <div class="table table-striped mt-3">
-        {% for table in tables %}
-            {{ table|safe }}
-        {% endfor %}
+        {{ consolidate|safe }}
+    </div>
+
+    <h2>Old</h2>
+    <div class="table table-striped mt-3">
+        {{ old|safe }}
     </div>
 {% endblock %}
