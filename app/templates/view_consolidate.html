@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
     <h1>Consolidate Data</h1>
-    <p>total_cost_sum: {{ info['total_cost_sum'] }}</p>
-    <p>position_total_sum: {{ info['position_total_sum'] }}</p>
-    <p>total_wages_sum: {{ info['total_wages_sum'] }}</p>
-    <p>total_rents_wage_sum: {{ info['total_rents_wage_sum'] }}</p>
+    <p>Cost: {{ info['total_cost_sum'] }}</p>
+    <p>Position: {{ info['position_total_sum'] }}</p>
+    <p>Wages: {{ info['total_wages_sum'] }}</p>
+    <p>Rent Wages: {{ info['total_rents_wage_sum'] }}</p>
     <div class="table table-striped mt-3">
         {{ consolidate|safe }}
     </div>

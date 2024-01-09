@@ -10,22 +10,12 @@
 </head>
 <body>
     <div class="container">
-        <div class="topbar">
-            <ul class="nav">
-                <li class="nav-item">
-                    <a class="nav-link" href="/">Upload</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="consolidate">Consolidate</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="movimentation">Movimentation</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="negotiation">Negotiation</a>
-                </li>
-            </ul>
-        </div>
+        <nav class="nav">
+            <a class="nav-link" href="/">Upload</a>
+            <a class="nav-link" href="/consolidate">Consolidate</a>
+            <a class="nav-link" href="/movimentation">Movimentation</a>
+            <a class="nav-link" href="/negotiation">Negotiation</a>
+        </nav>
         <div class="content">
             {% block content %}
             {% endblock %}

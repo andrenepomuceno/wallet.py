@@ -55,12 +55,12 @@ def view_asset(asset=None):
         'view_asset.html', info=asset_info, 
         buys_events=buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
         sells_events=sells_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
-        wages_events=wages[['Data', 'Valor da Operação', 'Movimentação']].to_html(classes='pandas-dataframe'),
+        wages_events=wages[['Data', 'Valor da Operação', 'Movimentação','Produto']].to_html(classes='pandas-dataframe'),
 
         # negotiation_buys=[negotiation_buys[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')],
         # negotiation_sells=[negotiation_sells[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')]
 
-        all_negotiation=all_negotiation[['Data do Negócio','Tipo de Movimentação','Quantidade','Preço','Valor']].to_html(),
+        all_negotiation=all_negotiation[['Data do Negócio','Tipo de Movimentação','Quantidade','Preço','Valor','Código de Negociação']].to_html(),
         all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
     )
 
@@ -70,11 +70,10 @@ def view_consolidate():
     consolidate = info['consolidate']
     old = info['old']
     return render_template('view_consolidate.html', info=info, 
-                           consolidate=consolidate[['url','ticker','currency','last_close_price',
+                           consolidate=consolidate[['url','currency','last_close_price',
                                                     'position_sum','position_total','buy_avg_price',
                                                     'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                                                    'rentability','rentability_by_year']].to_html(classes='pandas-dataframe', escape=False), 
-                           old=old[['url','ticker','currency','last_close_price',
-                                    'position_sum','position_total','buy_avg_price',
-                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                                    'rentability','rentability_by_year']].to_html(classes='pandas-dataframe', escape=False))
+                                                    'rentability','rentability_by_year']].to_html(classes='pandas-dataframe', escape=False, index=False), 
+                           old=old[['url','currency',
+                                    'position_sum','buy_avg_price',
+                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost']].to_html(classes='pandas-dataframe', escape=False, index=False))

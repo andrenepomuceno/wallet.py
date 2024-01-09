@@ -258,31 +258,6 @@ def view_asset_request(request, asset):
     position = buys_quantity_sum - sells_sum
     asset_info['position'] = position
 
-    if position > 0:
-        if is_valid_ticker(ticker) and (ticker != 'VVAR3'):
-            # maybe check if position > 0
-            try:
-                stock = yf.Ticker(ticker + ".SA")
-                hist = stock.history(period="1d")
-                if not hist.empty:
-                    last_close_price = hist['Close'].iloc[-1]
-                    asset_info['last_close_price'] = round(last_close_price, 2)
-
-                currency = stock.info['currency']
-                asset_info['currency'] = currency
-            except:
-                pass
-        elif ticker in scrap_dict:
-            app.logger.info(f'Scraping data for {ticker}')
-            scrap_info = scrap_dict[ticker]
-            if 'cache' in scrap_info:
-                last_close_price = scrap_info['cache']
-            else:
-                scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
-                last_close_price = price_to_float(scraped[0])
-                scrap_info['cache'] = last_close_price
-            asset_info['last_close_price'] = round(last_close_price, 2)
-
     if first_buy is not None:
         asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
 
@@ -317,6 +292,31 @@ def view_asset_request(request, asset):
 
     position_sum = round(position + rented, 2)
     asset_info['position_sum'] = position_sum
+
+    if position > 0:
+        if is_valid_ticker(ticker) and (ticker != 'VVAR3'):
+            # maybe check if position > 0
+            try:
+                stock = yf.Ticker(ticker + ".SA")
+                hist = stock.history(period="1d")
+                if not hist.empty:
+                    last_close_price = hist['Close'].iloc[-1]
+                    asset_info['last_close_price'] = round(last_close_price, 2)
+
+                currency = stock.info['currency']
+                asset_info['currency'] = currency
+            except:
+                pass
+        elif ticker in scrap_dict:
+            app.logger.info(f'Scraping data for {ticker}')
+            scrap_info = scrap_dict[ticker]
+            if 'cache' in scrap_info:
+                last_close_price = scrap_info['cache']
+            else:
+                scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
+                last_close_price = price_to_float(scraped[0])
+                scrap_info['cache'] = last_close_price
+            asset_info['last_close_price'] = round(last_close_price, 2)
 
     if last_close_price != None and position_sum > 0:
         position_total = position_sum * last_close_price
@@ -355,7 +355,7 @@ def view_consolidate_request(request):
     movimentation['Produto_Parsed'] = parse_produto(movimentation['Produto'])
     movimentation['Ticker'] = parse_ticker(movimentation['Produto'])
 
-    products = movimentation['Produto_Parsed'].value_counts().to_frame()
+    products = movimentation['Ticker'].value_counts().to_frame()
     for index, product in products.iterrows():
         asset_info = view_asset_request(request, product.name)
         new_row = pd.DataFrame([asset_info])
@@ -368,7 +368,7 @@ def view_consolidate_request(request):
                                       'position_sum','position_total','buy_avg_price',
                                       'total_cost','wages_sum','rents_wage_sum','liquid_cost',
                                       'rentability','rentability_by_year']]
-    consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='view/{x}'>{x}</a>")
+    consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/view/{x}'>{x}</a>")
 
         
     df = consolidate.loc[consolidate['position_sum'] > 0]
