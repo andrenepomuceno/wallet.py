@@ -69,4 +69,12 @@ def view_consolidate():
     info = view_consolidate_request(request)
     consolidate = info['consolidate']
     old = info['old']
-    return render_template('view_consolidate.html', info=info, consolidate=consolidate.to_html(classes='pandas-dataframe'), old=old.to_html(classes='pandas-dataframe'))
+    return render_template('view_consolidate.html', info=info, 
+                           consolidate=consolidate[['url','ticker','currency','last_close_price',
+                                                    'position_sum','position_total','buy_avg_price',
+                                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost',
+                                                    'rentability','rentability_by_year']].to_html(classes='pandas-dataframe', escape=False), 
+                           old=old[['url','ticker','currency','last_close_price',
+                                    'position_sum','position_total','buy_avg_price',
+                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost',
+                                    'rentability','rentability_by_year']].to_html(classes='pandas-dataframe', escape=False))

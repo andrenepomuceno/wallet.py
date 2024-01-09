@@ -188,6 +188,12 @@ def view_asset_request(request, asset):
     ]
     dataframes['sells'] = sells
 
+    taxes = debit.loc[
+        ((debit['Movimentação'] == "Cobrança de Taxa Semestral"))
+    ]
+    taxes_sum = taxes['Valor da Operação'].sum()
+    asset_info['taxes_sum'] = round(taxes_sum, 2)
+
     wages = credit.loc[
         ((credit['Movimentação'] == "Dividendo") 
          | (credit['Movimentação'] == "Juros Sobre Capital Próprio") 
@@ -292,7 +298,7 @@ def view_asset_request(request, asset):
     total_cost = buys_value_sum - sells_value_sum
     asset_info['total_cost'] = round(total_cost, 2)
 
-    liquid_cost = total_cost - wages_sum - rents_wages_sum
+    liquid_cost = total_cost - wages_sum - rents_wages_sum + taxes_sum
     asset_info['liquid_cost'] = round(liquid_cost, 2)
 
     buys_wsum = (buys['Quantidade'] * buys['Preço unitário']).sum()
@@ -357,15 +363,21 @@ def view_consolidate_request(request):
 
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
-        
-    consolidate = consolidate.sort_values(by='rentability', ascending=False)
+
     consolidate = consolidate[['name','ticker','currency','last_close_price',
                                       'position_sum','position_total','buy_avg_price',
                                       'total_cost','wages_sum','rents_wage_sum','liquid_cost',
                                       'rentability','rentability_by_year']]
+    consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='view/{x}'>{x}</a>")
+
         
-    ret['consolidate'] = consolidate.loc[consolidate['position_sum'] > 0]
-    ret['old'] = consolidate.loc[consolidate['position_sum'] <= 0].sort_values(by='liquid_cost', ascending=True)
+    df = consolidate.loc[consolidate['position_sum'] > 0]
+    df = df.sort_values(by='rentability', ascending=False)
+    ret['consolidate'] = df
+
+    old = consolidate.loc[consolidate['position_sum'] <= 0]
+    old = old.sort_values(by='liquid_cost', ascending=True)
+    ret['old'] = old
     
     ret['total_cost_sum'] = consolidate['total_cost'].sum()
     ret['total_wages_sum'] = consolidate['wages_sum'].sum()
