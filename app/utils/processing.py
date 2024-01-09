@@ -6,6 +6,15 @@ from lxml import html
 from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation
 
+import re
+
+def is_valid_ticker(ticker):
+    pattern = r'[A-Z0-9]{4}(3|4|11)$'
+    if re.match(pattern, ticker):
+        return True
+    else:
+        return False
+
 def scrape_data(url, xpath):
     try:
         response = requests.get(url)
@@ -60,8 +69,7 @@ def view_movimentation_request(request):
     if len(df) == 0:
         return df
     
-    df['Produto_Parsed'] = df['Produto'].str.extract(r'^([A-Z0-9]{4}|[a-zA-Z0-9 .]+)', expand=False)
-    df['Produto_Parsed'].fillna('', inplace=True)
+    df['Produto_Parsed'] = parse_produto(df['Produto'])
     print(df['Produto_Parsed'].value_counts())
     #print(df['Produto'].value_counts())
 
@@ -82,6 +90,11 @@ def view_negotiation_request(request):
     df = b3_negotiation_sql_to_df(result)
     return df
 
+def parse_produto(column):
+    result = column.str.extract(r'^([A-Z0-9]{4}|[a-zA-Z0-9 .]+)', expand=False)
+    result.fillna('', inplace=True)
+    return result
+
 def parse_ticker(column):
     result = column.str.extract(r'^([A-Z0-9]{4}[0-9]{1,2}|[a-zA-Z0-9 .]+)', expand=False)
     result.fillna('', inplace=True)
@@ -95,6 +108,9 @@ def view_asset_request(request, asset):
 
     asset_info['name'] = asset
     asset_info['currency'] = 'BRL'
+
+    first_buy = None
+    age = None
 
     query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
     result = query.all()
@@ -201,25 +217,30 @@ def view_asset_request(request, asset):
         sells = consolidate(sells, negotiation_sells, 'Venda')
         dataframes['sells'] = sells
 
-        stock = yf.Ticker(ticker + ".SA")
-        hist = stock.history(period="1d")
-        if not hist.empty:
-            last_close_price = hist['Close'].iloc[-1]
-            asset_info['last_close_price'] = round(last_close_price, 2)
-        # try:
-        #     currency = stock.info['currency']
-        #     asset_info['currency'] = currency
-        # except KeyError:
-        #     pass
+        if is_valid_ticker(ticker) and (ticker != 'VVAR3'):
+            # maybe check if position > 0
+            try:
+                stock = yf.Ticker(ticker + ".SA")
+                hist = stock.history(period="1d")
+                if not hist.empty:
+                    last_close_price = hist['Close'].iloc[-1]
+                    asset_info['last_close_price'] = round(last_close_price, 2)
+
+                currency = stock.info['currency']
+                asset_info['currency'] = currency
+            except:
+                pass
 
     else:
-        print('Warning! Negotiation data not found!')
+        app.logger.warning('Warning! Negotiation data not found!')
         dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
                                                           'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
         # return asset_info
 
-    asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
-    asset_info['age'] = age.days
+    if first_buy is not None:
+        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
+    if age is not None:
+        asset_info['age'] = age.days
 
     buys_quantity_sum = buys['Quantidade'].sum()
     asset_info['buys_quantity_sum'] = buys_quantity_sum
@@ -241,6 +262,12 @@ def view_asset_request(request, asset):
     buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
     asset_info['buy_avg_price'] = round(buy_avg_price, 2)
 
+    buys_wsum2 = buys['Valor da Operação'].sum()
+    buy_avg_price2 = buys_wsum2 / buys_quantity if buys_quantity > 0 else 0
+    asset_info['buy_avg_price2'] = round(buy_avg_price2, 2)
+    if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
+        app.logger.warning("Warning! buys_wsum inconsistency!")
+
     sells_sum = sells['Quantidade'].sum()
     asset_info['sells_sum'] = round(sells_sum, 2)
 
@@ -258,13 +285,89 @@ def view_asset_request(request, asset):
         asset_info['position_total'] = round(position_total, 2)
 
         rentabiliy = position_total/liquid_cost
-        asset_info['rentability'] = round((rentabiliy - 1) * 100, 2)
-        
+        rentabiliy = round((rentabiliy - 1) * 100, 2)
+        asset_info['rentability'] = rentabiliy
+
+        if age is not None:
+            by_year = round(rentabiliy/(age.days/365), 2)
+            asset_info['rentability_by_year'] = by_year
 
     print(asset_info)
 
     asset_info['dataframes'] = dataframes
     return asset_info
+
+def view_consolidate_request(request):
+    app.logger.info(f'view_consolidate_request')
+
+    ret = {}
+    consolidate = pd.DataFrame()
+
+    query = B3_Movimentation.query
+    result = query.all()
+    movimentation = b3_movimentation_sql_to_df(result)
+    if len(movimentation) == 0:
+        return ret
+    
+    movimentation['Produto_Parsed'] = parse_produto(movimentation['Produto'])
+    movimentation['Ticker'] = parse_ticker(movimentation['Produto'])
+
+    products = movimentation['Produto_Parsed'].value_counts().to_frame()
+
+    asset_list = []
+    
+    for index, product in products.iterrows():
+        asset_info = view_asset_request(request, product.name)
+
+        # asset_info['dataframes'] = ''
+        new_row = pd.DataFrame([asset_info])
+        consolidate = pd.concat([consolidate, new_row], ignore_index=True)
+
+    # print(pd.DataFrame(asset_list))
+    # print(movimentation['Ticker'].value_counts())
+        
+    ret['consolidate'] = consolidate[['name','ticker','currency','last_close_price','position_sum','position_total','buy_avg_price','total_cost','wages_sum','rents_wage_sum','liquid_cost','rentability','rentability_by_year']]
+
+    return ret
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def analyse_rents(asset_info, dataframes):
     app.logger.debug('Analyzing rents...')

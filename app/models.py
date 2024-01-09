@@ -10,7 +10,7 @@ import pandas as pd
 # PRECO_UNITARIO = 'Preço unitário'
 # VALOR_OPERACAO = 'Valor da Operação'
 
-class B3_Movimentation(db.Model): # TODO rename to B3_Movimentations
+class B3_Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     entrada_saida = db.Column(db.String)
     data = db.Column(db.String)

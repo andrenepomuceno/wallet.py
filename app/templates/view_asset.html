@@ -14,42 +14,32 @@
     <p>Rent Wages: {{ info['currency'] }} {{ info['rents_wage_sum'] }}</p>
     <p>Liquid Cost: {{ info['currency'] }} {{ info['liquid_cost'] }}</p>
     <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
-    <p>Rentabiliy: {{ info['rentability'] }} %</p>
+    <p>Rentabiliy: {{ info['rentability'] }} % ({{ info['rentability_by_year'] }} %/y)</p>
 
     <h2>Buys</h2>
     <div class="table table-striped mt-3">
-        {% for row in buys_events %}
-            {{ row|safe }}
-        {% endfor %}
+        {{ buys_events|safe }}
     </div>
     <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
 
     <h2>Sells</h2>
     <div class="table table-striped mt-3">
-        {% for row in sells_events %}
-            {{ row|safe }}
-        {% endfor %}
+        {{ sells_events|safe }}
     </div>
     <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
 
     <h2>Wages</h2>
     <div class="table table-striped mt-3">
-        {% for row in wages_events %}
-            {{ row|safe }}
-        {% endfor %}
+        {{ wages_events|safe }}
     </div>
 
     <h2>All Negotiation</h2>
     <div class="table table-striped mt-3">
-        {% for row in all_negotiation %}
-            {{ row|safe }}
-        {% endfor %}
+        {{ all_negotiation|safe }}
     </div>
 
     <h2>All Movimentations</h2>
     <div class="table table-striped mt-3">
-        {% for row in all_events %}
-            {{ row|safe }}
-        {% endfor %}
+        {{ all_movimentation|safe }}
     </div>
 {% endblock %}
