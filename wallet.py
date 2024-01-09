@@ -297,8 +297,9 @@ def view_asset_request(request, asset):
         ]
         dataframes['negotitation_buys'] = negotiation_buys
 
-        first_buy = negotiation_buys.iloc[0]['Data do Negócio']
-        age = pd.to_datetime("today") - first_buy
+        if len(negotiation_buys) > 0:
+            first_buy = negotiation_buys.iloc[0]['Data do Negócio']
+            age = pd.to_datetime("today") - first_buy
 
         negotiation_sells = negotiation.loc[
             (
@@ -351,7 +352,10 @@ def view_asset_request(request, asset):
     total_sell = sells['Valor da Operação'].sum()
     asset_info['total_sell'] = total_sell
 
-    total_cost = buys['Valor da Operação'].sum() - total_sell
+    total_buy = buys['Valor da Operação'].sum()
+    asset_info['total_buy'] = round(total_buy, 2)
+
+    total_cost = total_buy - total_sell
     asset_info['total_cost'] = round(total_cost, 2)
 
     liquid_cost = total_cost - wages_sum - rents_wages_sum

@@ -10,7 +10,6 @@
     <p>Position: {{ info['position_sum'] }} ({{ info['rented'] }} rented)</p>
     <p>Position: {{ info['currency'] }} {{ info['position_total'] }}</p>
     <p>Total Cost: {{ info['currency'] }} {{ info['total_cost'] }}</p>
-    <!-- <p>Sells: {{ info['currency'] }} {{ info['total_sell'] }}</p> -->
     <p>Wages: {{ info['currency'] }} {{ info['wages_sum'] }}</p>
     <p>Rent Wages: {{ info['currency'] }} {{ info['rents_wage_sum'] }}</p>
     <p>Liquid Cost: {{ info['currency'] }} {{ info['liquid_cost'] }}</p>
@@ -23,6 +22,7 @@
             {{ row|safe }}
         {% endfor %}
     </div>
+    <p>Buys Total: {{ info['currency'] }} {{ info['total_buy'] }}</p>
 
     <h2>Sells</h2>
     <div class="table table-striped mt-3">
@@ -30,6 +30,7 @@
             {{ row|safe }}
         {% endfor %}
     </div>
+    <p>Sells Total: {{ info['currency'] }} {{ info['total_sell'] }}</p>
 
     <h2>Wages</h2>
     <div class="table table-striped mt-3">
