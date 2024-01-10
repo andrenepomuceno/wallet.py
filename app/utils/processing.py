@@ -401,21 +401,31 @@ def view_consolidate_request(request):
     consolidate = consolidate[['name','url','ticker','currency','last_close_price',
                                       'position_sum','position_total','buy_avg_price',
                                       'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                                      'rentability','rentability_by_year']]
+                                      'rentability','rentability_by_year','age','taxes_sum']]
 
         
     df = consolidate.loc[consolidate['position_sum'] > 0]
     df = df.sort_values(by='rentability', ascending=False)
+    df['age'] = round(df['age']/365, 2)
     ret['consolidate'] = df
 
     old = consolidate.loc[consolidate['position_sum'] <= 0]
     old = old.sort_values(by='liquid_cost', ascending=True)
     ret['old'] = old
     
-    ret['total_cost_sum'] = round(consolidate['total_cost'].sum(), 2)
-    ret['total_wages_sum'] = round(consolidate['wages_sum'].sum(), 2)
-    ret['total_rents_wage_sum'] = round(consolidate['rents_wage_sum'].sum(), 2)
-    ret['position_total_sum'] = round(consolidate['position_total'].sum(), 2)
+    consolidate_brl = consolidate.loc[consolidate['currency'] == 'BRL']
+    ret['total_cost_sum'] = round(consolidate_brl['total_cost'].sum(), 2)
+    ret['total_wages_sum'] = round(consolidate_brl['wages_sum'].sum(), 2)
+    ret['total_rents_wage_sum'] = round(consolidate_brl['rents_wage_sum'].sum(), 2)
+    ret['position_total_sum'] = round(consolidate_brl['position_total'].sum(), 2)
+    ret['taxes_sum'] = round(consolidate_brl['taxes_sum'].sum(), 2)
+
+    consolidate_usd = consolidate.loc[consolidate['currency'] == 'USD']
+    ret['total_cost_sum_usd'] = round(consolidate_usd['total_cost'].sum(), 2)
+    ret['total_wages_sum_usd'] = round(consolidate_usd['wages_sum'].sum(), 2)
+    ret['total_rents_wage_sum_usd'] = round(consolidate_usd['rents_wage_sum'].sum(), 2)
+    ret['position_total_sum_usd'] = round(consolidate_usd['position_total'].sum(), 2)
+    ret['taxes_sum_usd'] = round(consolidate_usd['taxes_sum'].sum(), 2)
 
     return ret
 
@@ -461,6 +471,7 @@ def view_extract_asset_request(request, asset):
     buys = credit.loc[
         (
             (credit['Movimentação'] == "Compra")
+            | (credit['Movimentação'] == "Desdobramento")
         )
     ]
     dataframes['buys'] = buys
