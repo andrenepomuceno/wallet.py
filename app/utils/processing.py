@@ -399,9 +399,9 @@ def view_consolidate_request(request):
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate])
     consolidate = consolidate[['name','url','ticker','currency','last_close_price',
-                                      'position_sum','position_total','buy_avg_price',
-                                      'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                                      'rentability','rentability_by_year','age','taxes_sum']]
+                               'position_sum','position_total','buy_avg_price',
+                               'total_cost','wages_sum','rents_wage_sum','liquid_cost',
+                               'rentability','rentability_by_year','age','taxes_sum']]
 
         
     df = consolidate.loc[consolidate['position_sum'] > 0]
