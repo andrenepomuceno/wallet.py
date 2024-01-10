@@ -38,6 +38,18 @@ class B3_Negotiation(db.Model):
 
     def __repr__(self):
         return f'<B3_Negotiation {self.id}>'
+    
+class Avenue_Extract(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.String)
+    hora = db.Column(db.String)
+    liquidacao = db.Column(db.String)
+    descricao = db.Column(db.String)
+    valor = db.Column(db.Float)
+    saldo = db.Column(db.Float)
+
+    def __repr__(self):
+        return f'<Avenue_Extract {self.id}>'
 
 def process_b3_movimentation(file_path):
     app.logger.info(f'Processing file: {file_path}')
@@ -115,3 +127,36 @@ def process_b3_negotiation(file_path):
 
 def process_avenue_extract(file_path):
     app.logger.info(f'Processing Avenue Extract file: {file_path}')
+
+    if file_path.endswith('.csv'):
+        df = pd.read_csv(file_path)
+
+    df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
+    df['Liquidação'] = pd.to_datetime(df['Liquidação'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
+    df['Valor (U$)'] = pd.to_numeric(df['Valor (U$)'], errors='coerce').fillna(0.0)
+    df['Saldo da conta (U$)'] = pd.to_numeric(df['Saldo da conta (U$)'], errors='coerce').fillna(0.0)
+
+    app.logger.info('Inserting data into database...')
+    for _, row in df.iterrows():
+        # Verifica se a entrada já existe
+        if not Avenue_Extract.query.filter_by(
+            data=row['Data'],                                  
+            hora=row['Hora'],
+            liquidacao=row['Liquidação'],
+            descricao=row['Descrição'],
+            valor=row['Valor (U$)'],
+            saldo=row['Saldo da conta (U$)']
+        ).first():
+            new_entry = Avenue_Extract(
+                data=row['Data'],
+                hora=row['Hora'],
+                liquidacao=row['Liquidação'],
+                descricao=row['Descrição'],
+                valor=row['Valor (U$)'],
+                saldo=row['Saldo da conta (U$)']
+            )
+            db.session.add(new_entry)
+    db.session.commit()
+
+    return df
+

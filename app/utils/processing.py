@@ -5,7 +5,7 @@ from lxml import html
 import re
 
 from app import app, db
-from app.models import B3_Movimentation, B3_Negotiation
+from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract
 
 scrap_dict = {
     # "Tesouro Selic 2024": {
@@ -61,6 +61,15 @@ def b3_negotiation_sql_to_df(result):
                                'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
                                'Valor'])
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'])
+    return df
+
+def avenue_extract_sql_to_df(result):
+    df = pd.DataFrame([(d.data, d.hora, d.liquidacao, d.descricao, 
+                        d.valor, d.saldo) for d in result], 
+                      columns=['Data', 'Hora', 'Liquidação', 'Descrição',
+                               'Valor (U$)', 'Saldo da conta (U$)'])
+    df['Data'] = pd.to_datetime(df['Data'])
+    df['Liquidação'] = pd.to_datetime(df['Liquidação'])
     return df
 
 def view_movimentation_request(request):
@@ -388,6 +397,12 @@ def view_consolidate_request(request):
 
 def view_extract_request(request):
     app.logger.info(f'view_extract_request')
+
+    query = Avenue_Extract.query.order_by(Avenue_Extract.data.asc())
+    result = query.all()
+    extract = avenue_extract_sql_to_df(result)
+
+    return extract
 
 
 

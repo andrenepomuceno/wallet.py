@@ -3,7 +3,7 @@ from flask import render_template, request, redirect, url_for
 import os
 from app import app
 from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract
-from app.utils.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
+from app.utils.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request, view_extract_request
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
