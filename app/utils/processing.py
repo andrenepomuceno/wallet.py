@@ -356,7 +356,6 @@ def view_consolidate_request(request):
 
     ret = {}
     
-
     query = B3_Movimentation.query
     result = query.all()
     movimentation = b3_movimentation_sql_to_df(result)
