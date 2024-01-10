@@ -65,9 +65,11 @@ def b3_negotiation_sql_to_df(result):
 
 def avenue_extract_sql_to_df(result):
     df = pd.DataFrame([(d.data, d.hora, d.liquidacao, d.descricao, 
-                        d.valor, d.saldo) for d in result], 
+                        d.valor, d.saldo,
+                        d.entrada_saida, d.produto, d.movimentacao, d.quantidade, d.preco_unitario) for d in result], 
                       columns=['Data', 'Hora', 'Liquidação', 'Descrição',
-                               'Valor (U$)', 'Saldo da conta (U$)'])
+                               'Valor (U$)', 'Saldo da conta (U$)',
+                               'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade', 'Preço unitário'])
     df['Data'] = pd.to_datetime(df['Data'])
     df['Liquidação'] = pd.to_datetime(df['Liquidação'])
     return df
@@ -370,6 +372,22 @@ def view_consolidate_request(request):
         new_row = pd.DataFrame([asset_info])
         consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
+    query = Avenue_Extract.query
+    result = query.all()
+    movimentation = avenue_extract_sql_to_df(result)
+    if len(movimentation) == 0:
+        return ret
+
+    products = movimentation['Produto'].value_counts().to_frame()
+    print(products)
+    for index, product in products.iterrows():
+        if product.name == '':
+            continue
+        
+        asset_info = view_extract_asset_request(request, product.name)
+        new_row = pd.DataFrame([asset_info])
+        consolidate = pd.concat([consolidate, new_row], ignore_index=True)
+
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
 
@@ -404,200 +422,146 @@ def view_extract_request(request):
 
     return extract
 
+def view_extract_asset_request(request, asset):
+    app.logger.info(f'Processing view_extract_asset_request for "{asset}".')
 
+    asset_info = {}
+    dataframes = {}
 
+    asset_info['name'] = asset
+    asset_info['currency'] = 'USD'
 
+    first_buy = None
+    age = None
+    last_close_price = None
 
+    query = Avenue_Extract.query.filter(Avenue_Extract.produto.like(f'%{asset}%')).order_by(Avenue_Extract.data.asc())
+    result = query.all()
+    extract = avenue_extract_sql_to_df(result)
+    if len(extract) == 0:
+        app.logger.warning(f'Extract data not found for {asset}')
+        return asset_info
+    
+    extract['Valor da Operação'] = abs(extract['Valor (U$)'])
+    
+    dataframes['movimentation'] = extract
 
+    ticker = extract['Produto'].value_counts().index[0]
+    asset_info['ticker'] = ticker
 
+    credit = extract.loc[extract['Entrada/Saída'] == "Credito"]
+    debit = extract.loc[extract['Entrada/Saída'] == "Debito"]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def analyse_rents(asset_info, dataframes):
-    app.logger.debug('Analyzing rents...')
-
-    credit = dataframes['credit']
-    sells = dataframes['sells']
-    buys = dataframes['buys']
-
-    rents = credit.loc[
-        ((credit['Movimentação'] == "Empréstimo"))
-        # & ((credit['Quantidade'] > 0))
-        # & ((credit['Preço unitário'] == 0))
-        # & ((credit['Valor da Operação'] == 0))
+    buys = credit.loc[
+        (
+            (credit['Movimentação'] == "Compra")
+        )
     ]
+    dataframes['buys'] = buys
+    if len(buys) > 0:
+        first_buy = buys.iloc[0]['Data']
+        age = pd.to_datetime("today") - first_buy
 
-    # dados corrompidos na tabela de rent3, quantidade = 48 onde deveria ser 24
-    # bug em abev3, quantidade = 249, varias movimentações nos dias 2022-12-02
-    rents = rents.groupby(['Data'], as_index=False).agg({'Quantidade': 'sum', 'Valor da Operação': 'sum'})
-    dataframes['rents'] = rents
+    sells = debit.loc[
+        (
+            (debit['Movimentação'] == "Venda")
+        )
+    ]
+    dataframes['sells'] = sells
 
-    print('--- Rents ---')
-    print(rents.to_string())
+    taxes = debit.loc[
+        (debit['Movimentação'] == "Impostos")
+        | (debit['Movimentação'] == "Corretagem")
+    ]
+    taxes_sum = taxes['Valor da Operação'].sum()
+    asset_info['taxes_sum'] = round(taxes_sum, 2)
 
-    rents_income_sum = rents['Valor da Operação'].sum()
-    asset_info['rents_income_sum'] = rents_income_sum
+    wages = credit.loc[
+        (credit['Movimentação'] == "Dividendos")
+    ]
+    wages_sum = wages['Valor da Operação'].sum()
 
-    rented = 0
-    finished_rents = 0
-    rents_not_found = 0
-    sells_remove_list = []
-    buys_remove_list = []
-    for _, rent_row in rents.iterrows():
-        quantity = rent_row['Quantidade']
-        start = rent_row['Data']
-        op_value = rent_row['Valor da Operação']
+    dataframes['wages'] = wages
+    asset_info['wages_sum'] = round(wages_sum, 2)
 
-        print(f'\nAnalyzing start = {start} quant = {quantity} value = {op_value}')
-        print(f'Rented = {rented}')
+    rents_wages_sum = 0
+    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
 
-        if op_value > 0:
-            print(f'Rent payment, skipping...')
-            continue
+    buys_quantity_sum = buys['Quantidade'].sum()
+    asset_info['buys_quantity_sum'] = buys_quantity_sum
 
-        #print(f'Searching rent {quantity} {start}')
-        rent_liquidation = sells.loc[(
-            sells['Quantidade'] <= quantity) 
-            & (sells['Data'] >= start)
-            & (sells['Data'] < start + pd.Timedelta(days=7))
-            & (sells['Movimentação'] == "Transferência - Liquidação")
-            # & (sells['Preço unitário'] == 0)
-            # & (sells['Valor da Operação'] == 0)
-        ]
-        rent_liquidation_len = len(rent_liquidation)
+    sells_sum = sells['Quantidade'].sum()
+    asset_info['sells_sum'] = round(sells_sum, 2)
 
-        if rent_liquidation_len == 0:
-            print("Warning! Rent liquidation not found!")
-            rents_not_found += 1
-            continue
-            
-        rent_liquidation = rent_liquidation[['Data','Quantidade']]
-        print(f'rent_liquidation=\n{rent_liquidation.to_string()}')
+    position = buys_quantity_sum - sells_sum
+    asset_info['position'] = position
 
-        liquidation_sum = 0
-        iterations = 0
-        rent_liquidation_list = []
-        for idx, liquidation_row in rent_liquidation.iterrows():
-            liquidation_sum += liquidation_row['Quantidade']
-            iterations += 1
-            rent_liquidation_list.append(idx)
-            if liquidation_sum == quantity:
-                print(f'Rent liquidated with {iterations} iterations')
-                sells_remove_list += rent_liquidation_list
-                break
-            elif liquidation_sum > quantity:
-                print(f'Warning! rent_sell_sum > quantity')
-                break
-        
-        if liquidation_sum != quantity:
-            print(f'Warning! Rent liquidation not found! (fractions)')
-            rents_not_found += 1
-            continue
+    if first_buy is not None:
+        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
 
-        rented += liquidation_sum
+    if age is not None:
+        asset_info['age'] = age.days
 
-        rent_refund = buys.loc[(
-            (buys['Quantidade'] == quantity) 
-            & (buys['Data'] >= start)
-            & (buys['Movimentação'] == "Transferência - Liquidação")
-        )]
-        rent_refund_len = len(rent_refund)
+    buys_value_sum = buys['Valor da Operação'].sum()
+    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
 
-        rent_refund_list = []
-        if rent_refund_len > 0:
-            rent_refund = rent_refund[['Data','Quantidade']]
-            print(f'rent_refund=\n{rent_refund.to_string()}')    
+    sells_value_sum = sells['Valor da Operação'].sum()
+    asset_info['sells_value_sum'] = sells_value_sum
 
-            print("Exact rent refund found! Getting head...")
-            head = rent_refund.iloc[0]
-            refund_date = head['Data']
+    total_cost = buys_value_sum - sells_value_sum
+    asset_info['total_cost'] = round(total_cost, 2)
 
-            print(f"Refund date: {refund_date}")
-            print(f"Duration: {refund_date - start}")
+    liquid_cost = total_cost - wages_sum - rents_wages_sum + taxes_sum
+    asset_info['liquid_cost'] = round(liquid_cost, 2)
 
-            rented -= head['Quantidade']
-            finished_rents += 1
+    buys_wsum = (buys['Quantidade'] * buys['Preço unitário']).sum()
+    buys_quantity = buys['Quantidade'].sum()
+    buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
+    asset_info['buy_avg_price'] = round(buy_avg_price, 2)
 
-            rent_refund_list.append(rent_refund.index[0])
-            buys_remove_list += rent_refund_list
+    buys_wsum2 = buys['Valor da Operação'].sum()
+    buy_avg_price2 = buys_wsum2 / buys_quantity if buys_quantity > 0 else 0
+    asset_info['buy_avg_price2'] = round(buy_avg_price2, 2)
+    if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
+        app.logger.warning("Warning! buys_wsum inconsistency!")
 
-            continue
-        else:
-            print("Warning! Exact rent refund not found! Trying fractions...")
+    asset_info['rented'] = 0
+    rented = asset_info['rented']
 
-        rent_refund_frac = buys.loc[(
-            (buys['Quantidade'] < quantity) 
-            & (buys['Data'] >= start)
-            & (buys['Movimentação'] == "Transferência - Liquidação")
-        )]
-        rent_refund_frac_len = len(rent_refund_frac)
+    position_sum = round(position + rented, 2)
+    asset_info['position_sum'] = position_sum
 
-        if rent_refund_frac_len == 0:
-            print("Warning! Fractioned rent refund not found! Still in rent?...")
-            continue
+    if position > 0:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="1d")
+            if not hist.empty:
+                last_close_price = hist['Close'].iloc[-1]
+                asset_info['last_close_price'] = round(last_close_price, 2)
 
-        rent_refund_frac = rent_refund_frac[['Data','Quantidade']]
-        print(f'rent_refund_frac=\n{rent_refund_frac.to_string()}')
+            currency = stock.info['currency']
+            asset_info['currency'] = currency
+        except:
+            pass
 
-        refund_sum = 0
-        iterations = 0
-        for idx, refund_row in rent_refund_frac.iterrows():
-            refund_sum += refund_row['Quantidade']
-            iterations += 1
+    if last_close_price != None and position_sum > 0:
+        position_total = position_sum * last_close_price
+        asset_info['position_total'] = round(position_total, 2)
 
-            rent_refund_list.append(idx)
+        rentabiliy = position_total/liquid_cost
+        rentabiliy = round((rentabiliy - 1) * 100, 2)
+        asset_info['rentability'] = rentabiliy
 
-            if refund_sum == quantity:
-                print(f'Rent refunded with {iterations} iterations')
-                refund_date = refund_row['Data']
+        if age is not None:
+            by_year = round(rentabiliy/(age.days/365), 2)
+            asset_info['rentability_by_year'] = by_year
+    
+    else:
+        asset_info['position_total'] = 0
+        asset_info['rentability'] = -100
+        asset_info['rentability_by_year'] = -100
 
-                print(f"Refund date: {refund_date}")
-                print(f"Duration: {refund_date - start}")
+    app.logger.debug(asset_info)
 
-                rented -= quantity
-                finished_rents += 1
-
-                buys_remove_list += rent_refund_list
-
-                sells
-                break
-            elif refund_sum > quantity:
-                print(f'Warning! rent_sell_sum > quantity')
-                break
-                
-        if refund_sum != quantity:
-            print("Warning! Fractioned rent refund not found! Still in rent?...")
-
-    asset_info['rented'] = rented
-    asset_info['finished_rents'] = finished_rents
-    asset_info['sells_remove_list'] = sells_remove_list
-    asset_info['buys_remove_list'] = buys_remove_list
+    asset_info['dataframes'] = dataframes
+    return asset_info

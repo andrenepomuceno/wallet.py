@@ -3,7 +3,7 @@ from flask import render_template, request, redirect, url_for
 import os
 from app import app
 from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract
-from app.utils.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request, view_extract_request
+from app.utils.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request, view_extract_request, view_extract_asset_request
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -106,4 +106,26 @@ def view_extract():
     df = view_extract_request(request)
     return render_template('view_extract.html', tables=[df.to_html(classes='pandas-dataframe')])
 
+@app.route('/extract/<asset>', methods=['GET', 'POST'])
+def view_extract_asset(asset=None):
+    asset_info = view_extract_asset_request(request, asset)
 
+    dataframes = asset_info['dataframes']
+    wages = dataframes['wages']
+    all_movimentation = dataframes['movimentation']
+    
+    buys_events = dataframes['buys']
+    sells_events = dataframes['sells']
+    # negotiation_buys = dataframes['negotiation_buys']
+    # negotiation_sells = dataframes['negotiation_sells']
+    return render_template(
+        'view_asset.html', info=asset_info, 
+        buys_events=buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
+        sells_events=sells_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
+        wages_events=wages[['Data', 'Valor da Operação', 'Movimentação','Produto']].to_html(classes='pandas-dataframe'),
+
+        # negotiation_buys=[negotiation_buys[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')],
+        # negotiation_sells=[negotiation_sells[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')]
+
+        all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
+    )

@@ -1,5 +1,6 @@
 from app import app, db
 import pandas as pd
+import re
 
 # ENTRADA_SAIDA = 'Entrada/Saída'    
 # DATA = 'Data'
@@ -47,6 +48,12 @@ class Avenue_Extract(db.Model):
     descricao = db.Column(db.String)
     valor = db.Column(db.Float)
     saldo = db.Column(db.Float)
+
+    entrada_saida = db.Column(db.String)
+    produto = db.Column(db.String)
+    movimentacao = db.Column(db.String)
+    quantidade = db.Column(db.Float)
+    preco_unitario = db.Column(db.Float)
 
     def __repr__(self):
         return f'<Avenue_Extract {self.id}>'
@@ -125,6 +132,48 @@ def process_b3_negotiation(file_path):
 
     return df
 
+def fill_table(df):
+    def parse_entrada_saida(x):
+        if re.match(r'Câmbio Instantâneo|Câmbio Padrão|Compra|Dividendos|Estorno', x):
+            return 'Credito'
+        else:
+            return 'Debito'
+    df['Entrada/Saída'] = df['Descrição'].apply(parse_entrada_saida)
+
+    def parse_produto(x):
+        match = re.search(r'(Compra de [0-9.]+|Dividendos|Corretagem) ([A-Z]{1,4})', x)
+        if match:
+            return match.group(2)
+        else:
+            return ''
+    df['Produto'] = df['Descrição'].apply(parse_produto)
+
+    def parse_movimentacao(x):
+        match = re.search(r'Câmbio|Compra|Impostos|Dividendos|Corretagem', x)
+        if match:
+            return match.group(0)
+        else:
+            return '???'
+    df['Movimentação'] = df['Descrição'].apply(parse_movimentacao)
+
+    def parse_quantidade(x):
+        match = re.search(r'Compra de ([0-9.]+)', x)
+        if match:
+            return float(match.group(1))
+        else:
+            return None
+    df['Quantidade'] = df['Descrição'].apply(parse_quantidade)
+
+    def parse_preco_unitario(x):
+        match = re.search(r'\$ ?([0-9.]+)', x)
+        if match:
+            return float(match.group(1))
+        else:
+            return None
+    df['Preço unitário'] = df['Descrição'].apply(parse_preco_unitario)
+
+    return df
+
 def process_avenue_extract(file_path):
     app.logger.info(f'Processing Avenue Extract file: {file_path}')
 
@@ -136,6 +185,8 @@ def process_avenue_extract(file_path):
     df['Valor (U$)'] = pd.to_numeric(df['Valor (U$)'], errors='coerce').fillna(0.0)
     df['Saldo da conta (U$)'] = pd.to_numeric(df['Saldo da conta (U$)'], errors='coerce').fillna(0.0)
 
+    df = fill_table(df)
+
     app.logger.info('Inserting data into database...')
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
@@ -145,7 +196,13 @@ def process_avenue_extract(file_path):
             liquidacao=row['Liquidação'],
             descricao=row['Descrição'],
             valor=row['Valor (U$)'],
-            saldo=row['Saldo da conta (U$)']
+            saldo=row['Saldo da conta (U$)'],
+
+            entrada_saida=row['Entrada/Saída'],
+            produto=row['Produto'],
+            movimentacao=row['Movimentação'],
+            quantidade=row['Quantidade'],
+            preco_unitario=row['Preço unitário']
         ).first():
             new_entry = Avenue_Extract(
                 data=row['Data'],
@@ -153,7 +210,13 @@ def process_avenue_extract(file_path):
                 liquidacao=row['Liquidação'],
                 descricao=row['Descrição'],
                 valor=row['Valor (U$)'],
-                saldo=row['Saldo da conta (U$)']
+                saldo=row['Saldo da conta (U$)'],
+
+                entrada_saida=row['Entrada/Saída'],
+                produto=row['Produto'],
+                movimentacao=row['Movimentação'],
+                quantidade=row['Quantidade'],
+                preco_unitario=row['Preço unitário']
             )
             db.session.add(new_entry)
     db.session.commit()
