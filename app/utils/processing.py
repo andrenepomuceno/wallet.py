@@ -355,7 +355,7 @@ def view_consolidate_request(request):
     app.logger.info(f'view_consolidate_request')
 
     ret = {}
-    consolidate = pd.DataFrame()
+    
 
     query = B3_Movimentation.query
     result = query.all()
@@ -366,11 +366,14 @@ def view_consolidate_request(request):
     movimentation['Produto_Parsed'] = parse_produto(movimentation['Produto'])
     movimentation['Ticker'] = parse_ticker(movimentation['Produto'])
 
+    b3_consolidate = pd.DataFrame()
     products = movimentation['Ticker'].value_counts().to_frame()
     for index, product in products.iterrows():
         asset_info = view_asset_request(request, product.name)
         new_row = pd.DataFrame([asset_info])
-        consolidate = pd.concat([consolidate, new_row], ignore_index=True)
+        b3_consolidate = pd.concat([b3_consolidate, new_row], ignore_index=True)
+
+    b3_consolidate['url'] = b3_consolidate['name'].apply(lambda x: f"<a href='/view/{x}'>{x}</a>")
 
     query = Avenue_Extract.query
     result = query.all()
@@ -378,24 +381,27 @@ def view_consolidate_request(request):
     if len(movimentation) == 0:
         return ret
 
+    avenue_consolidate = pd.DataFrame()
     products = movimentation['Produto'].value_counts().to_frame()
     print(products)
     for index, product in products.iterrows():
         if product.name == '':
             continue
-        
+
         asset_info = view_extract_asset_request(request, product.name)
         new_row = pd.DataFrame([asset_info])
-        consolidate = pd.concat([consolidate, new_row], ignore_index=True)
+        avenue_consolidate = pd.concat([avenue_consolidate, new_row], ignore_index=True)
+
+    avenue_consolidate['url'] = avenue_consolidate['name'].apply(lambda x: f"<a href='/extract/{x}'>{x}</a>")
 
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
 
-    consolidate = consolidate[['name','ticker','currency','last_close_price',
+    consolidate = pd.concat([b3_consolidate, avenue_consolidate])
+    consolidate = consolidate[['name','url','ticker','currency','last_close_price',
                                       'position_sum','position_total','buy_avg_price',
                                       'total_cost','wages_sum','rents_wage_sum','liquid_cost',
                                       'rentability','rentability_by_year']]
-    consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/view/{x}'>{x}</a>")
 
         
     df = consolidate.loc[consolidate['position_sum'] > 0]
