@@ -8,6 +8,11 @@
     <p>Wages: {{ info['total_wages_sum'] }}</p>
     <p>Rent Wages: {{ info['total_rents_wage_sum'] }}</p>
     <p>Taxes: {{ info['taxes_sum'] }}</p>
+    <!-- <p>Cost: {{ info['total_cost_sum'] + info['total_cost_sum_usd_brl'] }}</p>
+    <p>Position: {{ info['position_total_sum'] + info['position_total_sum_usd_brl'] }}</p>
+    <p>Wages: {{ info['total_wages_sum'] + info['total_wages_sum_usd_brl'] }}</p>
+    <p>Rent Wages: {{ info['total_rents_wage_sum'] + info['total_rents_wage_sum_usd_brl'] }}</p>
+    <p>Taxes: {{ info['taxes_sum'] + info['taxes_sum_usd_brl'] }}</p> -->
 
     <h2>USD</h2>
     <p>Cost: {{ info['total_cost_sum_usd'] }}</p>
@@ -15,13 +20,14 @@
     <p>Wages: {{ info['total_wages_sum_usd'] }}</p>
     <p>Rent Wages: {{ info['total_rents_wage_sum_usd'] }}</p>
     <p>Taxes: {{ info['taxes_sum_usd'] }}</p>
+    <p>USD/BRL: {{ info['usd_brl'] }}</p>
 
     <h2>Consolidate</h2>
     <div class="table table-striped mt-3">
         {{ consolidate|safe }}
     </div>
 
-    <h2>Old</h2>
+    <h2>Finished</h2>
     <div class="table table-striped mt-3">
         {{ old|safe }}
     </div>

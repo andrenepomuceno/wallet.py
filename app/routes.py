@@ -2,8 +2,9 @@ from flask import render_template, request, redirect, url_for
 
 import os
 from app import app
-from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract
-from app.utils.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request, view_extract_request, view_extract_asset_request
+from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_cripto_extract
+from app.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
+from app.processing import view_extract_request, view_extract_asset_request
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -26,6 +27,9 @@ def home():
             return redirect(url_for('view_negotiation'))
         elif filetype == 'Avenue Extract':
             process_avenue_extract(filepath)
+            return redirect(url_for('view_extract'))
+        elif filetype == 'Cripto':
+            process_cripto_extract(filepath)
             return redirect(url_for('view_extract'))
         else:
             return render_template('index.html', message='Filetype not supported.')
@@ -91,39 +95,42 @@ def view_extract_asset(asset=None):
         all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
     )
 
-
-
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
     info = view_consolidate_request(request)
+    
     consolidate = info['consolidate']
+    consolidate = consolidate[['url','currency','last_close_price','position_sum','position_total','buy_avg_price',
+                               'total_cost','wages_sum','rents_wage_sum','liquid_cost','rentability','rentability_by_year','age']]
+    consolidate = consolidate.rename(columns={
+        'url': 'Name',
+        'currency': 'Currency',
+        'last_close_price': 'Close Price',
+        'position_sum': "Position",
+        'position_total': 'Position',
+        'buy_avg_price': 'Avg Price',
+        'total_cost': 'Total Cost',
+        'wages_sum': 'Wages',
+        'rents_wage_sum': 'Rent Wages',
+        'liquid_cost': 'Liquid Cost',
+        'rentability': 'Rentability',
+        'rentability_by_year': 'Rentability/year',
+        'age': 'Age'
+    })
+
     old = info['old']
+    old = old[['url','currency','position_sum','buy_avg_price','total_cost','wages_sum','rents_wage_sum','liquid_cost']]
+    old = old.rename(columns={
+        'url': 'Name',
+        'currency': 'Currency',
+        'position_sum': "Position",
+        'buy_avg_price': 'Avg Price',
+        'total_cost': 'Total Cost',
+        'wages_sum': 'Wages',
+        'rents_wage_sum': 'Rent Wages',
+        'liquid_cost': 'Liquid Cost'
+    })
+
     return render_template('view_consolidate.html', info=info,
-                           consolidate=consolidate[['url','currency','last_close_price','position_sum','position_total','buy_avg_price',
-                                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                                                    'rentability','rentability_by_year','age']].rename(columns={
-                                                        'url': 'Name',
-                                                        'currency': 'Currency',
-                                                        'last_close_price': 'Close Price',
-                                                        'position_sum': "Position",
-                                                        'position_total': 'Position',
-                                                        'buy_avg_price': 'Avg Price',
-                                                        'total_cost': 'Total Cost',
-                                                        'wages_sum': 'Wages',
-                                                        'rents_wage_sum': 'Rent Wages',
-                                                        'liquid_cost': 'Liquid Cost',
-                                                        'rentability': 'Rentability',
-                                                        'rentability_by_year': 'Rentability/year',
-                                                        'age': 'Age'
-                                                    }).to_html(classes='pandas-dataframe', escape=False, index=False), 
-                           old=old[['url','currency','position_sum','buy_avg_price',
-                                    'total_cost','wages_sum','rents_wage_sum','liquid_cost']].rename(columns={
-                                        'url': 'Name',
-                                        'currency': 'Currency',
-                                        'position_sum': "Position",
-                                        'buy_avg_price': 'Avg Price',
-                                        'total_cost': 'Total Cost',
-                                        'wages_sum': 'Wages',
-                                        'rents_wage_sum': 'Rent Wages',
-                                        'liquid_cost': 'Liquid Cost'
-                                    }).to_html(classes='pandas-dataframe', escape=False, index=False))
+                           consolidate=consolidate.to_html(classes='pandas-dataframe', escape=False, index=False), 
+                           old=old.to_html(classes='pandas-dataframe', escape=False, index=False))

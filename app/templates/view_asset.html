@@ -4,7 +4,8 @@
 
     <h2>Information</h2>
     <p>Ticker: {{ info['ticker'] }}</p>
-    <p>Last Close Price: {{ info['currency'] }} {{ info['last_close_price'] }}</p>
+    <p>Full Name: {{ info['long_name'] }}</p>
+    <p>Last Close Price: {{ info['currency'] }} {{ info['last_close_price'] }} ({{ info['price_gain'] }} %)</p>
     <p>Buy Average Price: {{ info['currency'] }} {{ info['buy_avg_price'] }}</p>
     <!-- <p>Currency: {{ info['currency'] }}</p> -->
     <p>Position: {{ info['position_sum'] }} ({{ info['rented'] }} rented)</p>

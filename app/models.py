@@ -24,39 +24,6 @@ class B3_Movimentation(db.Model):
 
     def __repr__(self):
         return f'<B3_Movimentation {self.id}>'
-    
-class B3_Negotiation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.String)
-    tipo = db.Column(db.String)
-    mercado = db.Column(db.String)
-    prazo = db.Column(db.String)
-    instituicao = db.Column(db.String)
-    codigo = db.Column(db.String)
-    quantidade = db.Column(db.Float)
-    preco = db.Column(db.Float)
-    valor = db.Column(db.Float)
-
-    def __repr__(self):
-        return f'<B3_Negotiation {self.id}>'
-    
-class Avenue_Extract(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.String)
-    hora = db.Column(db.String)
-    liquidacao = db.Column(db.String)
-    descricao = db.Column(db.String)
-    valor = db.Column(db.Float)
-    saldo = db.Column(db.Float)
-
-    entrada_saida = db.Column(db.String)
-    produto = db.Column(db.String)
-    movimentacao = db.Column(db.String)
-    quantidade = db.Column(db.Float)
-    preco_unitario = db.Column(db.Float)
-
-    def __repr__(self):
-        return f'<Avenue_Extract {self.id}>'
 
 def process_b3_movimentation(file_path):
     app.logger.info(f'Processing file: {file_path}')
@@ -91,6 +58,29 @@ def process_b3_movimentation(file_path):
     db.session.commit()
 
     return df
+
+def b3_movimentation_sql_to_df(result):
+    df = pd.DataFrame([(d.entrada_saida, d.data, d.movimentacao, d.produto, 
+                        d.instituicao, d.quantidade, d.preco_unitario, d.valor_operacao) for d in result], 
+                      columns=['Entrada/Saída', 'Data', 'Movimentação', 'Produto',
+                               'Instituição', 'Quantidade', 'Preço unitário', 'Valor da Operação'])
+    df['Data'] = pd.to_datetime(df['Data'])
+    return df
+
+class B3_Negotiation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.String)
+    tipo = db.Column(db.String)
+    mercado = db.Column(db.String)
+    prazo = db.Column(db.String)
+    instituicao = db.Column(db.String)
+    codigo = db.Column(db.String)
+    quantidade = db.Column(db.Float)
+    preco = db.Column(db.Float)
+    valor = db.Column(db.Float)
+
+    def __repr__(self):
+        return f'<B3_Negotiation {self.id}>'
 
 def process_b3_negotiation(file_path):
     app.logger.info(f'Processing B3 Negotiation file: {file_path}')
@@ -132,7 +122,35 @@ def process_b3_negotiation(file_path):
 
     return df
 
-def fill_table(df):
+def b3_negotiation_sql_to_df(result):
+    df = pd.DataFrame([(d.data, d.tipo, d.mercado, d.prazo, 
+                        d.instituicao, d.codigo, d.quantidade, d.preco,
+                        d.valor) for d in result], 
+                      columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
+                               'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
+                               'Valor'])
+    df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'])
+    return df
+
+class Avenue_Extract(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.String)
+    hora = db.Column(db.String)
+    liquidacao = db.Column(db.String)
+    descricao = db.Column(db.String)
+    valor = db.Column(db.Float)
+    saldo = db.Column(db.Float)
+
+    entrada_saida = db.Column(db.String)
+    produto = db.Column(db.String)
+    movimentacao = db.Column(db.String)
+    quantidade = db.Column(db.Float)
+    preco_unitario = db.Column(db.Float)
+
+    def __repr__(self):
+        return f'<Avenue_Extract {self.id}>'
+
+def extract_fill(df):
     def parse_entrada_saida(x):
         if re.match(r'Câmbio Instantâneo|Câmbio Padrão|Compra|Dividendos|Estorno', x):
             return 'Credito'
@@ -185,7 +203,7 @@ def process_avenue_extract(file_path):
     df['Valor (U$)'] = pd.to_numeric(df['Valor (U$)'], errors='coerce').fillna(0.0)
     df['Saldo da conta (U$)'] = pd.to_numeric(df['Saldo da conta (U$)'], errors='coerce').fillna(0.0)
 
-    df = fill_table(df)
+    df = extract_fill(df)
 
     app.logger.info('Inserting data into database...')
     for _, row in df.iterrows():
@@ -223,3 +241,95 @@ def process_avenue_extract(file_path):
 
     return df
 
+def avenue_extract_sql_to_df(result):
+    df = pd.DataFrame([(d.data, d.hora, d.liquidacao, d.descricao, 
+                        d.valor, d.saldo,
+                        d.entrada_saida, d.produto, d.movimentacao, d.quantidade, d.preco_unitario) for d in result], 
+                      columns=['Data', 'Hora', 'Liquidação', 'Descrição',
+                               'Valor (U$)', 'Saldo da conta (U$)',
+                               'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade', 'Preço unitário'])
+    df['Data'] = pd.to_datetime(df['Data'])
+    df['Liquidação'] = pd.to_datetime(df['Liquidação'])
+
+    return df
+
+class Cripto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.String)
+    categoria = db.Column(db.String)
+    moeda = db.Column(db.String)
+    quantidade = db.Column(db.Float)
+    saldo = db.Column(db.Float)
+
+    entrada_saida = db.Column(db.String)
+    produto = db.Column(db.String)
+    movimentacao = db.Column(db.String)
+    preco_unitario = db.Column(db.Float)
+
+    def __repr__(self):
+        return f'<Cripto {self.id}>'
+
+def process_cripto_extract(file_path):
+    app.logger.info(f'process_cripto_extract file: {file_path}')
+
+    if file_path.endswith('.csv'):
+        df = pd.read_csv(file_path)
+
+    df['Data'] = pd.to_datetime(df['Data'])
+    df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
+    df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
+
+    df['Entrada/Saída'] = df['Quantidade'].apply(lambda x: 'Credito' if x >= 0 else 'Debito')
+    df['Produto'] = df['Moeda']
+
+    def parse_row(row):
+        quantidade = row['Quantidade']
+        categoria = row['Categoria']
+        if quantidade >= 0:
+            if re.match(r'Execução de ordem', categoria):
+                return 'Compra'
+            else:
+                return ''
+        else:
+            if re.match(r'Execução de ordem', categoria):
+                return 'Venda'
+            else:
+                return ''
+    df['Movimentação'] = df.apply(parse_row, axis=1)
+    df['Preço unitário'] = 0
+    
+    print(df.to_string())
+
+    return df
+
+    app.logger.info('Inserting data into database...')
+    for _, row in df.iterrows():
+        # Verifica se a entrada já existe
+        if not Cripto.query.filter_by(
+            data=row['Data'],
+            categoria=row['Categoria'],
+            moeda=row['Moeda'],
+            quantidade=row['Quantidade'],
+            saldo=row['Saldo'],
+
+            entrada_saida=row['Entrada/Saída'],
+            produto=row['Produto'],
+            movimentacao=row['Movimentação'],
+            preco_unitario=row['Preço unitário']
+        ).first():
+            new_entry = Avenue_Extract(
+                data=row['Data'],
+                categoria=row['Categoria'],
+                moeda=row['Moeda'],
+                quantidade=row['Quantidade'],
+                saldo=row['Saldo'],
+
+                entrada_saida=row['Entrada/Saída'],
+                produto=row['Produto'],
+                movimentacao=row['Movimentação'],
+                preco_unitario=row['Preço unitário']
+            )
+            db.session.add(new_entry)
+    db.session.commit()
+
+    return df
