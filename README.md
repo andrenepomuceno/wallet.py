@@ -1,6 +1,6 @@
-# Wallet App
+# wallet.py
 
-O Wallet App é uma aplicação web desenvolvida em Flask para gerenciar e analisar uma carteira de investimentos. Permite o upload de dados de investimento e fornece funcionalidades para visualização e filtragem destes dados.
+O wallet.py é uma aplicação web desenvolvida em Flask para gerenciar e analisar uma carteira de investimentos. Permite o upload de dados de investimento e fornece funcionalidades para visualização e filtragem destes dados.
 
 ## Recursos
 
@@ -19,14 +19,16 @@ O Wallet App é uma aplicação web desenvolvida em Flask para gerenciar e anali
 ## Configuração do Ambiente
 
 ```shell
-cd wallet.js
+git clone git@github.com:andrenepomuceno/wallet.py.git
+
+cd wallet.py
 
 python3 -m venv venv
 source venv/bin/activate
 
 pip3 install -r requirements.txt
 
-./wallet.js
+./wallet.py 
 ```
 
 Então acesse a página inicial em `http://localhost:5000`
