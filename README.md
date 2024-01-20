@@ -1,22 +1,22 @@
 # wallet.py
 
-O wallet.py é uma aplicação web desenvolvida em Flask para gerenciar e analisar uma carteira de investimentos. Permite o upload de dados de investimento e fornece funcionalidades para visualização e filtragem destes dados.
+wallet.py is a web application developed in Python to manage and analyze an investment portfolio. It allows the upload of investment data and provides functionalities for viewing and filtering this data.
 
-## Recursos
+## Features
 
-- Upload de arquivos CSV/XLSX com dados de investimentos.
-- Armazenamento de dados em banco de dados SQLite.
-- Visualização e filtragem de dados de investimentos.
-- Interface web para interação com o usuário.
+- Upload of CSV/XLSX files with investment data.
+- Data storage in SQLite database.
+- Visualization and filtering of investment data.
+- Web interface for user interaction.
 
-## Dependências
+## Dependencies
 
 - Flask
 - SQLAlchemy
 - Pandas
 - Yahoo Finance
 
-## Configuração do Ambiente
+## Environment Setup
 
 ```shell
 git clone git@github.com:andrenepomuceno/wallet.py.git
@@ -31,4 +31,4 @@ pip3 install -r requirements.txt
 ./wallet.py 
 ```
 
-Então acesse a página inicial em `http://localhost:5000`
+Then access the home page at http://localhost:5000
