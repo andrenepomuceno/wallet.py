@@ -723,18 +723,24 @@ def view_consolidate_request(request):
     ret['old'] = old
     
     consolidate_brl = consolidate.loc[consolidate['currency'] == 'BRL']
-    ret['total_cost_sum'] = round(consolidate_brl['total_cost'].sum(), 2)
+    total_cost = consolidate_brl['total_cost'].sum()
+    ret['total_cost_sum'] = round(total_cost, 2)
     ret['total_wages_sum'] = round(consolidate_brl['wages_sum'].sum(), 2)
     ret['total_rents_wage_sum'] = round(consolidate_brl['rents_wage_sum'].sum(), 2)
-    ret['position_total_sum'] = round(consolidate_brl['position_total'].sum(), 2)
+    total_position = consolidate_brl['position_total'].sum()
+    ret['position_total_sum'] = round(total_position, 2)
     ret['taxes_sum'] = round(consolidate_brl['taxes_sum'].sum(), 2)
+    ret['rentability'] = 100 * round(total_position/total_cost - 1, 2)
 
     consolidate_usd = consolidate.loc[consolidate['currency'] == 'USD']
-    ret['total_cost_sum_usd'] = round(consolidate_usd['total_cost'].sum(), 2)
+    total_cost_usd = consolidate_usd['total_cost'].sum()
+    ret['total_cost_sum_usd'] = round(total_cost_usd, 2)
     ret['total_wages_sum_usd'] = round(consolidate_usd['wages_sum'].sum(), 2)
     ret['total_rents_wage_sum_usd'] = round(consolidate_usd['rents_wage_sum'].sum(), 2)
-    ret['position_total_sum_usd'] = round(consolidate_usd['position_total'].sum(), 2)
+    total_position_usd = consolidate_usd['position_total'].sum()
+    ret['position_total_sum_usd'] = round(total_position_usd, 2)
     ret['taxes_sum_usd'] = round(consolidate_usd['taxes_sum'].sum(), 2)
+    ret['rentability_usd'] = 100 * round(total_position_usd/total_cost_usd - 1, 2)
 
     rate = 0
     if 'BRL' in usd_rates:

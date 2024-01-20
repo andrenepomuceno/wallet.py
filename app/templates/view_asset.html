@@ -35,10 +35,12 @@
         {{ wages_events|safe }}
     </div>
 
-    <h2>All Negotiation</h2>
-    <div class="table table-striped mt-3">
-        {{ all_negotiation|safe }}
-    </div>
+    {% if all_negotiation %}
+        <h2>All Negotiation</h2>
+        <div class="table table-striped mt-3">
+            {{ all_negotiation|safe }}
+        </div>
+    {% endif %}
 
     <h2>All Movimentations</h2>
     <div class="table table-striped mt-3">

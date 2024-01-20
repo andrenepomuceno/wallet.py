@@ -1,10 +1,11 @@
-from flask import render_template, request, redirect, url_for
+from flask import render_template, request, redirect, url_for, flash
 
 import os
-from app import app
-from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
+from app import app, db
+from app.models import Generic_Extract, process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
 from app.processing import view_generic_asset_request, view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
 from app.processing import view_extract_request, view_extract_asset_request, view_generic_extract_request
+from app.forms import GenericExtractForm
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -88,8 +89,43 @@ def view_extract_asset(asset=None):
 
 @app.route('/generic', methods=['GET', 'POST'])
 def view_generic_extract():
+    app.logger.info('view_generic_extract')
+
+    addForm = GenericExtractForm()
+    if addForm.validate_on_submit():
+        app.logger.info('On submit')
+
+        existing_entry = Generic_Extract.query.filter_by(
+            date=addForm.date.data,
+            asset=addForm.asset.data,
+            movimentation=addForm.movimentation.data,
+            quantity=addForm.quantity.data,
+            price=addForm.price.data,
+            total=addForm.total.data
+        ).first()
+
+        if not existing_entry:
+            new_entry = Generic_Extract(
+                date=addForm.date.data,
+                asset=addForm.asset.data,
+                movimentation=addForm.movimentation.data,
+                quantity=addForm.quantity.data,
+                price=addForm.price.data,
+                total=addForm.total.data
+            )
+            db.session.add(new_entry)
+            db.session.commit()
+            app.logger.info('Added new entry to database!')
+            flash('Entry added successfully!')
+            return redirect(url_for('view_generic_extract'))
+        else:
+            app.logger.info('New entry already exists in the database!')
+            flash('Entry already exists in the database.')
+    else:
+        app.logger.debug(f'Not submit. Errors: {addForm.errors}')
+
     df = view_generic_extract_request(request)
-    return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')])
+    return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')], form=addForm)
 
 @app.route('/generic/<asset>', methods=['GET', 'POST'])
 def view_generic_asset(asset=None):
@@ -107,7 +143,6 @@ def view_generic_asset(asset=None):
         wages_events=wages[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe'),
         all_movimentation=all_movimentation.to_html(classes='pandas-dataframe')
     )
-
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():

@@ -3,7 +3,7 @@
     <h1>B3 Movimentation Data</h1>
 
     <!-- Botão para Mostrar/Ocultar o Formulário de Filtro -->
-    <button type="button" class="btn btn-info" onclick="toggleFilters()">Mostrar/Ocultar Filtros</button>
+    <button type="button" class="btn btn-info" onclick="toggleDisplay('filterForm')">Mostrar/Ocultar Filtros</button>
 
     <!-- Formulário de Filtro em um Container -->
     <form method="post" action="/movimentation" id="filterForm" class="form-inline" style="display: none;">
@@ -57,15 +57,4 @@
             {{ table|safe }}
         {% endfor %}
     </div>
-
-    <script>
-        function toggleFilters() {
-            var filterForm = document.getElementById("filterForm");
-            if (filterForm.style.display === "none") {
-                filterForm.style.display = "block";
-            } else {
-                filterForm.style.display = "none";
-            }
-        }
-    </script>
 {% endblock %}

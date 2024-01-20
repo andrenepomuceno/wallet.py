@@ -4,7 +4,7 @@
 
     <h2>BRL</h2>
     <p>Cost: {{ info['total_cost_sum'] }}</p>
-    <p>Position: {{ info['position_total_sum'] }}</p>
+    <p>Position: {{ info['position_total_sum'] }} ({{ info['rentability'] }} %)</p>
     <p>Wages: {{ info['total_wages_sum'] }}</p>
     <p>Rent Wages: {{ info['total_rents_wage_sum'] }}</p>
     <p>Taxes: {{ info['taxes_sum'] }}</p>
@@ -16,7 +16,7 @@
 
     <h2>USD</h2>
     <p>Cost: {{ info['total_cost_sum_usd'] }}</p>
-    <p>Position: {{ info['position_total_sum_usd'] }}</p>
+    <p>Position: {{ info['position_total_sum_usd'] }} ({{ info['rentability_usd'] }} %)</p>
     <p>Wages: {{ info['total_wages_sum_usd'] }}</p>
     <p>Rent Wages: {{ info['total_rents_wage_sum_usd'] }}</p>
     <p>Taxes: {{ info['taxes_sum_usd'] }}</p>
