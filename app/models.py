@@ -274,13 +274,7 @@ def process_generic_extract(df):
     df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
     df['Price'] = pd.to_numeric(df['Price'], errors='coerce').fillna(0.0)
     df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0.0)
-
-    def fill_movimentation(row):
-        if pd.isna(row['Movimentation']):
-            return 'Buy' if row['Total'] >= 0 else 'Sell'
-        else:
-            return row['Movimentation']
-    df['Movimentation'] = df.apply(fill_movimentation, axis=1)
+    df['Movimentation'] = df['Movimentation'].fillna('')
     
     print(df.to_string())
 
@@ -319,6 +313,13 @@ def generic_extract_sql_to_df(result):
                       columns=['Date', 'Asset', 'Movimentation', 'Quantity',
                                'Price', 'Total'])
     df['Date'] = pd.to_datetime(df['Date'])
+
+    def fill_movimentation(row):
+        if row['Movimentation'] == '':
+            return 'Buy' if row['Total'] >= 0 else 'Sell'
+        else:
+            return row['Movimentation']
+    df['Movimentation'] = df.apply(fill_movimentation, axis=1)
 
     return df
 
