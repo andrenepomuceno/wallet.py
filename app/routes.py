@@ -5,7 +5,7 @@ from app import app, db
 from app.models import Generic_Extract, process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
 from app.processing import view_generic_asset_request, view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
 from app.processing import view_extract_request, view_extract_asset_request, view_generic_extract_request
-from app.forms import GenericExtractForm
+from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -39,8 +39,10 @@ def home():
 
 @app.route('/movimentation', methods=['GET', 'POST'])
 def view_movimentation():
+    filterForm = B3MovimentationFilterForm()
+
     df = view_movimentation_request(request)
-    return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')])
+    return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')], form=filterForm)
 
 @app.route('/negotiation', methods=['GET', 'POST'])
 def view_negotiation():
@@ -91,9 +93,9 @@ def view_extract_asset(asset=None):
 def view_generic_extract():
     app.logger.info('view_generic_extract')
 
-    addForm = GenericExtractForm()
+    addForm = GenericExtractAddForm()
     if addForm.validate_on_submit():
-        app.logger.info('On submit')
+        app.logger.info('addForm On submit.')
 
         existing_entry = Generic_Extract.query.filter_by(
             date=addForm.date.data,
@@ -125,7 +127,7 @@ def view_generic_extract():
         app.logger.debug(f'Not submit. Errors: {addForm.errors}')
 
     df = view_generic_extract_request(request)
-    return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')], form=addForm)
+    return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')], addForm=addForm)
 
 @app.route('/generic/<asset>', methods=['GET', 'POST'])
 def view_generic_asset(asset=None):

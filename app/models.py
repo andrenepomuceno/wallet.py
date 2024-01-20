@@ -33,6 +33,8 @@ def process_b3_movimentation(file_path):
         df = pd.read_csv(file_path)
     elif file_path.endswith('.xlsx'):
         df = pd.read_excel(file_path)
+    else:
+        raise Exception('Filetype not supported')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Preço unitário'] = pd.to_numeric(df['Preço unitário'], errors='coerce').fillna(0.0)
@@ -90,6 +92,8 @@ def process_b3_negotiation(file_path):
         df = pd.read_csv(file_path)
     elif file_path.endswith('.xlsx'):
         df = pd.read_excel(file_path)
+    else:
+        raise Exception('Filetype not supported')
 
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
@@ -202,6 +206,8 @@ def process_avenue_extract(file_path):
         df = pd.read_csv(file_path)
     elif file_path.endswith('.xlsx'):
         df = pd.read_excel(file_path)
+    else:
+        raise Exception('Filetype not supported')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Liquidação'] = pd.to_datetime(df['Liquidação'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
