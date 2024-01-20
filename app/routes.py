@@ -2,9 +2,9 @@ from flask import render_template, request, redirect, url_for
 
 import os
 from app import app
-from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_cripto_extract
-from app.processing import view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
-from app.processing import view_extract_request, view_extract_asset_request
+from app.models import process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
+from app.processing import view_generic_asset_request, view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
+from app.processing import view_extract_request, view_extract_asset_request, view_generic_extract_request
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -28,9 +28,9 @@ def home():
         elif filetype == 'Avenue Extract':
             process_avenue_extract(filepath)
             return redirect(url_for('view_extract'))
-        elif filetype == 'Cripto':
-            process_cripto_extract(filepath)
-            return redirect(url_for('view_extract'))
+        elif filetype == 'Generic Extract':
+            process_generic_extract(filepath)
+            return redirect(url_for('view_generic_extract'))
         else:
             return render_template('index.html', message='Filetype not supported.')
         
@@ -49,24 +49,17 @@ def view_negotiation():
 @app.route('/view/<asset>', methods=['GET', 'POST'])
 def view_asset(asset=None):
     asset_info = view_asset_request(request, asset)
-
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
     all_movimentation = dataframes['movimentation']
     all_negotiation = dataframes['negotiation']
     buys_events = dataframes['buys']
     sells_events = dataframes['sells']
-    # negotiation_buys = dataframes['negotiation_buys']
-    # negotiation_sells = dataframes['negotiation_sells']
     return render_template(
         'view_asset.html', info=asset_info, 
         buys_events=buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
         sells_events=sells_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
         wages_events=wages[['Data', 'Valor da Operação', 'Movimentação','Produto']].to_html(classes='pandas-dataframe'),
-
-        # negotiation_buys=[negotiation_buys[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')],
-        # negotiation_sells=[negotiation_sells[['Data do Negócio','Quantidade','Preço', 'Valor']].to_html(classes='pandas-dataframe')]
-
         all_negotiation=all_negotiation[['Data do Negócio','Tipo de Movimentação','Quantidade','Preço','Valor','Código de Negociação']].to_html(),
         all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
     )
@@ -78,15 +71,13 @@ def view_extract():
 
 @app.route('/extract/<asset>', methods=['GET', 'POST'])
 def view_extract_asset(asset=None):
+    # TODO unify with view_asset
     asset_info = view_extract_asset_request(request, asset)
-
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
     all_movimentation = dataframes['movimentation']
-    
     buys_events = dataframes['buys']
     sells_events = dataframes['sells']
-
     return render_template(
         'view_asset.html', info=asset_info, 
         buys_events=buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
@@ -94,6 +85,29 @@ def view_extract_asset(asset=None):
         wages_events=wages[['Data', 'Valor da Operação', 'Movimentação','Produto']].to_html(classes='pandas-dataframe'),
         all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
     )
+
+@app.route('/generic', methods=['GET', 'POST'])
+def view_generic_extract():
+    df = view_generic_extract_request(request)
+    return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')])
+
+@app.route('/generic/<asset>', methods=['GET', 'POST'])
+def view_generic_asset(asset=None):
+    # TODO unify with view_asset
+    asset_info = view_generic_asset_request(request, asset)
+    dataframes = asset_info['dataframes']
+    wages = dataframes['wages']
+    all_movimentation = dataframes['movimentation']
+    buys_events = dataframes['buys']
+    sells_events = dataframes['sells']
+    return render_template(
+        'view_asset.html', info=asset_info, 
+        buys_events=buys_events.to_html(classes='pandas-dataframe'),
+        sells_events=sells_events.to_html(classes='pandas-dataframe'),
+        wages_events=wages[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe'),
+        all_movimentation=all_movimentation.to_html(classes='pandas-dataframe')
+    )
+
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():

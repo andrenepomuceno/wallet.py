@@ -3,9 +3,10 @@ import yfinance_cache as yf
 import requests
 import requests_cache
 from lxml import html
+import re
 
 from app import app, db
-from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df
+from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_valid_b3_ticker, parse_b3_produto, parse_b3_ticker, brl_to_float
 
 scrap_dict = {
@@ -44,6 +45,7 @@ def scrape_data(url, xpath):
         return [f"Erro ao realizar o scraping: {e}"]
 
 def usd_exchange_rate(currency = 'BRL'):
+    app.logger.info('usd_exchange_rate')
     url = 'https://api.exchangerate-api.com/v4/latest/USD'
     try:
         response = request_cache.get(url)
@@ -471,6 +473,175 @@ def view_extract_asset_request(request, asset):
     asset_info['valid'] = True
     return asset_info
 
+def view_generic_extract_request(request):
+    app.logger.info(f'view_generic_extract')
+
+    query = Generic_Extract.query.order_by(Generic_Extract.date.asc())
+    result = query.all()
+    extract = generic_extract_sql_to_df(result)
+
+    return extract
+
+def view_generic_asset_request(request, asset):
+    app.logger.info(f'Processing view_generic_asset_request for "{asset}".')
+
+    asset_info = {}
+    dataframes = {}
+
+    asset_info['valid'] = False
+    asset_info['name'] = asset
+    
+    currency = 'BRL'
+    first_buy = None
+    age = None
+    last_close_price = 0
+
+    query = Generic_Extract.query.filter(Generic_Extract.asset.like(f'%{asset}%')).order_by(Generic_Extract.date.asc())
+    result = query.all()
+    extract_df = generic_extract_sql_to_df(result)
+    if len(extract_df) == 0:
+        app.logger.warning(f'Extract data not found for {asset}')
+        return asset_info
+    
+    dataframes['movimentation'] = extract_df
+
+    ticker = extract_df['Asset'].value_counts().index[0]
+    asset_info['ticker'] = ticker
+
+    buys = extract_df.loc[
+        (
+            (extract_df['Movimentation'] == "Buy")
+        )
+    ]
+    dataframes['buys'] = buys
+    if len(buys) > 0:
+        first_buy = buys.iloc[0]['Date']
+        age = pd.to_datetime("today") - first_buy
+
+    sells = extract_df.loc[
+        (
+            (extract_df['Movimentation'] == "Sell")
+        )
+    ]
+    dataframes['sells'] = sells
+
+    taxes = extract_df.loc[
+        (extract_df['Movimentation'] == "Taxes")
+    ]
+    taxes_sum = abs(taxes['Total'].sum())
+    dataframes['taxes'] = taxes
+    asset_info['taxes_sum'] = round(taxes_sum, 2)
+
+    wages = extract_df.loc[
+        (extract_df['Movimentation'] == "Wages")
+    ]
+    wages_sum = abs(wages['Total'].sum())
+    dataframes['wages'] = wages
+    asset_info['wages_sum'] = round(wages_sum, 2)
+
+    rents_wages_sum = 0
+    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
+
+    buys_quantity_sum = buys['Quantity'].sum()
+    asset_info['buys_quantity_sum'] = buys_quantity_sum
+
+    sells_sum = abs(sells['Quantity'].sum())
+    asset_info['sells_sum'] = round(sells_sum, 2)
+
+    position = buys_quantity_sum - sells_sum
+    asset_info['position'] = position
+
+    if first_buy is not None:
+        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
+
+    if age is not None:
+        asset_info['age'] = age.days
+
+    buys_value_sum = buys['Total'].sum()
+    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
+
+    sells_value_sum = abs(sells['Total'].sum())
+    asset_info['sells_value_sum'] = sells_value_sum
+
+    total_cost = buys_value_sum - sells_value_sum
+    asset_info['total_cost'] = round(total_cost, 2)
+
+    liquid_cost = total_cost - wages_sum - rents_wages_sum + taxes_sum
+    asset_info['liquid_cost'] = round(liquid_cost, 2)
+
+    buys_wsum = (buys['Quantity'] * buys['Price']).sum()
+    buys_quantity = buys['Quantity'].sum()
+    buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
+    asset_info['buy_avg_price'] = round(buy_avg_price, 2)
+
+    buys_wsum2 = buys['Total'].sum()
+    buy_avg_price2 = buys_wsum2 / buys_quantity if buys_quantity > 0 else 0
+    asset_info['buy_avg_price2'] = round(buy_avg_price2, 2)
+    if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
+        app.logger.warning("Warning! buys_wsum inconsistency!")
+
+    asset_info['rented'] = 0
+    rented = asset_info['rented']
+
+    position_sum = round(position + rented, 4)
+    asset_info['position_sum'] = position_sum
+
+    long_name = ''
+
+    if position > 0:
+        app.logger.info('Trying to get online asset data...')
+        # try:
+        if re.match(r'BTC|ETH', ticker):
+            app.logger.debug('Cripto data!')
+            stock = yf.Ticker(ticker + "-USD")
+            info = stock.info
+
+            last_close_price = info['previousClose']
+            long_name = info['name']
+
+            rate = usd_exchange_rate('BRL')
+            last_close_price = rate * last_close_price
+
+        elif ticker in scrap_dict:
+            app.logger.info(f'Scraping data for {ticker}')
+            scrap_info = scrap_dict[ticker]
+            scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
+            last_close_price = scraped[0]
+
+        else:
+            app.logger.info('Ticker not supported!')
+        
+        # except:
+        #     app.logger.error('Failed to get online asset data!')
+        #     pass
+
+    asset_info['last_close_price'] = round(last_close_price, 2)
+    asset_info['currency'] = currency
+    asset_info['long_name'] = long_name
+
+    position_total = 0
+    rentabiliy = -100
+    price_gain = -100
+    by_year = None
+    if last_close_price != None and position_sum > 0:
+        position_total = position_sum * last_close_price
+        rentabiliy = 100 * (position_total/liquid_cost - 1)
+        price_gain = 100 * (last_close_price/buy_avg_price - 1)
+        if age is not None:
+            by_year = round(rentabiliy/(age.days/365), 2)
+            
+    
+    asset_info['position_total'] = round(position_total, 2)
+    asset_info['rentability'] = round(rentabiliy, 2)
+    asset_info['price_gain'] = round(price_gain, 2)
+    asset_info['rentability_by_year'] = by_year
+
+    asset_info['valid'] = True
+    app.logger.debug(asset_info)
+
+    asset_info['dataframes'] = dataframes
+    return asset_info
+
 def view_consolidate_request(request):
     app.logger.info(f'view_consolidate_request')
 
@@ -513,10 +684,29 @@ def view_consolidate_request(request):
 
     avenue_consolidate['url'] = avenue_consolidate['name'].apply(lambda x: f"<a href='/extract/{x}'>{x}</a>")
 
+    query = Generic_Extract.query
+    result = query.all()
+    movimentation = generic_extract_sql_to_df(result)
+    if len(movimentation) == 0:
+        return ret
+    
+    generic_consolidate = pd.DataFrame()
+    products = movimentation['Asset'].value_counts().to_frame()
+    print(products)
+    for index, product in products.iterrows():
+        if product.name == '':
+            continue
+
+        asset_info = view_generic_asset_request(request, product.name)
+        new_row = pd.DataFrame([asset_info])
+        generic_consolidate = pd.concat([generic_consolidate, new_row], ignore_index=True)
+
+    generic_consolidate['url'] = generic_consolidate['name'].apply(lambda x: f"<a href='/generic/{x}'>{x}</a>")
+
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
 
-    consolidate = pd.concat([b3_consolidate, avenue_consolidate])
+    consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     consolidate = consolidate[['name','url','ticker','currency','last_close_price',
                                'position_sum','position_total','buy_avg_price',
                                'total_cost','wages_sum','rents_wage_sum','liquid_cost',
