@@ -6,6 +6,7 @@ from app.models import Generic_Extract, process_b3_movimentation, process_b3_neg
 from app.processing import view_generic_asset_request, view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
 from app.processing import view_extract_request, view_extract_asset_request, view_generic_extract_request
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
+import pandas as pd
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -14,33 +15,48 @@ def home():
         filetype = request.form['filetype']
 
         if not file:
-            return render_template('index.html', message='No file provided for upload.')
+            flash('Error! No file provided for upload.')
+            return render_template('index.html')
         
         filepath = os.path.join('uploads', file.filename)
         file.save(filepath)
         app.logger.debug(f'File {file.filename} saved at {filepath}.')
 
+        if filepath.endswith('.csv'):
+            df = pd.read_csv(filepath)
+        elif filepath.endswith('.xlsx'):
+            df = pd.read_excel(filepath)
+        else:
+            flash('Error! Filetype not supported.')
+            return render_template('index.html')
+        
+        app.logger.debug(f'File {file.filename} loaded to dataframe!')
+        
         if filetype == 'B3 Movimentation':
-            process_b3_movimentation(filepath)
+            process_b3_movimentation(df)
+            flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_movimentation'))
         elif filetype == 'B3 Negotiation':
-            process_b3_negotiation(filepath)
+            process_b3_negotiation(df)
+            flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_negotiation'))
         elif filetype == 'Avenue Extract':
-            process_avenue_extract(filepath)
+            process_avenue_extract(df)
+            flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_extract'))
         elif filetype == 'Generic Extract':
-            process_generic_extract(filepath)
+            process_generic_extract(df)
+            flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_generic_extract'))
         else:
-            return render_template('index.html', message='Filetype not supported.')
+            flash('Error! File type not supported.')
+            return render_template('index.html')
         
-    return render_template('index.html', message='')
+    return render_template('index.html')
 
 @app.route('/movimentation', methods=['GET', 'POST'])
 def view_movimentation():
     filterForm = B3MovimentationFilterForm()
-
     df = view_movimentation_request(request)
     return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')], form=filterForm)
 
@@ -125,6 +141,9 @@ def view_generic_extract():
             flash('Entry already exists in the database.')
     else:
         app.logger.debug(f'Not submit. Errors: {addForm.errors}')
+        for field, errors in addForm.errors.items():
+            for error in errors:
+                flash(f"Error validating field {getattr(addForm, field).label.text}: {error}")
 
     df = view_generic_extract_request(request)
     return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')], addForm=addForm)

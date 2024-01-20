@@ -1,5 +1,5 @@
 from app import app, db
-from flask import abort
+from flask import abort, flash
 import pandas as pd
 import re
 
@@ -26,15 +26,8 @@ class B3_Movimentation(db.Model):
     def __repr__(self):
         return f'<B3_Movimentation {self.id}>'
 
-def process_b3_movimentation(file_path):
-    app.logger.info(f'Processing file: {file_path}')
-    
-    if file_path.endswith('.csv'):
-        df = pd.read_csv(file_path)
-    elif file_path.endswith('.xlsx'):
-        df = pd.read_excel(file_path)
-    else:
-        raise Exception('Filetype not supported')
+def process_b3_movimentation(df):
+    app.logger.info(f'Processing B3 Movimentation...')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Preço unitário'] = pd.to_numeric(df['Preço unitário'], errors='coerce').fillna(0.0)
@@ -43,6 +36,7 @@ def process_b3_movimentation(file_path):
     df['Produto'] = df['Produto'].str.strip()
 
     app.logger.info('Inserting data into database...')
+    duplicates = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
         if not B3_Movimentation.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
@@ -58,6 +52,9 @@ def process_b3_movimentation(file_path):
                 valor_operacao=row['Valor da Operação']
             )
             db.session.add(new_entry)
+        else:
+            duplicates += 1
+    flash(f'Duplicated rows discarded: {duplicates}')
     db.session.commit()
 
     return df
@@ -85,22 +82,16 @@ class B3_Negotiation(db.Model):
     def __repr__(self):
         return f'<B3_Negotiation {self.id}>'
 
-def process_b3_negotiation(file_path):
-    app.logger.info(f'Processing B3 Negotiation file: {file_path}')
+def process_b3_negotiation(df):
+    app.logger.info(f'Processing B3 Negotiation...')
     
-    if file_path.endswith('.csv'):
-        df = pd.read_csv(file_path)
-    elif file_path.endswith('.xlsx'):
-        df = pd.read_excel(file_path)
-    else:
-        raise Exception('Filetype not supported')
-
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
     df['Preço'] = pd.to_numeric(df['Preço'], errors='coerce').fillna(0.0)
     df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
 
     app.logger.info('Inserting data into database...')
+    duplicates = 0
     for _, row in df.iterrows():
         if not B3_Negotiation.query.filter_by(
             data=row['Data do Negócio'],                                  
@@ -125,6 +116,9 @@ def process_b3_negotiation(file_path):
                 valor=row['Valor']
             )
             db.session.add(new_entry)
+        else:
+            duplicates += 1
+    flash(f'Duplicated rows discarded: {duplicates}')
     db.session.commit()
 
     return df
@@ -199,15 +193,8 @@ def extract_fill(df):
 
     return df
 
-def process_avenue_extract(file_path):
-    app.logger.info(f'Processing Avenue Extract file: {file_path}')
-
-    if file_path.endswith('.csv'):
-        df = pd.read_csv(file_path)
-    elif file_path.endswith('.xlsx'):
-        df = pd.read_excel(file_path)
-    else:
-        raise Exception('Filetype not supported')
+def process_avenue_extract(df):
+    app.logger.info(f'Processing Avenue Extract file...')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Liquidação'] = pd.to_datetime(df['Liquidação'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
@@ -217,6 +204,7 @@ def process_avenue_extract(file_path):
     df = extract_fill(df)
 
     app.logger.info('Inserting data into database...')
+    duplicates = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
         if not Avenue_Extract.query.filter_by(
@@ -248,6 +236,9 @@ def process_avenue_extract(file_path):
                 preco_unitario=row['Preço unitário']
             )
             db.session.add(new_entry)
+        else:
+            duplicates += 1
+    flash(f'Duplicated rows discarded: {duplicates}')
     db.session.commit()
 
     return df
@@ -276,24 +267,25 @@ class Generic_Extract(db.Model):
     def __repr__(self):
         return f'<Generic_Extract {self.id}>'
 
-def process_generic_extract(file_path):
-    app.logger.info(f'process_generic_extract file: {file_path}')
+def process_generic_extract(df):
+    app.logger.info(f'Processing Generic Extract file...')
 
-    if file_path.endswith('.csv'):
-        df = pd.read_csv(file_path)
-    elif file_path.endswith('.xlsx'):
-        df = pd.read_excel(file_path)
-    else:
-        raise Exception('Filetype not supported')
-
-    df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
+    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d').dt.strftime('%Y-%m-%d')
     df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
     df['Price'] = pd.to_numeric(df['Price'], errors='coerce').fillna(0.0)
     df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0.0)
+
+    def fill_movimentation(row):
+        if pd.isna(row['Movimentation']):
+            return 'Buy' if row['Total'] >= 0 else 'Sell'
+        else:
+            return row['Movimentation']
+    df['Movimentation'] = df.apply(fill_movimentation, axis=1)
     
     print(df.to_string())
 
     app.logger.info('Inserting data into database...')
+    duplicates = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
         if not Generic_Extract.query.filter_by(
@@ -302,7 +294,7 @@ def process_generic_extract(file_path):
             movimentation=row['Movimentation'],
             quantity=row['Quantity'],
             price=row['Price'],
-            total=row['Total'],
+            total=row['Total']
         ).first():
             new_entry = Generic_Extract(
                 date=row['Date'],
@@ -310,10 +302,14 @@ def process_generic_extract(file_path):
                 movimentation=row['Movimentation'],
                 quantity=row['Quantity'],
                 price=row['Price'],
-                total=row['Total'],
+                total=row['Total']
             )
             db.session.add(new_entry)
+        else:
+            duplicates += 1
     db.session.commit()
+
+    flash(f'Duplicated rows discarded: {duplicates}')
 
     return df
 
@@ -323,13 +319,6 @@ def generic_extract_sql_to_df(result):
                       columns=['Date', 'Asset', 'Movimentation', 'Quantity',
                                'Price', 'Total'])
     df['Date'] = pd.to_datetime(df['Date'])
-
-    def fill_movimentation(row):
-        if pd.isna(row['Movimentation']):
-            return 'Buy' if row['Total'] >= 0 else 'Sell'
-        else:
-            return row['Movimentation']
-    df['Movimentation'] = df.apply(fill_movimentation, axis=1)
 
     return df
 
