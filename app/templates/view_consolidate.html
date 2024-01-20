@@ -2,31 +2,40 @@
 {% block content %}
     <h1>Consolidate Data</h1>
 
-    <h2>BRL</h2>
-    <p>Total Cost: {{ info['total_cost_sum'] }}</p>
-    <p>Liquid Cost: {{ info['liquid_cost'] }}</p>
-    <p>Position: {{ info['position_total_sum'] }} ({{ info['rentability'] }} %)</p>
-    <p>Wages: {{ info['total_wages_sum'] }}</p>
-    <p>Rent Wages: {{ info['total_rents_wage_sum'] }}</p>
-    <p>Taxes: {{ info['taxes_sum'] }}</p>
-    <!-- <p>Cost: {{ info['total_cost_sum'] + info['total_cost_sum_usd_brl'] }}</p>
-    <p>Position: {{ info['position_total_sum'] + info['position_total_sum_usd_brl'] }}</p>
-    <p>Wages: {{ info['total_wages_sum'] + info['total_wages_sum_usd_brl'] }}</p>
-    <p>Rent Wages: {{ info['total_rents_wage_sum'] + info['total_rents_wage_sum_usd_brl'] }}</p>
-    <p>Taxes: {{ info['taxes_sum'] + info['taxes_sum_usd_brl'] }}</p> -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <h2>BRL</h2>
+                <p>Total Cost: {{ info['total_cost_sum'] }}</p>
+                <p>Liquid Cost: {{ info['liquid_cost'] }}</p>
+                <p>Position: {{ info['position_total_sum'] }} ({{ info['rentability'] }} %)</p>
+                <p>Wages: {{ info['total_wages_sum'] }}</p>
+                <p>Rent Wages: {{ info['total_rents_wage_sum'] }}</p>
+                <p>Taxes: {{ info['taxes_sum'] }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <h2>USD</h2>
+                <p>Cost: {{ info['total_cost_sum_usd'] }} (BRL {{ info['total_cost_sum_usd_brl'] }})</p>
+                <p>Liquid Cost: {{ info['liquid_cost_usd'] }}</p>
+                <p>Position: {{ info['position_total_sum_usd'] }} (BRL {{ info['position_total_sum_usd_brl'] }}) ({{ info['rentability_usd'] }} %)</p>
+                <p>Wages: {{ info['total_wages_sum_usd'] }}</p>
+                <p>Rent Wages: {{ info['total_rents_wage_sum_usd'] }}</p>
+                <p>Taxes: {{ info['taxes_sum_usd'] }}</p>
+                <p>USD/BRL: {{ info['usd_brl'] }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <h2>Consolidate</h2>
+                <p>Cost: BRL {{ info['total_cost_brl'] }}</p>
+                <p>Position: BRL {{ info['total_position_brl'] }} ({{ info['rentability_brl'] }} %)</p>
+            </div>
+        </div>
+    </div>    
 
-    <h2>USD</h2>
-    <p>Cost: {{ info['total_cost_sum_usd'] }} (BRL {{ info['total_cost_sum_usd_brl'] }})</p>
-    <p>Liquid Cost: {{ info['liquid_cost_usd'] }}</p>
-    <p>Position: {{ info['position_total_sum_usd'] }} (BRL {{ info['position_total_sum_usd_brl'] }}) ({{ info['rentability_usd'] }} %)</p>
-    <p>Wages: {{ info['total_wages_sum_usd'] }}</p>
-    <p>Rent Wages: {{ info['total_rents_wage_sum_usd'] }}</p>
-    <p>Taxes: {{ info['taxes_sum_usd'] }}</p>
-    <p>USD/BRL: {{ info['usd_brl'] }}</p>
-
-    <h2>Consolidate</h2>
-    <p>Cost: BRL {{ info['total_cost_brl'] }}</p>
-    <p>Position: BRL {{ info['total_position_brl'] }} ({{ info['rentability_brl'] }} %)</p>
+    <h2>Assets</h2>
     <div class="table table-striped mt-3">
         {{ consolidate|safe }}
     </div>

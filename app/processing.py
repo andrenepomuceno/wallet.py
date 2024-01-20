@@ -610,6 +610,7 @@ def view_generic_asset_request(request, asset):
 
         else:
             app.logger.info('Ticker not supported!')
+            last_close_price = buy_avg_price
         
         # except:
         #     app.logger.error('Failed to get online asset data!')
@@ -750,7 +751,6 @@ def view_consolidate_request(request):
     ret['taxes_sum_usd'] = round(consolidate_usd['taxes_sum'].sum(), 2)
     ret['rentability_usd'] = 100 * round(total_position_usd/total_cost_usd - 1, 2)
     ret['liquid_cost_usd'] = round(liquid_cost_usd, 2)
-
 
     rate = usd_exchange_rate('BRL')
     ret['usd_brl'] = rate
