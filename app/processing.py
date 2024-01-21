@@ -660,63 +660,60 @@ def view_consolidate_request(request):
     query = B3_Movimentation.query
     result = query.all()
     movimentation = b3_movimentation_sql_to_df(result)
-    if len(movimentation) == 0:
-        return ret
-    
-    movimentation['Produto_Parsed'] = parse_b3_produto(movimentation['Produto'])
-    movimentation['Ticker'] = parse_b3_ticker(movimentation['Produto'])
-
     b3_consolidate = pd.DataFrame()
-    products = movimentation['Ticker'].value_counts().to_frame()
-    for index, product in products.iterrows():
-        asset_info = view_asset_request(request, product.name)
-        new_row = pd.DataFrame([asset_info])
-        b3_consolidate = pd.concat([b3_consolidate, new_row], ignore_index=True)
+    if len(movimentation) > 0:
+        movimentation['Produto_Parsed'] = parse_b3_produto(movimentation['Produto'])
+        movimentation['Ticker'] = parse_b3_ticker(movimentation['Produto'])
 
-    b3_consolidate['url'] = b3_consolidate['name'].apply(lambda x: f"<a href='/view/{x}'>{x}</a>")
+        products = movimentation['Ticker'].value_counts().to_frame()
+        for index, product in products.iterrows():
+            asset_info = view_asset_request(request, product.name)
+            new_row = pd.DataFrame([asset_info])
+            b3_consolidate = pd.concat([b3_consolidate, new_row], ignore_index=True)
+
+        b3_consolidate['url'] = b3_consolidate['name'].apply(lambda x: f"<a href='/view/{x}'>{x}</a>")
 
     query = Avenue_Extract.query
     result = query.all()
     movimentation = avenue_extract_sql_to_df(result)
-    if len(movimentation) == 0:
-        return ret
-
     avenue_consolidate = pd.DataFrame()
-    products = movimentation['Produto'].value_counts().to_frame()
-    print(products)
-    for index, product in products.iterrows():
-        if product.name == '':
-            continue
+    if len(movimentation) > 0:
+        products = movimentation['Produto'].value_counts().to_frame()
+        print(products)
+        for index, product in products.iterrows():
+            if product.name == '':
+                continue
 
-        asset_info = view_extract_asset_request(request, product.name)
-        new_row = pd.DataFrame([asset_info])
-        avenue_consolidate = pd.concat([avenue_consolidate, new_row], ignore_index=True)
+            asset_info = view_extract_asset_request(request, product.name)
+            new_row = pd.DataFrame([asset_info])
+            avenue_consolidate = pd.concat([avenue_consolidate, new_row], ignore_index=True)
 
-    avenue_consolidate['url'] = avenue_consolidate['name'].apply(lambda x: f"<a href='/extract/{x}'>{x}</a>")
+        avenue_consolidate['url'] = avenue_consolidate['name'].apply(lambda x: f"<a href='/extract/{x}'>{x}</a>")
 
     query = Generic_Extract.query
     result = query.all()
     movimentation = generic_extract_sql_to_df(result)
-    if len(movimentation) == 0:
-        return ret
-    
     generic_consolidate = pd.DataFrame()
-    products = movimentation['Asset'].value_counts().to_frame()
-    print(products)
-    for index, product in products.iterrows():
-        if product.name == '':
-            continue
+    if len(movimentation) > 0:
+        products = movimentation['Asset'].value_counts().to_frame()
+        print(products)
+        for index, product in products.iterrows():
+            if product.name == '':
+                continue
 
-        asset_info = view_generic_asset_request(request, product.name)
-        new_row = pd.DataFrame([asset_info])
-        generic_consolidate = pd.concat([generic_consolidate, new_row], ignore_index=True)
+            asset_info = view_generic_asset_request(request, product.name)
+            new_row = pd.DataFrame([asset_info])
+            generic_consolidate = pd.concat([generic_consolidate, new_row], ignore_index=True)
 
-    generic_consolidate['url'] = generic_consolidate['name'].apply(lambda x: f"<a href='/generic/{x}'>{x}</a>")
+        generic_consolidate['url'] = generic_consolidate['name'].apply(lambda x: f"<a href='/generic/{x}'>{x}</a>")
 
     # print(pd.DataFrame(asset_list))
     # print(movimentation['Ticker'].value_counts())
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
+    if len(consolidate) == 0:
+        return ret
+
     consolidate = consolidate[['name','url','ticker','currency','last_close_price',
                                'position_sum','position_total','buy_avg_price',
                                'total_cost','wages_sum','rents_wage_sum','liquid_cost',
