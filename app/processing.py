@@ -271,11 +271,8 @@ def view_asset_request(request, asset):
         if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
             try:
                 stock = yf.Ticker(ticker + ".SA")
-                hist = stock.history(period="1d")
-                print(stock.info)
                 long_name = stock.info['longName']
-                if not hist.empty:
-                    last_close_price = hist['Close'].iloc[-1]
+                last_close_price = stock.info['previousClose']
                 currency = stock.info['currency']
                 asset_class = 'Ação'
             except:
@@ -441,9 +438,7 @@ def view_extract_asset_request(request, asset):
     if position > 0:
         try:
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="1d")
-            if not hist.empty:
-                last_close_price = hist['Close'].iloc[-1]
+            last_close_price = stock.info['previousClose']
             currency = stock.info['currency']
             long_name = stock.info['longName']
             asset_class = 'Stock'
@@ -600,22 +595,17 @@ def view_generic_asset_request(request, asset):
         app.logger.debug('Cripto data!')
         stock = yf.Ticker(ticker + "-USD")
         info = stock.info
-
         last_close_price = info['previousClose']
         long_name = info['name']
-
         rate = usd_exchange_rate('BRL')
         last_close_price = rate * last_close_price
-
         asset_class = 'Cripto'
 
     elif re.match(r'.*\.SA', ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
-
         last_close_price = info['previousClose']
         long_name = info['longName']
-
         asset_class = 'Ação'
 
     elif ticker in scrape_dict:

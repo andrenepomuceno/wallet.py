@@ -19,8 +19,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-upload_folder = 'uploads'
-if not os.path.exists(upload_folder):
-    os.makedirs(upload_folder)
+uploads_folder = 'uploads'
+if not os.path.exists(uploads_folder):
+    os.makedirs(uploads_folder)
 
 from app import routes
