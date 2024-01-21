@@ -58,7 +58,7 @@ def home():
 def view_movimentation():
     filterForm = B3MovimentationFilterForm()
     df = view_movimentation_request(request)
-    return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')], form=filterForm)
+    return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')], filterForm=filterForm)
 
 @app.route('/negotiation', methods=['GET', 'POST'])
 def view_negotiation():

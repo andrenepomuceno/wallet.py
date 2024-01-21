@@ -9,7 +9,7 @@ from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_valid_b3_ticker, parse_b3_produto, parse_b3_ticker, brl_to_float
 
-scrap_dict = {
+scrape_dict = {
     # "Tesouro Selic 2024": {
     #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2024/',
     #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
@@ -27,8 +27,6 @@ scrap_dict = {
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
     }
 }
-
-usd_rates = {}
 
 request_cache = requests_cache.CachedSession('request_cache', expire_after=3600)
 
@@ -268,6 +266,7 @@ def view_asset_request(request, asset):
     asset_info['position_sum'] = position_sum
 
     long_name = ''
+    asset_class = ''
     if position > 0:
         if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
             try:
@@ -278,18 +277,21 @@ def view_asset_request(request, asset):
                 if not hist.empty:
                     last_close_price = hist['Close'].iloc[-1]
                 currency = stock.info['currency']
+                asset_class = 'Ação'
             except:
                 pass
 
-        elif ticker in scrap_dict:
+        elif ticker in scrape_dict:
             app.logger.info(f'Scraping data for {ticker}')
-            scrap_info = scrap_dict[ticker]
+            scrap_info = scrape_dict[ticker]
             scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
             last_close_price = brl_to_float(scraped[0])
+            asset_class = 'Renda Fixa'
 
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
     asset_info['long_name'] = long_name
+    asset_info['asset_class'] = asset_class
 
     position_total = 0
     rentabiliy = -100
@@ -435,6 +437,7 @@ def view_extract_asset_request(request, asset):
     asset_info['position_sum'] = position_sum
 
     long_name = ''
+    asset_class = ''
     if position > 0:
         try:
             stock = yf.Ticker(ticker)
@@ -443,12 +446,14 @@ def view_extract_asset_request(request, asset):
                 last_close_price = hist['Close'].iloc[-1]
             currency = stock.info['currency']
             long_name = stock.info['longName']
+            asset_class = 'Stock'
         except:
             pass
 
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
     asset_info['long_name'] = long_name
+    asset_info['asset_class'] = asset_class
 
     position_total = 0
     rentabiliy = -100
@@ -587,7 +592,7 @@ def view_generic_asset_request(request, asset):
     asset_info['position_sum'] = position_sum
 
     long_name = ''
-
+    asset_class = ''
     if position > 0:
         app.logger.info('Trying to get online asset data...')
         # try:
@@ -602,9 +607,11 @@ def view_generic_asset_request(request, asset):
             rate = usd_exchange_rate('BRL')
             last_close_price = rate * last_close_price
 
-        elif ticker in scrap_dict:
+            asset_class = 'Cripto'
+
+        elif ticker in scrape_dict:
             app.logger.info(f'Scraping data for {ticker}')
-            scrap_info = scrap_dict[ticker]
+            scrap_info = scrape_dict[ticker]
             scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
             last_close_price = scraped[0]
 
@@ -619,6 +626,7 @@ def view_generic_asset_request(request, asset):
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
     asset_info['long_name'] = long_name
+    asset_info['asset_class'] = asset_class
 
     position_total = 0
     rentabiliy = -100
@@ -736,9 +744,8 @@ def view_consolidate_request(request):
     ret['total_rents_wage_sum'] = round(total_rents, 2)
     ret['position_total_sum'] = round(total_position, 2)
     ret['taxes_sum'] = round(taxes_sum, 2)
-    ret['rentability'] = 100 * round(total_position/total_cost - 1, 2)
+    ret['rentability'] = round(100 * (total_position/total_cost - 1), 2)
     ret['liquid_cost'] = round(liquid_cost, 2)
-
 
     consolidate_usd = consolidate.loc[consolidate['currency'] == 'USD']
     total_cost_usd = consolidate_usd['total_cost'].sum()
@@ -749,7 +756,7 @@ def view_consolidate_request(request):
     ret['total_rents_wage_sum_usd'] = round(consolidate_usd['rents_wage_sum'].sum(), 2)
     ret['position_total_sum_usd'] = round(total_position_usd, 2)
     ret['taxes_sum_usd'] = round(consolidate_usd['taxes_sum'].sum(), 2)
-    ret['rentability_usd'] = 100 * round(total_position_usd/total_cost_usd - 1, 2)
+    ret['rentability_usd'] = round(100 * (total_position_usd/total_cost_usd - 1), 2)
     ret['liquid_cost_usd'] = round(liquid_cost_usd, 2)
 
     rate = usd_exchange_rate('BRL')
@@ -765,6 +772,6 @@ def view_consolidate_request(request):
     total_position_brl = total_position + total_position_usd * rate
     ret['total_cost_brl'] = round(total_cost_brl, 2)
     ret['total_position_brl'] = round(total_position_brl, 2)
-    ret['rentability_brl'] = 100 * round(total_position_brl/total_cost_brl - 1, 2)
+    ret['rentability_brl'] = round(100 * (total_position_brl/total_cost_brl - 1), 2)
 
     return ret

@@ -7,33 +7,33 @@
     <div class="container" id="filterForm" style="display: none;">
         <h2>Filter</h2>
         <form method="POST" class="form-inline">
-            {{ form.hidden_tag() }}
+            {{ filterForm.hidden_tag() }}
             <div class="form-group">
-                {{ form.entrada_saida.label(class="form-control-label") }} {{ form.entrada_saida(class="form-control") }}
+                {{ filterForm.entrada_saida.label(class="form-control-label") }} {{ filterForm.entrada_saida(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.data.label(class="form-control-label") }} {{ form.data(class="form-control") }}
+                {{ filterForm.data.label(class="form-control-label") }} {{ filterForm.data(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.movimentacao.label(class="form-control-label") }} {{ form.movimentacao(class="form-control") }}
+                {{ filterForm.movimentacao.label(class="form-control-label") }} {{ filterForm.movimentacao(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.produto.label(class="form-control-label") }} {{ form.produto(class="form-control") }}
+                {{ filterForm.produto.label(class="form-control-label") }} {{ filterForm.produto(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.instituicao.label(class="form-control-label") }} {{ form.instituicao(class="form-control") }}
+                {{ filterForm.instituicao.label(class="form-control-label") }} {{ filterForm.instituicao(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.quantidade.label(class="form-control-label") }} {{ form.quantidade(class="form-control") }}
+                {{ filterForm.quantidade.label(class="form-control-label") }} {{ filterForm.quantidade(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.preco_unitario.label(class="form-control-label") }} {{ form.preco_unitario(class="form-control") }}
+                {{ filterForm.preco_unitario.label(class="form-control-label") }} {{ filterForm.preco_unitario(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.valor_operacao.label(class="form-control-label") }} {{ form.valor_operacao(class="form-control") }}
+                {{ filterForm.valor_operacao.label(class="form-control-label") }} {{ filterForm.valor_operacao(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ form.submit(class="btn btn-primary") }}
+                {{ filterForm.submit(class="btn btn-primary") }}
             </div>
         </form>
     </div>
