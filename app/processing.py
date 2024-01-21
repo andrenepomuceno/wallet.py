@@ -655,6 +655,7 @@ def view_consolidate_request(request):
     app.logger.info(f'view_consolidate_request')
 
     ret = {}
+    ret['valid'] = False
     
     query = B3_Movimentation.query
     result = query.all()
@@ -773,5 +774,7 @@ def view_consolidate_request(request):
     ret['total_cost_brl'] = round(total_cost_brl, 2)
     ret['total_position_brl'] = round(total_position_brl, 2)
     ret['rentability_brl'] = round(100 * (total_position_brl/total_cost_brl - 1), 2)
+
+    ret['valid'] = True
 
     return ret

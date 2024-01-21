@@ -168,6 +168,11 @@ def view_generic_asset(asset=None):
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
     info = view_consolidate_request(request)
+
+    if not info['valid']:
+        flash('Data not found! Please upload something.')
+        return redirect(url_for('home'))
+
     
     consolidate = info['consolidate']
     consolidate = consolidate[['url','currency','last_close_price','position_sum','position_total','buy_avg_price',
