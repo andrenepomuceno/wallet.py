@@ -15,6 +15,7 @@ SECRET_KEY = os.urandom(32)
 app.config['SECRET_KEY'] = SECRET_KEY
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///demo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 

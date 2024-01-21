@@ -593,29 +593,45 @@ def view_generic_asset_request(request, asset):
 
     long_name = ''
     asset_class = ''
-    if position > 0:
-        app.logger.info('Trying to get online asset data...')
-        # try:
-        if re.match(r'BTC|ETH', ticker):
-            app.logger.debug('Cripto data!')
-            stock = yf.Ticker(ticker + "-USD")
+    # if position > 0:
+    app.logger.info('Trying to get online asset data...')
+    # try:
+    if re.match(r'^(BTC|ETH)$', ticker):
+        app.logger.debug('Cripto data!')
+        stock = yf.Ticker(ticker + "-USD")
+        info = stock.info
+
+        last_close_price = info['previousClose']
+        long_name = info['name']
+
+        rate = usd_exchange_rate('BRL')
+        last_close_price = rate * last_close_price
+
+        asset_class = 'Cripto'
+
+    elif re.match(r'.*\.SA', ticker):
+        stock = yf.Ticker(ticker)
+        info = stock.info
+
+        last_close_price = info['previousClose']
+        long_name = info['longName']
+
+        asset_class = 'Ação'
+
+    elif ticker in scrape_dict:
+        app.logger.info(f'Scraping data for {ticker}')
+        scrap_info = scrape_dict[ticker]
+        scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
+        last_close_price = scraped[0]
+
+    else:
+        try:
+            stock = yf.Ticker(ticker)
             info = stock.info
-
             last_close_price = info['previousClose']
-            long_name = info['name']
-
-            rate = usd_exchange_rate('BRL')
-            last_close_price = rate * last_close_price
-
-            asset_class = 'Cripto'
-
-        elif ticker in scrape_dict:
-            app.logger.info(f'Scraping data for {ticker}')
-            scrap_info = scrape_dict[ticker]
-            scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
-            last_close_price = scraped[0]
-
-        else:
+            long_name = info['longName']
+            currency = info['currency']
+        except:
             app.logger.info('Ticker not supported!')
             last_close_price = buy_avg_price
         
