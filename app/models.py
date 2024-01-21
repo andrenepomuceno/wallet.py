@@ -37,6 +37,7 @@ def process_b3_movimentation(df):
 
     app.logger.info('Inserting data into database...')
     duplicates = 0
+    added = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
         if not B3_Movimentation.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
@@ -52,10 +53,13 @@ def process_b3_movimentation(df):
                 valor_operacao=row['Valor da Operação']
             )
             db.session.add(new_entry)
+            added += 1
         else:
             duplicates += 1
-    flash(f'Duplicated rows discarded: {duplicates}')
     db.session.commit()
+
+    flash(f'Rows Added: {added}')
+    flash(f'Duplicated rows discarded: {duplicates}')
 
     return df
 
@@ -92,6 +96,7 @@ def process_b3_negotiation(df):
 
     app.logger.info('Inserting data into database...')
     duplicates = 0
+    added = 0
     for _, row in df.iterrows():
         if not B3_Negotiation.query.filter_by(
             data=row['Data do Negócio'],                                  
@@ -116,10 +121,13 @@ def process_b3_negotiation(df):
                 valor=row['Valor']
             )
             db.session.add(new_entry)
+            added += 1
         else:
             duplicates += 1
-    flash(f'Duplicated rows discarded: {duplicates}')
     db.session.commit()
+
+    flash(f'Rows Added: {added}')
+    flash(f'Duplicated rows discarded: {duplicates}')
 
     return df
 
@@ -205,6 +213,7 @@ def process_avenue_extract(df):
 
     app.logger.info('Inserting data into database...')
     duplicates = 0
+    added = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
         if not Avenue_Extract.query.filter_by(
@@ -236,10 +245,13 @@ def process_avenue_extract(df):
                 preco_unitario=row['Preço unitário']
             )
             db.session.add(new_entry)
+            added += 1
         else:
             duplicates += 1
-    flash(f'Duplicated rows discarded: {duplicates}')
     db.session.commit()
+
+    flash(f'Rows Added: {added}')
+    flash(f'Duplicated rows discarded: {duplicates}')
 
     return df
 
@@ -280,6 +292,7 @@ def process_generic_extract(df):
 
     app.logger.info('Inserting data into database...')
     duplicates = 0
+    added = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
         if not Generic_Extract.query.filter_by(
@@ -299,10 +312,12 @@ def process_generic_extract(df):
                 total=row['Total']
             )
             db.session.add(new_entry)
+            added += 1
         else:
             duplicates += 1
     db.session.commit()
 
+    flash(f'Rows Added: {added}')
     flash(f'Duplicated rows discarded: {duplicates}')
 
     return df
