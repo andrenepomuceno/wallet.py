@@ -7,7 +7,7 @@ def is_valid_b3_ticker(ticker):
     else:
         return False
 
-def parse_b3_produto(column):
+def parse_b3_product(column):
     result = column.str.extract(r'^([A-Z0-9]{4}|[a-zA-Z0-9 .]+)', expand=False)
     result.fillna('', inplace=True)
     return result

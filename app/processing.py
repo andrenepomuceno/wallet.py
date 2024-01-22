@@ -7,7 +7,7 @@ import re
 
 from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
-from app.utils.parsing import is_valid_b3_ticker, parse_b3_produto, parse_b3_ticker, brl_to_float
+from app.utils.parsing import is_valid_b3_ticker, parse_b3_product, parse_b3_ticker, brl_to_float
 
 scrape_dict = {
     # "Tesouro Selic 2024": {
@@ -77,7 +77,7 @@ def process_b3_movimentation_request(request):
     if len(df) == 0:
         return df
     
-    df['Produto_Parsed'] = parse_b3_produto(df['Produto'])
+    df['Produto_Parsed'] = parse_b3_product(df['Produto'])
     print(df['Produto_Parsed'].value_counts())
     #print(df['Produto'].value_counts())
 
@@ -162,6 +162,7 @@ def process_b3_asset_request(request, asset):
     ]
     dataframes['sells'] = sells
 
+    # TODO process negotiation first 
     query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
     result = query.all()
     negotiation = b3_negotiation_sql_to_df(result)
@@ -644,7 +645,6 @@ def process_generic_asset_request(request, asset):
         price_gain = 100 * (last_close_price/buy_avg_price - 1)
         if age is not None:
             by_year = round(rentabiliy/(age.days/365), 2)
-            
     
     asset_info['position_total'] = round(position_total, 2)
     asset_info['rentability'] = round(rentabiliy, 2)
@@ -668,7 +668,7 @@ def process_consolidate_request(request):
     movimentation = b3_movimentation_sql_to_df(result)
     b3_consolidate = pd.DataFrame()
     if len(movimentation) > 0:
-        movimentation['Produto_Parsed'] = parse_b3_produto(movimentation['Produto'])
+        movimentation['Produto_Parsed'] = parse_b3_product(movimentation['Produto'])
         movimentation['Ticker'] = parse_b3_ticker(movimentation['Produto'])
 
         products = movimentation['Ticker'].value_counts().to_frame()
@@ -755,28 +755,31 @@ def process_consolidate_request(request):
     total_cost_usd = consolidate_usd['total_cost'].sum()
     liquid_cost_usd = consolidate_usd['liquid_cost'].sum()
     total_position_usd = consolidate_usd['position_total'].sum()
+    total_wages_usd = consolidate_usd['rents_wage_sum'].sum()
+    taxes_usd = consolidate_usd['taxes_sum'].sum()
     ret['total_cost_sum_usd'] = round(total_cost_usd, 2)
     ret['total_wages_sum_usd'] = round(consolidate_usd['wages_sum'].sum(), 2)
-    ret['total_rents_wage_sum_usd'] = round(consolidate_usd['rents_wage_sum'].sum(), 2)
+    ret['total_rents_wage_sum_usd'] = round(total_wages_usd, 2)
     ret['position_total_sum_usd'] = round(total_position_usd, 2)
-    ret['taxes_sum_usd'] = round(consolidate_usd['taxes_sum'].sum(), 2)
+    ret['taxes_sum_usd'] = round(taxes_usd, 2)
     ret['rentability_usd'] = round(100 * (total_position_usd/total_cost_usd - 1), 2)
     ret['liquid_cost_usd'] = round(liquid_cost_usd, 2)
 
     rate = usd_exchange_rate('BRL')
     ret['usd_brl'] = rate
 
-    ret['total_cost_sum_usd_brl'] = round(rate * ret['total_cost_sum_usd'], 2)
-    ret['total_wages_sum_usd_brl'] = round(rate * ret['total_wages_sum_usd'], 2)
-    ret['total_rents_wage_sum_usd_brl'] = round(rate * ret['total_rents_wage_sum_usd'], 2)
-    ret['position_total_sum_usd_brl'] = round(rate * ret['position_total_sum_usd'], 2)
-    ret['taxes_sum_usd_brl'] = round(rate * ret['taxes_sum_usd'], 2)
+    ret['total_cost_sum_usd_brl'] = round(rate * total_cost_usd, 2)
+    ret['total_wages_sum_usd_brl'] = round(rate * total_wages_usd, 2)
+    ret['total_rents_wage_sum_usd_brl'] = round(rate * total_wages_usd, 2)
+    ret['position_total_sum_usd_brl'] = round(rate * total_position_usd, 2)
+    ret['taxes_sum_usd_brl'] = round(rate * taxes_usd, 2)
 
     total_cost_brl = total_cost + total_cost_usd * rate
     total_position_brl = total_position + total_position_usd * rate
+    rentability_brl = 100 * (total_position_brl/total_cost_brl - 1)
     ret['total_cost_brl'] = round(total_cost_brl, 2)
     ret['total_position_brl'] = round(total_position_brl, 2)
-    ret['rentability_brl'] = round(100 * (total_position_brl/total_cost_brl - 1), 2)
+    ret['rentability_brl'] = round(rentability_brl, 2)
 
     ret['valid'] = True
 

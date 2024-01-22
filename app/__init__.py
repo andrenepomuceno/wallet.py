@@ -23,4 +23,7 @@ uploads_folder = 'uploads'
 if not os.path.exists(uploads_folder):
     os.makedirs(uploads_folder)
 
+with app.app_context():
+    db.create_all()
+
 from app import routes

@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, flash
 
 import os
-from app import app, db
+from app import app, db, uploads_folder
 from app.models import Generic_Extract, process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
 from app.processing import process_generic_asset_request, process_b3_movimentation_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
 from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_generic_extract_request
@@ -18,7 +18,7 @@ def home():
             flash('Error! No file provided for upload.')
             return render_template('index.html')
         
-        filepath = os.path.join('uploads', file.filename)
+        filepath = os.path.join(uploads_folder, file.filename)
         file.save(filepath)
         app.logger.debug(f'File {file.filename} saved at {filepath}.')
 
