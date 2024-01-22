@@ -53,7 +53,7 @@ def usd_exchange_rate(currency = 'BRL'):
     except Exception as e:
         return f"Error getting exchange rate quotation: {e}"
 
-def view_movimentation_request(request):
+def process_b3_movimentation_request(request):
     app.logger.info('view_movimentation_request')
 
     df = pd.DataFrame()
@@ -90,7 +90,7 @@ def view_movimentation_request(request):
 
     return df
 
-def view_negotiation_request(request):
+def process_b3_negotiation_request(request):
     app.logger.info('view_negotiation_request')
 
     query = B3_Negotiation.query.order_by(B3_Negotiation.data.asc())
@@ -98,13 +98,13 @@ def view_negotiation_request(request):
     df = b3_negotiation_sql_to_df(result)
     return df
     
-def consolidate_buysell(movimentation, negotiation, tipo):
+def consolidate_buysell(movimentationDf, negotiationDf, movimentationType):
     columns = ["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação", "Produto"]
-    df1 = movimentation[columns]
+    df1 = movimentationDf[columns]
 
-    df2 = negotiation.copy()
+    df2 = negotiationDf.copy()
     df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação", "Código de Negociação": "Produto"}, inplace=True)
-    df2["Movimentação"] = tipo
+    df2["Movimentação"] = movimentationType
     df2 = df2[columns]
 
     df_merged = pd.concat([df1, df2], ignore_index=True)
@@ -112,7 +112,7 @@ def consolidate_buysell(movimentation, negotiation, tipo):
 
     return df_merged
 
-def view_asset_request(request, asset):
+def process_b3_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
 
     asset_info = {}
@@ -313,7 +313,7 @@ def view_asset_request(request, asset):
     asset_info['valid'] = True
     return asset_info
 
-def view_extract_request(request):
+def process_avenue_extract_request(request):
     app.logger.info(f'view_extract_request')
 
     query = Avenue_Extract.query.order_by(Avenue_Extract.data.asc())
@@ -322,7 +322,7 @@ def view_extract_request(request):
 
     return extract
 
-def view_extract_asset_request(request, asset):
+def process_avenue_asset_request(request, asset):
     app.logger.info(f'Processing view_extract_asset_request for "{asset}".')
 
     asset_info = {}
@@ -473,7 +473,7 @@ def view_extract_asset_request(request, asset):
     asset_info['valid'] = True
     return asset_info
 
-def view_generic_extract_request(request):
+def process_generic_extract_request(request):
     app.logger.info(f'view_generic_extract')
 
     query = Generic_Extract.query.order_by(Generic_Extract.date.asc())
@@ -482,7 +482,7 @@ def view_generic_extract_request(request):
 
     return extract
 
-def view_generic_asset_request(request, asset):
+def process_generic_asset_request(request, asset):
     app.logger.info(f'Processing view_generic_asset_request for "{asset}".')
 
     asset_info = {}
@@ -657,7 +657,7 @@ def view_generic_asset_request(request, asset):
     asset_info['dataframes'] = dataframes
     return asset_info
 
-def view_consolidate_request(request):
+def process_consolidate_request(request):
     app.logger.info(f'view_consolidate_request')
 
     ret = {}
@@ -673,7 +673,7 @@ def view_consolidate_request(request):
 
         products = movimentation['Ticker'].value_counts().to_frame()
         for index, product in products.iterrows():
-            asset_info = view_asset_request(request, product.name)
+            asset_info = process_b3_asset_request(request, product.name)
             new_row = pd.DataFrame([asset_info])
             b3_consolidate = pd.concat([b3_consolidate, new_row], ignore_index=True)
 
@@ -690,7 +690,7 @@ def view_consolidate_request(request):
             if product.name == '':
                 continue
 
-            asset_info = view_extract_asset_request(request, product.name)
+            asset_info = process_avenue_asset_request(request, product.name)
             new_row = pd.DataFrame([asset_info])
             avenue_consolidate = pd.concat([avenue_consolidate, new_row], ignore_index=True)
 
@@ -707,7 +707,7 @@ def view_consolidate_request(request):
             if product.name == '':
                 continue
 
-            asset_info = view_generic_asset_request(request, product.name)
+            asset_info = process_generic_asset_request(request, product.name)
             new_row = pd.DataFrame([asset_info])
             generic_consolidate = pd.concat([generic_consolidate, new_row], ignore_index=True)
 

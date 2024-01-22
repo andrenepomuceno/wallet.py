@@ -3,8 +3,8 @@ from flask import render_template, request, redirect, url_for, flash
 import os
 from app import app, db
 from app.models import Generic_Extract, process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
-from app.processing import view_generic_asset_request, view_movimentation_request, view_negotiation_request, view_asset_request, view_consolidate_request
-from app.processing import view_extract_request, view_extract_asset_request, view_generic_extract_request
+from app.processing import process_generic_asset_request, process_b3_movimentation_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
+from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_generic_extract_request
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
 import pandas as pd
 
@@ -49,7 +49,7 @@ def home():
             flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_generic_extract'))
         else:
-            flash('Error! File type not supported.')
+            flash(f'Error! Failed to parse {file.filename}.')
             return render_template('index.html')
         
     return render_template('index.html')
@@ -57,17 +57,17 @@ def home():
 @app.route('/movimentation', methods=['GET', 'POST'])
 def view_movimentation():
     filterForm = B3MovimentationFilterForm()
-    df = view_movimentation_request(request)
+    df = process_b3_movimentation_request(request)
     return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')], filterForm=filterForm)
 
 @app.route('/negotiation', methods=['GET', 'POST'])
 def view_negotiation():
-    df = view_negotiation_request(request)
+    df = process_b3_negotiation_request(request)
     return render_template('view_negotiation.html', tables=[df.to_html(classes='pandas-dataframe')])
 
 @app.route('/view/<asset>', methods=['GET', 'POST'])
 def view_asset(asset=None):
-    asset_info = view_asset_request(request, asset)
+    asset_info = process_b3_asset_request(request, asset)
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
     all_movimentation = dataframes['movimentation']
@@ -85,13 +85,13 @@ def view_asset(asset=None):
 
 @app.route('/extract', methods=['GET', 'POST'])
 def view_extract():
-    df = view_extract_request(request)
+    df = process_avenue_extract_request(request)
     return render_template('view_extract.html', tables=[df.to_html(classes='pandas-dataframe')])
 
 @app.route('/extract/<asset>', methods=['GET', 'POST'])
 def view_extract_asset(asset=None):
     # TODO unify with view_asset
-    asset_info = view_extract_asset_request(request, asset)
+    asset_info = process_avenue_asset_request(request, asset)
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
     all_movimentation = dataframes['movimentation']
@@ -145,13 +145,13 @@ def view_generic_extract():
             for error in errors:
                 flash(f"Error validating field {getattr(addForm, field).label.text}: {error}")
 
-    df = view_generic_extract_request(request)
+    df = process_generic_extract_request(request)
     return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')], addForm=addForm)
 
 @app.route('/generic/<asset>', methods=['GET', 'POST'])
 def view_generic_asset(asset=None):
     # TODO unify with view_asset
-    asset_info = view_generic_asset_request(request, asset)
+    asset_info = process_generic_asset_request(request, asset)
     dataframes = asset_info['dataframes']
     wages = dataframes['wages']
     all_movimentation = dataframes['movimentation']
@@ -167,7 +167,7 @@ def view_generic_asset(asset=None):
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
-    info = view_consolidate_request(request)
+    info = process_consolidate_request(request)
 
     if not info['valid']:
         flash('Data not found! Please upload something.')
