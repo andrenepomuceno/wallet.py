@@ -1,5 +1,6 @@
 import pandas as pd
-import yfinance_cache as yf
+# import yfinance_cache as yf
+import yfinance as yf
 import requests
 import requests_cache
 from lxml import html
@@ -28,7 +29,7 @@ scrape_dict = {
     }
 }
 
-request_cache = requests_cache.CachedSession('request_cache', expire_after=3600)
+request_cache = requests_cache.CachedSession('request_cache', expire_after=6*60*60)
 
 def scrape_data(url, xpath):
     try:
@@ -271,7 +272,8 @@ def process_b3_asset_request(request, asset):
     if position > 0:
         if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
             try:
-                stock = yf.Ticker(ticker + ".SA")
+                # stock = yf.Ticker(ticker + ".SA")
+                stock = yf.Ticker(ticker + ".SA", session=request_cache)
                 long_name = stock.info['longName']
                 last_close_price = stock.info['previousClose']
                 currency = stock.info['currency']
@@ -438,7 +440,7 @@ def process_avenue_asset_request(request, asset):
     asset_class = ''
     if position > 0:
         try:
-            stock = yf.Ticker(ticker)
+            stock = yf.Ticker(ticker, session=request_cache)
             last_close_price = stock.info['previousClose']
             currency = stock.info['currency']
             long_name = stock.info['longName']
@@ -594,7 +596,7 @@ def process_generic_asset_request(request, asset):
     # try:
     if re.match(r'^(BTC|ETH)$', ticker):
         app.logger.debug('Cripto data!')
-        stock = yf.Ticker(ticker + "-USD")
+        stock = yf.Ticker(ticker + "-USD", session=request_cache)
         info = stock.info
         last_close_price = info['previousClose']
         long_name = info['name']
@@ -603,7 +605,7 @@ def process_generic_asset_request(request, asset):
         asset_class = 'Cripto'
 
     elif re.match(r'.*\.SA', ticker):
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker, session=request_cache)
         info = stock.info
         last_close_price = info['previousClose']
         long_name = info['longName']
@@ -617,7 +619,7 @@ def process_generic_asset_request(request, asset):
 
     else:
         try:
-            stock = yf.Ticker(ticker)
+            stock = yf.Ticker(ticker, session=request_cache)
             info = stock.info
             last_close_price = info['previousClose']
             long_name = info['longName']
