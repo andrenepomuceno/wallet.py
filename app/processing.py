@@ -113,74 +113,56 @@ def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentatio
 
     return df_merged
 
-def process_b3_dataframes(asset, ticker, buys, sells, taxes, wages, rents_wage, asset_info):
-    asset_info['name'] = asset
+def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info,
+                           data_column='Data', quantity_column='Quantidade',
+                           price_column='Preço unitário', total_column='Valor da Operação'):
     currency = 'BRL'
     first_buy = None
-    age = None
+    age_years = None
     last_close_price = 0
-
-    asset_info['ticker'] = ticker
-
-    if len(buys) > 0:
-        first_buy = buys.iloc[0]['Data']
-        age = pd.to_datetime("today") - first_buy
-
-    taxes_sum = taxes['Valor da Operação'].sum()
-    asset_info['taxes_sum'] = round(taxes_sum, 2)
-
-    wages_sum = wages['Valor da Operação'].sum()
-    asset_info['wages_sum'] = round(wages_sum, 2)
-
-    rents_wages_sum = rents_wage['Valor da Operação'].sum()
-    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
-
-    buys_quantity_sum = buys['Quantidade'].sum()
-    asset_info['buys_quantity_sum'] = buys_quantity_sum
-
-    sells_sum = sells['Quantidade'].sum()
-    asset_info['sells_sum'] = round(sells_sum, 2)
-
-    position = buys_quantity_sum - sells_sum
-    asset_info['position'] = position
-
-    if first_buy is not None:
-        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
-
-    if age is not None:
-        asset_info['age'] = age.days
-
-    buys_value_sum = buys['Valor da Operação'].sum()
-    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
-
-    sells_value_sum = sells['Valor da Operação'].sum()
-    asset_info['sells_value_sum'] = sells_value_sum
-
-    total_cost = buys_value_sum - sells_value_sum
-    asset_info['total_cost'] = round(total_cost, 2)
-
-    liquid_cost = total_cost - wages_sum - rents_wages_sum + taxes_sum
-    asset_info['liquid_cost'] = round(liquid_cost, 2)
-
-    buys_wsum = (buys['Quantidade'] * buys['Preço unitário']).sum()
-    buys_quantity = buys['Quantidade'].sum()
-    buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price'] = round(buy_avg_price, 2)
-
-    buys_wsum2 = buys['Valor da Operação'].sum()
-    buy_avg_price2 = buys_wsum2 / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price2'] = round(buy_avg_price2, 2)
-    if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
-        app.logger.warning("Warning! buys_wsum inconsistency!")
-
-    asset_info['rented'] = 0
-    rented = asset_info['rented']
-
-    position_sum = round(position + rented, 2)
-    asset_info['position_sum'] = position_sum
-
     long_name = ''
     asset_class = ''
+    last_sell = pd.to_datetime("today")
+
+    buy_quantity = buys[quantity_column].sum()
+    sell_quantity = sells[quantity_column].sum()
+    position = round(buy_quantity - sell_quantity, 8)
+
+    if len(buys) > 0:
+        first_buy = buys.iloc[0][data_column]
+        if position <= 0 and len(sells) > 0:
+            last_sell = sells.iloc[-1][data_column]
+        age_years = last_sell - first_buy
+        age_years = age_years.days/365
+
+    cost = (buys[quantity_column] * buys[price_column]).sum()
+    avg_price = cost / buy_quantity if buy_quantity > 0 else 0
+
+    wages_sum = wages[total_column].sum()
+    if rents_wage is not None:
+        rents_wages_sum = rents_wage[total_column].sum()
+    else:
+        rents_wages_sum = 0
+    taxes_sum = taxes[total_column].sum()
+
+    liquid_cost = cost - wages_sum - rents_wages_sum + taxes_sum
+
+    sells_sum = abs(sells[total_column].sum())
+
+    realized_gain = 0
+    for index, row in sells.iterrows():
+        date = row[data_column]
+        quantity = row[quantity_column]
+        price = row[price_column]
+
+        buys_before_sell = buys.loc[buys[data_column] <= date]
+        last_buy_quantity = buys_before_sell[quantity_column].sum()
+        last_cost = (buys_before_sell[quantity_column] * buys_before_sell[price_column]).sum()
+        last_avg_price = last_cost / last_buy_quantity if last_buy_quantity > 0 else 0
+        realized = (price - last_avg_price) * quantity
+
+        realized_gain += realized
+
     if position > 0:
         if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
             try:
@@ -193,41 +175,112 @@ def process_b3_dataframes(asset, ticker, buys, sells, taxes, wages, rents_wage, 
             except:
                 pass
 
-        elif ticker in scrape_dict:
-            app.logger.info(f'Scraping data for {ticker}')
-            scrap_info = scrape_dict[ticker]
-            scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
-            last_close_price = brl_to_float(scraped[0])
-            asset_class = 'Renda Fixa'
+        elif re.match(r'^(BTC|ETH)$', ticker):
+            try:
+                app.logger.debug('Cripto data!')
+                stock = yf.Ticker(ticker + "-USD", session=request_cache)
+                info = stock.info
+                last_close_price = info['previousClose']
+                long_name = info['name']
+                rate = usd_exchange_rate('BRL')
+                last_close_price = rate * last_close_price
+                asset_class = 'Cripto'
+            except:
+                pass
 
+        elif ticker in scrape_dict:
+            try:
+                app.logger.info(f'Scraping data for {ticker}')
+                scrap_info = scrape_dict[ticker]
+                scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
+                last_close_price = brl_to_float(scraped[0])
+                asset_class = 'Renda Fixa'
+            except:
+                pass
+
+        else:
+            try:
+                stock = yf.Ticker(ticker, session=request_cache)
+                last_close_price = stock.info['previousClose']
+                currency = stock.info['currency']
+                long_name = stock.info['longName']
+                asset_class = 'Stock'
+            except:
+                pass
+
+    not_realized_gain = (last_close_price - avg_price) * position
+
+    capital_gain = realized_gain + not_realized_gain + wages_sum + rents_wages_sum
+
+    rentability = capital_gain/liquid_cost
+
+    anualized_rentability = 0
+    if age_years is not None and age_years > 0:
+        anualized_rentability = pow((1 + rentability), 1/age_years) - 1
+
+    rented = 0 # TODO
+    position = round(position + rented, 2)
+
+    buys_value_sum = buys[total_column].sum()
+
+    position_total = 0
+    price_gain = -100
+    if last_close_price != None and position > 0:
+        position_total = position * last_close_price
+        price_gain = 100 * (last_close_price/avg_price - 1)
+    
+    asset_info['buy_quantity'] = round(buy_quantity, 2)
+    asset_info['sell_quantity'] = round(sell_quantity, 2)
+    asset_info['position'] = round(position, 2)
+
+    asset_info['cost'] = round(cost, 2)
+    asset_info['avg_price'] = round(avg_price, 2)
+
+    asset_info['taxes_sum'] = round(taxes_sum, 2)
+    asset_info['wages_sum'] = round(wages_sum, 2)
+    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
+
+    asset_info['liquid_cost'] = round(liquid_cost, 2)
+
+    asset_info['sells_value_sum'] = sells_sum
+
+    asset_info['realized_gain'] = round(realized_gain, 2)
+    asset_info['not_realized_gain'] = round(not_realized_gain, 2)
+    asset_info['capital_gain'] = round(capital_gain, 2)
+
+    asset_info['rentability'] = round(100 * rentability, 2)
+    asset_info['anualized_rentability'] = round(100 * anualized_rentability, 2)
+
+    if first_buy is not None:
+        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
+
+    if last_sell is not None:
+        asset_info['last_sell'] = last_sell.strftime("%Y-%m-%d")
+
+    if age_years is not None:
+        asset_info['age_years'] = age_years
+        asset_info['age'] = round(age_years * 365)
+    
+    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
+
+    asset_info['rented'] = rented
+    
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
     asset_info['long_name'] = long_name
     asset_info['asset_class'] = asset_class
 
-    position_total = 0
-    rentabiliy = -100
-    price_gain = -100
-    by_year = None
-    if last_close_price != None and position_sum > 0:
-        position_total = position_sum * last_close_price
-        rentabiliy = 100 * (position_total/liquid_cost - 1)
-        price_gain = 100 * (last_close_price/buy_avg_price - 1)
-        if age is not None:
-            by_year = round(rentabiliy/(age.days/365), 2)
-            
-    
     asset_info['position_total'] = round(position_total, 2)
-    asset_info['rentability'] = round(rentabiliy, 2)
+    
     asset_info['price_gain'] = round(price_gain, 2)
-    asset_info['rentability_by_year'] = by_year
+    asset_info['rentability_by_year'] = round(100 * anualized_rentability, 2)
 
     app.logger.debug(asset_info)
 
 def process_b3_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
 
-    asset_info = { 'valid': False }
+    asset_info = { 'valid': False, 'name': asset }
     dataframes = {}
 
     query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
@@ -241,6 +294,7 @@ def process_b3_asset_request(request, asset):
 
     movimentation_df['Ticker'] = parse_b3_ticker(movimentation_df['Produto'])
     ticker = movimentation_df['Ticker'].value_counts().index[0]
+    asset_info['ticker'] = ticker
 
     credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
     debit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Debito"]
@@ -313,7 +367,7 @@ def process_b3_asset_request(request, asset):
 
     asset_info['dataframes'] = dataframes
 
-    process_b3_dataframes(asset, ticker, buys, sells, taxes, wages, rents_wage, asset_info)
+    consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info)
 
     asset_info['valid'] = True
     
@@ -336,11 +390,6 @@ def process_avenue_asset_request(request, asset):
 
     asset_info['valid'] = False
     asset_info['name'] = asset
-    
-    currency = 'USD'
-    first_buy = None
-    age = None
-    last_close_price = 0
 
     query = Avenue_Extract.query.filter(Avenue_Extract.produto.like(f'%{asset}%')).order_by(Avenue_Extract.data.asc())
     result = query.all()
@@ -385,98 +434,7 @@ def process_avenue_asset_request(request, asset):
     ]
     dataframes['wages'] = wages
 
-    if len(buys) > 0:
-        first_buy = buys.iloc[0]['Data']
-        age = pd.to_datetime("today") - first_buy
-
-    taxes_sum = taxes['Valor da Operação'].sum()
-    asset_info['taxes_sum'] = round(taxes_sum, 2)
-
-    wages_sum = wages['Valor da Operação'].sum()
-    asset_info['wages_sum'] = round(wages_sum, 2)
-
-    rents_wages_sum = 0
-    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
-
-    buys_quantity_sum = buys['Quantidade'].sum()
-    asset_info['buys_quantity_sum'] = buys_quantity_sum
-
-    sells_sum = sells['Quantidade'].sum()
-    asset_info['sells_sum'] = round(sells_sum, 2)
-
-    position = buys_quantity_sum - sells_sum
-    asset_info['position'] = position
-
-    if first_buy is not None:
-        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
-
-    if age is not None:
-        asset_info['age'] = age.days
-
-    buys_value_sum = buys['Valor da Operação'].sum()
-    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
-
-    sells_value_sum = sells['Valor da Operação'].sum()
-    asset_info['sells_value_sum'] = sells_value_sum
-
-    total_cost = buys_value_sum - sells_value_sum
-    asset_info['total_cost'] = round(total_cost, 2)
-
-    liquid_cost = total_cost - wages_sum - rents_wages_sum + taxes_sum
-    asset_info['liquid_cost'] = round(liquid_cost, 2)
-
-    buys_wsum = (buys['Quantidade'] * buys['Preço unitário']).sum()
-    buys_quantity = buys['Quantidade'].sum()
-    buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price'] = round(buy_avg_price, 2)
-
-    buys_wsum2 = buys['Valor da Operação'].sum()
-    buy_avg_price2 = buys_wsum2 / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price2'] = round(buy_avg_price2, 2)
-    if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
-        app.logger.warning("Warning! buys_wsum inconsistency!")
-
-    asset_info['rented'] = 0
-    rented = asset_info['rented']
-
-    position_sum = round(position + rented, 2)
-    asset_info['position_sum'] = position_sum
-
-    long_name = ''
-    asset_class = ''
-    if position > 0:
-        try:
-            stock = yf.Ticker(ticker, session=request_cache)
-            last_close_price = stock.info['previousClose']
-            currency = stock.info['currency']
-            long_name = stock.info['longName']
-            asset_class = 'Stock'
-        except:
-            pass
-
-    asset_info['last_close_price'] = round(last_close_price, 2)
-    asset_info['currency'] = currency
-    asset_info['long_name'] = long_name
-    asset_info['asset_class'] = asset_class
-
-    position_total = 0
-    rentabiliy = -100
-    price_gain = -100
-    by_year = None
-    if last_close_price != None and position_sum > 0:
-        position_total = position_sum * last_close_price
-        rentabiliy = 100 * (position_total/liquid_cost - 1)
-        price_gain = 100 * (last_close_price/buy_avg_price - 1)
-        if age is not None:
-            by_year = round(rentabiliy/(age.days/365), 2)
-            
-    
-    asset_info['position_total'] = round(position_total, 2)
-    asset_info['rentability'] = round(rentabiliy, 2)
-    asset_info['price_gain'] = round(price_gain, 2)
-    asset_info['rentability_by_year'] = by_year
-
-    app.logger.debug(asset_info)
+    consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info)
 
     asset_info['dataframes'] = dataframes
     asset_info['valid'] = True
@@ -499,11 +457,6 @@ def process_generic_asset_request(request, asset):
 
     asset_info['valid'] = False
     asset_info['name'] = asset
-    
-    currency = 'BRL'
-    first_buy = None
-    age = None
-    last_close_price = 0
 
     query = Generic_Extract.query.filter(Generic_Extract.asset.like(f'%{asset}%')).order_by(Generic_Extract.date.asc())
     result = query.all()
@@ -541,131 +494,11 @@ def process_generic_asset_request(request, asset):
     ]
     dataframes['wages'] = wages
 
-    if len(buys) > 0:
-        first_buy = buys.iloc[0]['Date']
-        age = pd.to_datetime("today") - first_buy
-
-    taxes_sum = abs(taxes['Total'].sum())
-    asset_info['taxes_sum'] = round(taxes_sum, 2)
-
-    wages_sum = abs(wages['Total'].sum())
-    asset_info['wages_sum'] = round(wages_sum, 2)
-
-    rents_wages_sum = 0
-    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
-
-    buys_quantity_sum = buys['Quantity'].sum()
-    asset_info['buys_quantity_sum'] = buys_quantity_sum
-
-    sells_sum = abs(sells['Quantity'].sum())
-    asset_info['sells_sum'] = round(sells_sum, 2)
-
-    position = buys_quantity_sum - sells_sum
-    asset_info['position'] = position
-
-    if first_buy is not None:
-        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
-
-    if age is not None:
-        asset_info['age'] = age.days
-
-    buys_value_sum = buys['Total'].sum()
-    asset_info['buys_value_sum'] = round(buys_value_sum, 2)
-
-    sells_value_sum = abs(sells['Total'].sum())
-    asset_info['sells_value_sum'] = sells_value_sum
-
-    total_cost = buys_value_sum - sells_value_sum
-    asset_info['total_cost'] = round(total_cost, 2)
-
-    liquid_cost = total_cost - wages_sum - rents_wages_sum + taxes_sum
-    asset_info['liquid_cost'] = round(liquid_cost, 2)
-
-    buys_wsum = (buys['Quantity'] * buys['Price']).sum()
-    buys_quantity = buys['Quantity'].sum()
-    buy_avg_price = buys_wsum / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price'] = round(buy_avg_price, 2)
-
-    buys_wsum2 = buys['Total'].sum()
-    buy_avg_price2 = buys_wsum2 / buys_quantity if buys_quantity > 0 else 0
-    asset_info['buy_avg_price2'] = round(buy_avg_price2, 2)
-    if asset_info['buy_avg_price'] != asset_info['buy_avg_price2']:
-        app.logger.warning("Warning! buys_wsum inconsistency!")
-
-    asset_info['rented'] = 0
-    rented = asset_info['rented']
-
-    position_sum = round(position + rented, 4)
-    asset_info['position_sum'] = position_sum
-
-    long_name = ''
-    asset_class = ''
-    # if position > 0:
-    app.logger.info('Trying to get online asset data...')
-    # try:
-    if re.match(r'^(BTC|ETH)$', ticker):
-        app.logger.debug('Cripto data!')
-        stock = yf.Ticker(ticker + "-USD", session=request_cache)
-        info = stock.info
-        last_close_price = info['previousClose']
-        long_name = info['name']
-        rate = usd_exchange_rate('BRL')
-        last_close_price = rate * last_close_price
-        asset_class = 'Cripto'
-
-    elif re.match(r'.*\.SA', ticker):
-        stock = yf.Ticker(ticker, session=request_cache)
-        info = stock.info
-        last_close_price = info['previousClose']
-        long_name = info['longName']
-        asset_class = 'Ação'
-
-    elif ticker in scrape_dict:
-        app.logger.info(f'Scraping data for {ticker}')
-        scrap_info = scrape_dict[ticker]
-        scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
-        last_close_price = scraped[0]
-
-    else:
-        try:
-            stock = yf.Ticker(ticker, session=request_cache)
-            info = stock.info
-            last_close_price = info['previousClose']
-            long_name = info['longName']
-            currency = info['currency']
-        except:
-            app.logger.info('Ticker not supported!')
-            last_close_price = buy_avg_price
-        
-        # except:
-        #     app.logger.error('Failed to get online asset data!')
-        #     pass
-
-    asset_info['last_close_price'] = round(last_close_price, 2)
-    asset_info['currency'] = currency
-    asset_info['long_name'] = long_name
-    asset_info['asset_class'] = asset_class
-
-    position_total = 0
-    rentabiliy = -100
-    price_gain = -100
-    by_year = None
-    if last_close_price != None and position_sum > 0:
-        position_total = position_sum * last_close_price
-        rentabiliy = 100 * (position_total/liquid_cost - 1)
-        price_gain = 100 * (last_close_price/buy_avg_price - 1)
-        if age is not None:
-            by_year = round(rentabiliy/(age.days/365), 2)
-    
-    asset_info['position_total'] = round(position_total, 2)
-    asset_info['rentability'] = round(rentabiliy, 2)
-    asset_info['price_gain'] = round(price_gain, 2)
-    asset_info['rentability_by_year'] = by_year
-
-    asset_info['valid'] = True
-    app.logger.debug(asset_info)
+    consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info, 'Date', 'Quantity', 'Price', 'Total')
 
     asset_info['dataframes'] = dataframes
+    asset_info['valid'] = True
+
     return asset_info
 
 def process_consolidate_request(request):
@@ -728,26 +561,28 @@ def process_consolidate_request(request):
     # print(movimentation['Ticker'].value_counts())
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
+    # consolidate = b3_consolidate
+    # consolidate = pd.concat([b3_consolidate, avenue_consolidate])
     if len(consolidate) == 0:
         return ret
 
-    consolidate = consolidate[['name','url','ticker','currency','last_close_price',
-                               'position_sum','position_total','buy_avg_price',
-                               'total_cost','wages_sum','rents_wage_sum','liquid_cost',
-                               'rentability','rentability_by_year','age','taxes_sum']]
+    # consolidate = consolidate[['name','url','ticker','currency','last_close_price',
+    #                            'position','position_total','avg_price',
+    #                            'cost','wages_sum','rents_wage_sum','liquid_cost',
+    #                            'rentability','rentability_by_year','age','taxes_sum']]
 
         
-    df = consolidate.loc[consolidate['position_sum'] > 0]
+    df = consolidate.loc[consolidate['position'] > 0]
     df = df.sort_values(by='rentability', ascending=False)
     df['age'] = round(df['age']/365, 2)
     ret['consolidate'] = df
 
-    old = consolidate.loc[consolidate['position_sum'] <= 0]
-    old = old.sort_values(by='liquid_cost', ascending=True)
+    old = consolidate.loc[consolidate['position'] <= 0]
+    old = old.sort_values(by='capital_gain', ascending=False)
     ret['old'] = old
     
-    consolidate_brl = consolidate.loc[consolidate['currency'] == 'BRL']
-    total_cost = consolidate_brl['total_cost'].sum()
+    consolidate_brl = df.loc[df['currency'] == 'BRL']
+    total_cost = consolidate_brl['cost'].sum()
     total_wages = consolidate_brl['wages_sum'].sum()
     total_rents = consolidate_brl['rents_wage_sum'].sum()
     taxes_sum = consolidate_brl['taxes_sum'].sum()
@@ -759,11 +594,11 @@ def process_consolidate_request(request):
     ret['total_rents_wage_sum'] = round(total_rents, 2)
     ret['position_total_sum'] = round(total_position, 2)
     ret['taxes_sum'] = round(taxes_sum, 2)
-    ret['rentability'] = round(100 * (total_position/total_cost - 1), 2)
+    ret['rentability'] = round(100 * (total_position/liquid_cost - 1), 2)
     ret['liquid_cost'] = round(liquid_cost, 2)
 
-    consolidate_usd = consolidate.loc[consolidate['currency'] == 'USD']
-    total_cost_usd = consolidate_usd['total_cost'].sum()
+    consolidate_usd = df.loc[df['currency'] == 'USD']
+    total_cost_usd = consolidate_usd['cost'].sum()
     liquid_cost_usd = consolidate_usd['liquid_cost'].sum()
     total_position_usd = consolidate_usd['position_total'].sum()
     total_wages_usd = consolidate_usd['rents_wage_sum'].sum()
@@ -773,7 +608,7 @@ def process_consolidate_request(request):
     ret['total_rents_wage_sum_usd'] = round(total_wages_usd, 2)
     ret['position_total_sum_usd'] = round(total_position_usd, 2)
     ret['taxes_sum_usd'] = round(taxes_usd, 2)
-    ret['rentability_usd'] = round(100 * (total_position_usd/total_cost_usd - 1), 2)
+    ret['rentability_usd'] = round(100 * (total_position_usd/liquid_cost_usd - 1), 2)
     ret['liquid_cost_usd'] = round(liquid_cost_usd, 2)
 
     rate = usd_exchange_rate('BRL')
@@ -787,9 +622,11 @@ def process_consolidate_request(request):
 
     total_cost_brl = total_cost + total_cost_usd * rate
     total_position_brl = total_position + total_position_usd * rate
-    rentability_brl = 100 * (total_position_brl/total_cost_brl - 1)
+    total_liquid_cost_brl = liquid_cost + liquid_cost_usd * rate
+    rentability_brl = 100 * (total_position_brl/total_liquid_cost_brl - 1)
     ret['total_cost_brl'] = round(total_cost_brl, 2)
     ret['total_position_brl'] = round(total_position_brl, 2)
+    ret['total_liquid_cost_brl'] = round(total_liquid_cost_brl, 2)
     ret['rentability_brl'] = round(rentability_brl, 2)
 
     ret['valid'] = True

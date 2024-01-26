@@ -175,16 +175,16 @@ def view_consolidate():
 
     
     consolidate = info['consolidate']
-    consolidate = consolidate[['url','currency','last_close_price','position_sum','position_total','buy_avg_price',
-                               'total_cost','wages_sum','rents_wage_sum','liquid_cost','rentability','rentability_by_year','age']]
+    consolidate = consolidate[['url','currency','last_close_price','position','position_total','avg_price',
+                               'cost','wages_sum','rents_wage_sum','liquid_cost','rentability','rentability_by_year','age']]
     consolidate = consolidate.rename(columns={
         'url': 'Name',
         'currency': 'Currency',
         'last_close_price': 'Close Price',
-        'position_sum': "Position",
+        'position': "Position",
         'position_total': 'Position',
-        'buy_avg_price': 'Avg Price',
-        'total_cost': 'Total Cost',
+        'avg_price': 'Avg Price',
+        'cost': 'Total Cost',
         'wages_sum': 'Wages',
         'rents_wage_sum': 'Rent Wages',
         'liquid_cost': 'Liquid Cost',
@@ -194,16 +194,17 @@ def view_consolidate():
     })
 
     old = info['old']
-    old = old[['url','currency','position_sum','buy_avg_price','total_cost','wages_sum','rents_wage_sum','liquid_cost']]
+    old = old[['url','currency','position','avg_price','cost','wages_sum','rents_wage_sum','liquid_cost', 'capital_gain']]
     old = old.rename(columns={
         'url': 'Name',
         'currency': 'Currency',
-        'position_sum': "Position",
-        'buy_avg_price': 'Avg Price',
-        'total_cost': 'Total Cost',
+        'position': "Position",
+        'avg_price': 'Avg Price',
+        'cost': 'Total Cost',
         'wages_sum': 'Wages',
         'rents_wage_sum': 'Rent Wages',
-        'liquid_cost': 'Liquid Cost'
+        'liquid_cost': 'Liquid Cost',
+        'capital_gain': 'Capital Gain'
     })
 
     return render_template('view_consolidate.html', info=info,
