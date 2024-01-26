@@ -126,7 +126,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
 
     buy_quantity = buys[quantity_column].sum()
     sell_quantity = sells[quantity_column].sum()
-    position = round(buy_quantity - sell_quantity, 8)
+    position = round(buy_quantity - sell_quantity, 8) # avoid machine precision errors on zero
 
     if len(buys) > 0:
         first_buy = buys.iloc[0][data_column]
@@ -574,62 +574,83 @@ def process_consolidate_request(request):
     #                            'rentability','rentability_by_year','age','taxes_sum']]
 
         
-    df = consolidate.loc[consolidate['position'] > 0]
-    df = df.sort_values(by='rentability', ascending=False)
-    df['age'] = round(df['age']/365, 2)
-    ret['consolidate'] = df
+    assets = consolidate.loc[consolidate['position'] > 0]
+    assets = assets.sort_values(by='rentability', ascending=False)
+    assets['age'] = round(assets['age']/365, 2)
+    ret['consolidate'] = assets
 
-    old = consolidate.loc[consolidate['position'] <= 0]
-    old = old.sort_values(by='capital_gain', ascending=False)
-    ret['old'] = old
-    
-    consolidate_brl = df.loc[df['currency'] == 'BRL']
-    total_cost = consolidate_brl['cost'].sum()
-    total_wages = consolidate_brl['wages_sum'].sum()
-    total_rents = consolidate_brl['rents_wage_sum'].sum()
-    taxes_sum = consolidate_brl['taxes_sum'].sum()
-    liquid_cost = consolidate_brl['liquid_cost'].sum()
-    total_position = consolidate_brl['position_total'].sum()
+    finished = consolidate.loc[consolidate['position'] <= 0]
+    finished = finished.sort_values(by='capital_gain', ascending=False)
+    ret['finished'] = finished
 
-    ret['total_cost_sum'] = round(total_cost, 2)
-    ret['total_wages_sum'] = round(total_wages, 2)
-    ret['total_rents_wage_sum'] = round(total_rents, 2)
-    ret['position_total_sum'] = round(total_position, 2)
-    ret['taxes_sum'] = round(taxes_sum, 2)
-    ret['rentability'] = round(100 * (total_position/liquid_cost - 1), 2)
-    ret['liquid_cost'] = round(liquid_cost, 2)
+    def consolidate_currency(df, rate = 1):
+        ret = {}
 
-    consolidate_usd = df.loc[df['currency'] == 'USD']
-    total_cost_usd = consolidate_usd['cost'].sum()
-    liquid_cost_usd = consolidate_usd['liquid_cost'].sum()
-    total_position_usd = consolidate_usd['position_total'].sum()
-    total_wages_usd = consolidate_usd['rents_wage_sum'].sum()
-    taxes_usd = consolidate_usd['taxes_sum'].sum()
-    ret['total_cost_sum_usd'] = round(total_cost_usd, 2)
-    ret['total_wages_sum_usd'] = round(consolidate_usd['wages_sum'].sum(), 2)
-    ret['total_rents_wage_sum_usd'] = round(total_wages_usd, 2)
-    ret['position_total_sum_usd'] = round(total_position_usd, 2)
-    ret['taxes_sum_usd'] = round(taxes_usd, 2)
-    ret['rentability_usd'] = round(100 * (total_position_usd/liquid_cost_usd - 1), 2)
-    ret['liquid_cost_usd'] = round(liquid_cost_usd, 2)
+        cost = rate * df['cost'].sum()
+        wages = rate * df['wages_sum'].sum()
+        rents = rate * df['rents_wage_sum'].sum()
+        taxes = rate * df['taxes_sum'].sum()
+        liquid_cost = rate * df['liquid_cost'].sum()
+        position = rate * df['position_total'].sum()
+
+        ret['cost'] = round(cost, 2)
+        ret['wages'] = round(wages, 2)
+        ret['rents'] = round(rents, 2)
+        ret['position'] = round(position, 2)
+        ret['taxes'] = round(taxes, 2)
+        ret['liquid_cost'] = round(liquid_cost, 2)
+        ret['rentability'] = round(100 * (position/liquid_cost - 1), 2)
+
+        return ret
+
+    brl_df = assets.loc[assets['currency'] == 'BRL']
+    brl_ret = consolidate_currency(brl_df)
+    ret['BRL'] = brl_ret
+
+    usd_df = assets.loc[assets['currency'] == 'USD']
+    usd_ret = consolidate_currency(usd_df)
+    ret['USD'] = usd_ret
 
     rate = usd_exchange_rate('BRL')
     ret['usd_brl'] = rate
 
-    ret['total_cost_sum_usd_brl'] = round(rate * total_cost_usd, 2)
-    ret['total_wages_sum_usd_brl'] = round(rate * total_wages_usd, 2)
-    ret['total_rents_wage_sum_usd_brl'] = round(rate * total_wages_usd, 2)
-    ret['position_total_sum_usd_brl'] = round(rate * total_position_usd, 2)
-    ret['taxes_sum_usd_brl'] = round(rate * taxes_usd, 2)
+    usd_brl_ret = consolidate_currency(usd_df, rate)
+    ret['USD/BRL'] = usd_brl_ret
 
-    total_cost_brl = total_cost + total_cost_usd * rate
-    total_position_brl = total_position + total_position_usd * rate
-    total_liquid_cost_brl = liquid_cost + liquid_cost_usd * rate
-    rentability_brl = 100 * (total_position_brl/total_liquid_cost_brl - 1)
-    ret['total_cost_brl'] = round(total_cost_brl, 2)
-    ret['total_position_brl'] = round(total_position_brl, 2)
-    ret['total_liquid_cost_brl'] = round(total_liquid_cost_brl, 2)
-    ret['rentability_brl'] = round(rentability_brl, 2)
+    ret_total = {}
+
+    cost = brl_ret['cost'] + usd_brl_ret['cost']
+    wages = brl_ret['wages'] + usd_brl_ret['wages']
+    rents = brl_ret['rents'] + usd_brl_ret['rents']
+    position = brl_ret['position'] + usd_brl_ret['position']
+    liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
+    taxes = brl_ret['taxes'] + usd_brl_ret['taxes']
+    liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
+
+    ret_total['cost'] = round(cost, 2)
+    ret_total['wages'] = round(wages, 2)
+    ret_total['rents'] = round(rents, 2)
+    ret_total['position'] = round(position, 2)
+    ret_total['taxes'] = round(taxes, 2)
+    ret_total['liquid_cost'] = round(liquid_cost, 2)
+    ret_total['rentability'] = round(100 * (position/liquid_cost - 1), 2)
+
+    ret['TOTAL'] = ret_total
+
+    # ret['total_cost_sum_usd_brl'] = round(rate * total_cost_usd, 2)
+    # ret['total_wages_sum_usd_brl'] = round(rate * total_wages_usd, 2)
+    # ret['total_rents_wage_sum_usd_brl'] = round(rate * total_wages_usd, 2)
+    # ret['position_total_sum_usd_brl'] = round(rate * total_position_usd, 2)
+    # ret['taxes_sum_usd_brl'] = round(rate * taxes_usd, 2)
+
+    # total_cost_brl = cost + total_cost_usd * rate
+    # total_position_brl = position + total_position_usd * rate
+    # total_liquid_cost_brl = liquid_cost + liquid_cost_usd * rate
+    # rentability_brl = 100 * (total_position_brl/total_liquid_cost_brl - 1)
+    # ret['total_cost_brl'] = round(total_cost_brl, 2)
+    # ret['total_position_brl'] = round(total_position_brl, 2)
+    # ret['total_liquid_cost_brl'] = round(total_liquid_cost_brl, 2)
+    # ret['rentability_brl'] = round(rentability_brl, 2)
 
     ret['valid'] = True
 

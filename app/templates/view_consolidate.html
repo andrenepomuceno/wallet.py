@@ -6,31 +6,35 @@
         <div class="col-md-4">
             <div class="p-3 border bg-light">
                 <h2>BRL</h2>
-                <p>Total Cost: {{ info['total_cost_sum'] }}</p>
-                <p>Liquid Cost: {{ info['liquid_cost'] }}</p>
-                <p>Position: {{ info['position_total_sum'] }} ({{ info['rentability'] }} %)</p>
-                <p>Wages: {{ info['total_wages_sum'] }}</p>
-                <p>Rent Wages: {{ info['total_rents_wage_sum'] }}</p>
-                <p>Taxes: {{ info['taxes_sum'] }}</p>
+                <p>Cost: {{ info['BRL']['cost'] }}</p>
+                <p>Liquid Cost: {{ info['BRL']['liquid_cost'] }}</p>
+                <p>Position: {{ info['BRL']['position'] }} ({{ info['BRL']['rentability'] }} %)</p>
+                <p>Wages: {{ info['BRL']['wages'] }}</p>
+                <p>Rent Wages: {{ info['BRL']['rents'] }}</p>
+                <p>Taxes: {{ info['BRL']['taxes'] }}</p>
             </div>
         </div>
         <div class="col-md-4">
             <div class="p-3 border bg-light">
                 <h2>USD</h2>
-                <p>Cost: {{ info['total_cost_sum_usd'] }} (BRL {{ info['total_cost_sum_usd_brl'] }})</p>
-                <p>Liquid Cost: {{ info['liquid_cost_usd'] }}</p>
-                <p>Position: {{ info['position_total_sum_usd'] }} (BRL {{ info['position_total_sum_usd_brl'] }}) ({{ info['rentability_usd'] }} %)</p>
-                <p>Wages: {{ info['total_wages_sum_usd'] }}</p>
-                <p>Rent Wages: {{ info['total_rents_wage_sum_usd'] }}</p>
-                <p>Taxes: {{ info['taxes_sum_usd'] }}</p>
+                <p>Cost: {{ info['USD']['cost'] }} (BRL {{ info['USD/BRL']['cost'] }})</p>
+                <p>Liquid Cost: {{ info['USD']['liquid_cost'] }} (BRL {{ info['USD/BRL']['liquid_cost'] }})</p>
+                <p>Position: {{ info['USD']['position'] }} ({{ info['USD']['rentability'] }} %)</p>
+                <p>Wages: {{ info['USD']['wages'] }} (BRL {{ info['USD/BRL']['wages'] }})</p>
+                <p>Rent Wages: {{ info['USD']['rents'] }} (BRL {{ info['USD/BRL']['rents'] }})</p>
+                <p>Taxes: {{ info['USD']['taxes'] }} (BRL {{ info['USD/BRL']['taxes'] }})</p>
                 <p>USD/BRL: {{ info['usd_brl'] }}</p>
             </div>
         </div>
         <div class="col-md-4">
             <div class="p-3 border bg-light">
                 <h2>Consolidate</h2>
-                <p>Cost: BRL {{ info['total_cost_brl'] }}</p>
-                <p>Position: BRL {{ info['total_position_brl'] }} ({{ info['rentability_brl'] }} %)</p>
+                <p>Cost: {{ info['TOTAL']['cost'] }}</p>
+                <p>Liquid Cost: {{ info['TOTAL']['liquid_cost'] }}</p>
+                <p>Position: {{ info['TOTAL']['position'] }} ({{ info['TOTAL']['rentability'] }} %)</p>
+                <p>Wages: {{ info['TOTAL']['wages'] }}</p>
+                <p>Rent Wages: {{ info['TOTAL']['rents'] }}</p>
+                <p>Taxes: {{ info['TOTAL']['taxes'] }}</p>
             </div>
         </div>
     </div>    
