@@ -69,6 +69,15 @@ def b3_movimentation_sql_to_df(result):
                       columns=['Entrada/Saída', 'Data', 'Movimentação', 'Produto',
                                'Instituição', 'Quantidade', 'Preço unitário', 'Valor da Operação'])
     df['Data'] = pd.to_datetime(df['Data'])
+
+    df = df.rename(columns={
+        'Data': 'Date',
+        'Quantidade': 'Quantity',
+        'Movimentação': 'Movimentation',
+        'Preço unitário': 'Price',
+        'Valor da Operação': 'Total'
+    })
+
     return df
 
 class B3_Negotiation(db.Model):
@@ -139,6 +148,15 @@ def b3_negotiation_sql_to_df(result):
                                'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
                                'Valor'])
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'])
+
+    df = df.rename(columns={
+        'Data do Negócio': 'Date',
+        'Quantidade': 'Quantity',
+        'Tipo de Movimentação': 'Movimentation',
+        'Preço': 'Price',
+        'Valor': 'Total'
+    })
+
     return df
 
 class Avenue_Extract(db.Model):
@@ -264,6 +282,14 @@ def avenue_extract_sql_to_df(result):
                                'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade', 'Preço unitário'])
     df['Data'] = pd.to_datetime(df['Data'])
     df['Liquidação'] = pd.to_datetime(df['Liquidação'])
+
+    df = df.rename(columns={
+        'Data': 'Date',
+        'Quantidade': 'Quantity',
+        'Movimentação': 'Movimentation',
+        'Preço unitário': 'Price',
+        'Valor (U$)': 'Total'
+    })
 
     return df
 

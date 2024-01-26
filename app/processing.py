@@ -84,10 +84,10 @@ def process_b3_movimentation_request(request):
 
     df['Ticker'] = parse_b3_ticker(df['Produto'])
 
-    grouped = df[['Entrada/Saída', 'Movimentação']].groupby(['Entrada/Saída'])
+    grouped = df[['Entrada/Saída', 'Movimentation']].groupby(['Entrada/Saída'])
     print(grouped.value_counts())
 
-    # print(df['Movimentação'].value_counts())
+    # print(df['Movimentation'].value_counts())
 
     return df
 
@@ -100,22 +100,22 @@ def process_b3_negotiation_request(request):
     return df
     
 def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentationType):
-    columns = ["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação", "Produto"]
+    columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto"]
     df1 = movimentationDf[columns]
 
     df2 = negotiationDf.copy()
-    df2.rename(columns={"Data do Negócio": "Data", "Preço": "Preço unitário", "Valor": "Valor da Operação", "Código de Negociação": "Produto"}, inplace=True)
-    df2["Movimentação"] = movimentationType
+    df2.rename(columns={'Date': 'Date', "Preço": 'Price', "Valor": 'Total', "Código de Negociação": "Produto"}, inplace=True)
+    df2['Movimentation'] = movimentationType
     df2 = df2[columns]
 
     df_merged = pd.concat([df1, df2], ignore_index=True)
-    df_merged.sort_values(by='Data', inplace=True)
+    df_merged.sort_values(by='Date', inplace=True)
 
     return df_merged
 
 def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info,
-                           data_column='Data', quantity_column='Quantidade',
-                           price_column='Preço unitário', total_column='Valor da Operação'):
+                           data_column='Date', quantity_column='Quantity',
+                           price_column='Price', total_column='Total'):
     currency = 'BRL'
     first_buy = None
     age_years = None
@@ -303,16 +303,16 @@ def process_b3_asset_request(request, asset):
 
     buys = credit.loc[
         (
-            (credit['Movimentação'] == "Compra")
-            | (credit['Movimentação'] == "Desdobro") 
-            | (credit['Movimentação'] == "Bonificação em Ativos")
-            | (credit['Movimentação'] == "Atualização")
+            (credit['Movimentation'] == "Compra")
+            | (credit['Movimentation'] == "Desdobro") 
+            | (credit['Movimentation'] == "Bonificação em Ativos")
+            | (credit['Movimentation'] == "Atualização")
         )
     ]
 
     sells = debit.loc[
         (
-            (debit['Movimentação'] == "Venda")
+            (debit['Movimentation'] == "Venda")
         )
     ]
 
@@ -325,14 +325,14 @@ def process_b3_asset_request(request, asset):
 
         negotiation_buys = negotiation.loc[
             (
-                (negotiation['Tipo de Movimentação'] == "Compra")
+                (negotiation['Movimentation'] == "Compra")
             )
         ]
         # dataframes['negotitation_buys'] = negotiation_buys
 
         negotiation_sells = negotiation.loc[
             (
-                (negotiation['Tipo de Movimentação'] == "Venda")
+                (negotiation['Movimentation'] == "Venda")
             )
         ]
         # dataframes['negotitation_sells'] = negotiation_sells
@@ -341,30 +341,30 @@ def process_b3_asset_request(request, asset):
         sells = merge_movimentation_negotiation(sells, negotiation_sells, 'Venda')
     else:
         app.logger.warning(f'Warning! Negotiation data not found for {asset}!')
-        dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
-                                                          'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
+        dataframes['negotiation'] = pd.DataFrame(columns=['Date', 'Movimentation', 'Mercado', 'Prazo/Vencimento',
+                                                          'Instituição', 'Código de Negociação', 'Quantity', 'Price','Total'])
         # return asset_info
 
     dataframes['buys'] = buys
     dataframes['sells'] = sells
 
     taxes = debit.loc[
-        ((debit['Movimentação'] == "Cobrança de Taxa Semestral"))
+        ((debit['Movimentation'] == "Cobrança de Taxa Semestral"))
     ]
     dataframes['taxes'] = taxes
 
     wages = credit.loc[
-        ((credit['Movimentação'] == "Dividendo") 
-         | (credit['Movimentação'] == "Juros Sobre Capital Próprio") 
-         | (credit['Movimentação'] == "Reembolso") 
-         | (credit['Movimentação'] == "Rendimento")
-         | (credit['Movimentação'] == "Leilão de Fração"))
+        ((credit['Movimentation'] == "Dividendo") 
+         | (credit['Movimentation'] == "Juros Sobre Capital Próprio") 
+         | (credit['Movimentation'] == "Reembolso") 
+         | (credit['Movimentation'] == "Rendimento")
+         | (credit['Movimentation'] == "Leilão de Fração"))
     ]
     dataframes['wages'] = wages
 
     rents_wage = credit.loc[(
-        (credit['Movimentação'] == "Empréstimo")
-        & (credit['Valor da Operação'] > 0)
+        (credit['Movimentation'] == "Empréstimo")
+        & (credit['Total'] > 0)
     )]
 
     asset_info['dataframes'] = dataframes
@@ -400,7 +400,7 @@ def process_avenue_asset_request(request, asset):
         app.logger.warning(f'Extract data not found for {asset}')
         return asset_info
     
-    extract_df['Valor da Operação'] = abs(extract_df['Valor (U$)'])
+    extract_df['Total'] = abs(extract_df['Price'])
     
     dataframes['movimentation'] = extract_df
 
@@ -412,27 +412,27 @@ def process_avenue_asset_request(request, asset):
 
     buys = credit.loc[
         (
-            (credit['Movimentação'] == "Compra")
-            | (credit['Movimentação'] == "Desdobramento")
+            (credit['Movimentation'] == "Compra")
+            | (credit['Movimentation'] == "Desdobramento")
         )
     ]
     dataframes['buys'] = buys
 
     sells = debit.loc[
         (
-            (debit['Movimentação'] == "Venda")
+            (debit['Movimentation'] == "Venda")
         )
     ]
     dataframes['sells'] = sells
 
     taxes = debit.loc[
-        (debit['Movimentação'] == "Impostos")
-        | (debit['Movimentação'] == "Corretagem")
+        (debit['Movimentation'] == "Impostos")
+        | (debit['Movimentation'] == "Corretagem")
     ]
     dataframes['taxes'] = taxes
 
     wages = credit.loc[
-        (credit['Movimentação'] == "Dividendos")
+        (credit['Movimentation'] == "Dividendos")
     ]
     dataframes['wages'] = wages
 
@@ -559,39 +559,38 @@ def process_consolidate_request(request):
 
         generic_consolidate['url'] = generic_consolidate['name'].apply(lambda x: f"<a href='/generic/{x}'>{x}</a>")
 
-    # print(pd.DataFrame(asset_list))
-    # print(movimentation['Ticker'].value_counts())
-
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
-    # consolidate = b3_consolidate
-    # consolidate = pd.concat([b3_consolidate, avenue_consolidate])
     if len(consolidate) == 0:
         return ret
-
-    # consolidate = consolidate[['name','url','ticker','currency','last_close_price',
-    #                            'position','position_total','avg_price',
-    #                            'cost','wages_sum','rents_wage_sum','liquid_cost',
-    #                            'rentability','rentability_by_year','age','taxes_sum']]
-
         
     assets = consolidate.loc[consolidate['position'] > 0]
     assets = assets.sort_values(by='rentability', ascending=False)
-    assets['age'] = round(assets['age']/365, 2)
     ret['consolidate'] = assets
 
     finished = consolidate.loc[consolidate['position'] <= 0]
     finished = finished.sort_values(by='capital_gain', ascending=False)
     ret['finished'] = finished
 
-    def consolidate_currency(df, rate = 1):
+    def consolidate_summary(df, rate = 1):
         ret = {}
 
-        cost = rate * df['cost'].sum()
-        wages = rate * df['wages_sum'].sum()
-        rents = rate * df['rents_wage_sum'].sum()
-        taxes = rate * df['taxes_sum'].sum()
-        liquid_cost = rate * df['liquid_cost'].sum()
-        position = rate * df['position_total'].sum()
+        open = df #df.loc[df['position'] > 0]
+        # finished = df.loc[df['position'] <= 0]
+
+        cost = rate * open['cost'].sum()
+        wages = rate * open['wages_sum'].sum()
+        rents = rate * open['rents_wage_sum'].sum()
+        taxes = rate * open['taxes_sum'].sum()
+        liquid_cost = rate * open['liquid_cost'].sum()
+        position = rate * open['position_total'].sum()
+        capital_gain = rate * open['capital_gain'].sum()
+
+        # if finished is not None:
+        #     cost += rate * finished['cost'].sum()
+        #     wages += rate * finished['wages_sum'].sum()
+        #     rents += rate * finished['rents_wage_sum'].sum()
+        #     taxes += rate * finished['taxes_sum'].sum()
+        #     capital_gain += rate * finished['capital_gain'].sum()
 
         ret['cost'] = round(cost, 2)
         ret['wages'] = round(wages, 2)
@@ -599,22 +598,23 @@ def process_consolidate_request(request):
         ret['position'] = round(position, 2)
         ret['taxes'] = round(taxes, 2)
         ret['liquid_cost'] = round(liquid_cost, 2)
-        ret['rentability'] = round(100 * (position/liquid_cost - 1), 2)
+        ret['rentability'] = round(100 * (capital_gain/liquid_cost), 2)
+        ret['capital_gain'] = round(capital_gain, 2)
 
         return ret
 
-    brl_df = assets.loc[assets['currency'] == 'BRL']
-    brl_ret = consolidate_currency(brl_df)
+    brl_df = consolidate.loc[consolidate['currency'] == 'BRL']
+    brl_ret = consolidate_summary(brl_df)
     ret['BRL'] = brl_ret
 
-    usd_df = assets.loc[assets['currency'] == 'USD']
-    usd_ret = consolidate_currency(usd_df)
+    usd_df = consolidate.loc[consolidate['currency'] == 'USD']
+    usd_ret = consolidate_summary(usd_df)
     ret['USD'] = usd_ret
 
     rate = usd_exchange_rate('BRL')
     ret['usd_brl'] = rate
 
-    usd_brl_ret = consolidate_currency(usd_df, rate)
+    usd_brl_ret = consolidate_summary(usd_df, rate)
     ret['USD/BRL'] = usd_brl_ret
 
     ret_total = {}
@@ -626,6 +626,7 @@ def process_consolidate_request(request):
     liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
     taxes = brl_ret['taxes'] + usd_brl_ret['taxes']
     liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
+    capital_gain = brl_ret['capital_gain'] + usd_brl_ret['capital_gain']
 
     ret_total['cost'] = round(cost, 2)
     ret_total['wages'] = round(wages, 2)
@@ -633,24 +634,10 @@ def process_consolidate_request(request):
     ret_total['position'] = round(position, 2)
     ret_total['taxes'] = round(taxes, 2)
     ret_total['liquid_cost'] = round(liquid_cost, 2)
-    ret_total['rentability'] = round(100 * (position/liquid_cost - 1), 2)
+    ret_total['rentability'] = round(100 * capital_gain/liquid_cost, 2)
+    ret_total['capital_gain'] = round(capital_gain, 2)
 
     ret['TOTAL'] = ret_total
-
-    # ret['total_cost_sum_usd_brl'] = round(rate * total_cost_usd, 2)
-    # ret['total_wages_sum_usd_brl'] = round(rate * total_wages_usd, 2)
-    # ret['total_rents_wage_sum_usd_brl'] = round(rate * total_wages_usd, 2)
-    # ret['position_total_sum_usd_brl'] = round(rate * total_position_usd, 2)
-    # ret['taxes_sum_usd_brl'] = round(rate * taxes_usd, 2)
-
-    # total_cost_brl = cost + total_cost_usd * rate
-    # total_position_brl = position + total_position_usd * rate
-    # total_liquid_cost_brl = liquid_cost + liquid_cost_usd * rate
-    # rentability_brl = 100 * (total_position_brl/total_liquid_cost_brl - 1)
-    # ret['total_cost_brl'] = round(total_cost_brl, 2)
-    # ret['total_position_brl'] = round(total_position_brl, 2)
-    # ret['total_liquid_cost_brl'] = round(total_liquid_cost_brl, 2)
-    # ret['rentability_brl'] = round(rentability_brl, 2)
 
     ret['valid'] = True
 

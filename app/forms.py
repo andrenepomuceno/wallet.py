@@ -14,11 +14,11 @@ class GenericExtractAddForm(FlaskForm):
 
 class B3MovimentationFilterForm(FlaskForm):
     entrada_saida = StringField('Entrada/Saída')
-    data = StringField('Data')
-    movimentacao = StringField('Movimentação')
+    data = StringField('Date')
+    movimentacao = StringField('Movimentation')
     produto = StringField('Produto')
     instituicao = StringField('Instituição')
-    quantidade = FloatField('Quantidade')
-    preco_unitario = FloatField('Preço Unitário')
-    valor_operacao = FloatField('Valor da Operação')
+    quantidade = FloatField('Quantity')
+    preco_unitario = FloatField('Price')
+    valor_operacao = FloatField('Total')
     submit = SubmitField('Submit')

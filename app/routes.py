@@ -76,11 +76,11 @@ def view_asset(asset=None):
     sells_events = dataframes['sells']
     return render_template(
         'view_asset.html', info=asset_info, 
-        buys_events=buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
-        sells_events=sells_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
-        wages_events=wages[['Data', 'Valor da Operação', 'Movimentação','Produto']].to_html(classes='pandas-dataframe'),
-        all_negotiation=all_negotiation[['Data do Negócio','Tipo de Movimentação','Quantidade','Preço','Valor','Código de Negociação']].to_html(),
-        all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
+        buys_events=buys_events[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
+        sells_events=sells_events[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
+        wages_events=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe'),
+        all_negotiation=all_negotiation[['Date','Movimentation','Quantity','Price','Total','Código de Negociação']].to_html(),
+        all_movimentation=all_movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
     )
 
 @app.route('/extract', methods=['GET', 'POST'])
@@ -99,10 +99,10 @@ def view_extract_asset(asset=None):
     sells_events = dataframes['sells']
     return render_template(
         'view_asset.html', info=asset_info, 
-        buys_events=buys_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
-        sells_events=sells_events[['Data','Movimentação','Quantidade','Preço unitário', 'Valor da Operação', 'Produto']].to_html(classes='pandas-dataframe'),
-        wages_events=wages[['Data', 'Valor da Operação', 'Movimentação','Produto']].to_html(classes='pandas-dataframe'),
-        all_movimentation=all_movimentation[['Data','Entrada/Saída','Movimentação', 'Quantidade', 'Preço unitário', 'Valor da Operação','Produto']].to_html(classes='pandas-dataframe')
+        buys_events=buys_events[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
+        sells_events=sells_events[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
+        wages_events=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe'),
+        all_movimentation=all_movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
     )
 
 @app.route('/generic', methods=['GET', 'POST'])
