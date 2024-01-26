@@ -99,7 +99,7 @@ def process_b3_negotiation_request(request):
     df = b3_negotiation_sql_to_df(result)
     return df
     
-def consolidate_buysell(movimentationDf, negotiationDf, movimentationType):
+def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentationType):
     columns = ["Data", "Movimentação", "Quantidade", "Preço unitário", "Valor da Operação", "Produto"]
     df1 = movimentationDf[columns]
 
@@ -113,113 +113,25 @@ def consolidate_buysell(movimentationDf, negotiationDf, movimentationType):
 
     return df_merged
 
-def process_b3_asset_request(request, asset):
-    app.logger.info(f'Processing view asset request for "{asset}".')
-
-    asset_info = {}
-    dataframes = {}
-
-    asset_info['valid'] = False
+def process_b3_dataframes(asset, ticker, buys, sells, taxes, wages, rents_wage, asset_info):
     asset_info['name'] = asset
-
     currency = 'BRL'
     first_buy = None
     age = None
     last_close_price = 0
 
-    query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
-    result = query.all()
-    movimentation_df = b3_movimentation_sql_to_df(result)
-    if len(movimentation_df) == 0:
-        app.logger.warning(f'Movimentation data not found for {asset}')
-        return asset_info
-    
-    dataframes['movimentation'] = movimentation_df
-
-    movimentation_df['Ticker'] = parse_b3_ticker(movimentation_df['Produto'])
-    ticker = movimentation_df['Ticker'].value_counts().index[0]
     asset_info['ticker'] = ticker
 
-    credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
-    debit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Debito"]
-
-    buys = credit.loc[
-        (
-            (credit['Movimentação'] == "Compra")
-            | (credit['Movimentação'] == "Desdobro") 
-            | (credit['Movimentação'] == "Bonificação em Ativos")
-            | (credit['Movimentação'] == "Atualização")
-        )
-    ]
-    dataframes['buys'] = buys
     if len(buys) > 0:
         first_buy = buys.iloc[0]['Data']
         age = pd.to_datetime("today") - first_buy
 
-    sells = debit.loc[
-        (
-            (debit['Movimentação'] == "Venda")
-        )
-    ]
-    dataframes['sells'] = sells
-
-    # TODO process negotiation first 
-    query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
-    result = query.all()
-    negotiation = b3_negotiation_sql_to_df(result)
-    if len(negotiation) > 0:
-        dataframes['negotiation'] = negotiation
-
-        negotiation_buys = negotiation.loc[
-            (
-                (negotiation['Tipo de Movimentação'] == "Compra")
-            )
-        ]
-        dataframes['negotitation_buys'] = negotiation_buys
-
-        if len(negotiation_buys) > 0:
-            first_buy = negotiation_buys.iloc[0]['Data do Negócio']
-            age = pd.to_datetime("today") - first_buy
-
-        negotiation_sells = negotiation.loc[
-            (
-                (negotiation['Tipo de Movimentação'] == "Venda")
-            )
-        ]
-        dataframes['negotitation_sells'] = negotiation_sells
-
-        buys = consolidate_buysell(buys, negotiation_buys, 'Compra')
-        dataframes['buys'] = buys
-        sells = consolidate_buysell(sells, negotiation_sells, 'Venda')
-        dataframes['sells'] = sells
-    else:
-        app.logger.warning(f'Warning! Negotiation data not found for {asset}!')
-        dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
-                                                          'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
-        # return asset_info
-
-    taxes = debit.loc[
-        ((debit['Movimentação'] == "Cobrança de Taxa Semestral"))
-    ]
     taxes_sum = taxes['Valor da Operação'].sum()
-    dataframes['taxes'] = taxes
     asset_info['taxes_sum'] = round(taxes_sum, 2)
 
-    wages = credit.loc[
-        ((credit['Movimentação'] == "Dividendo") 
-         | (credit['Movimentação'] == "Juros Sobre Capital Próprio") 
-         | (credit['Movimentação'] == "Reembolso") 
-         | (credit['Movimentação'] == "Rendimento")
-         | (credit['Movimentação'] == "Leilão de Fração"))
-    ]
     wages_sum = wages['Valor da Operação'].sum()
-    dataframes['wages'] = wages
     asset_info['wages_sum'] = round(wages_sum, 2)
 
-    rents_wage = credit.loc[(
-        (credit['Movimentação'] == "Empréstimo")
-        & (credit['Valor da Operação'] > 0)
-    )]
     rents_wages_sum = rents_wage['Valor da Operação'].sum()
     asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
 
@@ -312,8 +224,99 @@ def process_b3_asset_request(request, asset):
 
     app.logger.debug(asset_info)
 
+def process_b3_asset_request(request, asset):
+    app.logger.info(f'Processing view asset request for "{asset}".')
+
+    asset_info = { 'valid': False }
+    dataframes = {}
+
+    query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
+    result = query.all()
+    movimentation_df = b3_movimentation_sql_to_df(result)
+    if len(movimentation_df) == 0:
+        app.logger.warning(f'Movimentation data not found for {asset}')
+        return asset_info
+    
+    dataframes['movimentation'] = movimentation_df
+
+    movimentation_df['Ticker'] = parse_b3_ticker(movimentation_df['Produto'])
+    ticker = movimentation_df['Ticker'].value_counts().index[0]
+
+    credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
+    debit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Debito"]
+
+    buys = credit.loc[
+        (
+            (credit['Movimentação'] == "Compra")
+            | (credit['Movimentação'] == "Desdobro") 
+            | (credit['Movimentação'] == "Bonificação em Ativos")
+            | (credit['Movimentação'] == "Atualização")
+        )
+    ]
+
+    sells = debit.loc[
+        (
+            (debit['Movimentação'] == "Venda")
+        )
+    ]
+
+    # TODO process negotiation first 
+    query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
+    result = query.all()
+    negotiation = b3_negotiation_sql_to_df(result)
+    if len(negotiation) > 0:
+        dataframes['negotiation'] = negotiation
+
+        negotiation_buys = negotiation.loc[
+            (
+                (negotiation['Tipo de Movimentação'] == "Compra")
+            )
+        ]
+        # dataframes['negotitation_buys'] = negotiation_buys
+
+        negotiation_sells = negotiation.loc[
+            (
+                (negotiation['Tipo de Movimentação'] == "Venda")
+            )
+        ]
+        # dataframes['negotitation_sells'] = negotiation_sells
+
+        buys = merge_movimentation_negotiation(buys, negotiation_buys, 'Compra')
+        sells = merge_movimentation_negotiation(sells, negotiation_sells, 'Venda')
+    else:
+        app.logger.warning(f'Warning! Negotiation data not found for {asset}!')
+        dataframes['negotiation'] = pd.DataFrame(columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
+                                                          'Instituição', 'Código de Negociação', 'Quantidade', 'Preço','Valor'])
+        # return asset_info
+
+    dataframes['buys'] = buys
+    dataframes['sells'] = sells
+
+    taxes = debit.loc[
+        ((debit['Movimentação'] == "Cobrança de Taxa Semestral"))
+    ]
+    dataframes['taxes'] = taxes
+
+    wages = credit.loc[
+        ((credit['Movimentação'] == "Dividendo") 
+         | (credit['Movimentação'] == "Juros Sobre Capital Próprio") 
+         | (credit['Movimentação'] == "Reembolso") 
+         | (credit['Movimentação'] == "Rendimento")
+         | (credit['Movimentação'] == "Leilão de Fração"))
+    ]
+    dataframes['wages'] = wages
+
+    rents_wage = credit.loc[(
+        (credit['Movimentação'] == "Empréstimo")
+        & (credit['Valor da Operação'] > 0)
+    )]
+
     asset_info['dataframes'] = dataframes
+
+    process_b3_dataframes(asset, ticker, buys, sells, taxes, wages, rents_wage, asset_info)
+
     asset_info['valid'] = True
+    
     return asset_info
 
 def process_avenue_extract_request(request):
@@ -363,9 +366,6 @@ def process_avenue_asset_request(request, asset):
         )
     ]
     dataframes['buys'] = buys
-    if len(buys) > 0:
-        first_buy = buys.iloc[0]['Data']
-        age = pd.to_datetime("today") - first_buy
 
     sells = debit.loc[
         (
@@ -378,15 +378,21 @@ def process_avenue_asset_request(request, asset):
         (debit['Movimentação'] == "Impostos")
         | (debit['Movimentação'] == "Corretagem")
     ]
-    taxes_sum = taxes['Valor da Operação'].sum()
     dataframes['taxes'] = taxes
-    asset_info['taxes_sum'] = round(taxes_sum, 2)
 
     wages = credit.loc[
         (credit['Movimentação'] == "Dividendos")
     ]
-    wages_sum = wages['Valor da Operação'].sum()
     dataframes['wages'] = wages
+
+    if len(buys) > 0:
+        first_buy = buys.iloc[0]['Data']
+        age = pd.to_datetime("today") - first_buy
+
+    taxes_sum = taxes['Valor da Operação'].sum()
+    asset_info['taxes_sum'] = round(taxes_sum, 2)
+
+    wages_sum = wages['Valor da Operação'].sum()
     asset_info['wages_sum'] = round(wages_sum, 2)
 
     rents_wages_sum = 0
@@ -517,9 +523,6 @@ def process_generic_asset_request(request, asset):
         )
     ]
     dataframes['buys'] = buys
-    if len(buys) > 0:
-        first_buy = buys.iloc[0]['Date']
-        age = pd.to_datetime("today") - first_buy
 
     sells = extract_df.loc[
         (
@@ -527,19 +530,25 @@ def process_generic_asset_request(request, asset):
         )
     ]
     dataframes['sells'] = sells
-
+    
     taxes = extract_df.loc[
         (extract_df['Movimentation'] == "Taxes")
     ]
-    taxes_sum = abs(taxes['Total'].sum())
     dataframes['taxes'] = taxes
-    asset_info['taxes_sum'] = round(taxes_sum, 2)
 
     wages = extract_df.loc[
         (extract_df['Movimentation'] == "Wages")
     ]
-    wages_sum = abs(wages['Total'].sum())
     dataframes['wages'] = wages
+
+    if len(buys) > 0:
+        first_buy = buys.iloc[0]['Date']
+        age = pd.to_datetime("today") - first_buy
+
+    taxes_sum = abs(taxes['Total'].sum())
+    asset_info['taxes_sum'] = round(taxes_sum, 2)
+
+    wages_sum = abs(wages['Total'].sum())
     asset_info['wages_sum'] = round(wages_sum, 2)
 
     rents_wages_sum = 0
