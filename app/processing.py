@@ -152,7 +152,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
     realized_gain = 0
     for index, row in sells.iterrows():
         date = row[data_column]
-        quantity = row[quantity_column]
+        quantity = abs(row[quantity_column])
         price = row[price_column]
 
         buys_before_sell = buys.loc[buys[data_column] <= date]
@@ -160,6 +160,8 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
         last_cost = (buys_before_sell[quantity_column] * buys_before_sell[price_column]).sum()
         last_avg_price = last_cost / last_buy_quantity if last_buy_quantity > 0 else 0
         realized = (price - last_avg_price) * quantity
+
+        print(f'realized = {realized}')
 
         realized_gain += realized
 
