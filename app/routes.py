@@ -205,7 +205,7 @@ def view_consolidate():
     
     consolidate = info['consolidate']
     consolidate = consolidate[['url','currency','last_close_price','position','position_total','avg_price',
-                               'cost','wages_sum','rents_wage_sum', 'taxes_sum', 'liquid_cost','realized_gain',
+                               'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
                                'not_realized_gain','capital_gain','rentability','rentability_by_year','age']]
     consolidate = consolidate.rename(columns={
         'url': 'Name',
@@ -216,7 +216,7 @@ def view_consolidate():
         'avg_price': 'Avg Price',
         'cost': 'Cost',
         'wages_sum': 'Wages',
-        'rents_wage_sum': 'Rent Wages',
+        'rent_wages_sum': 'Rent Wages',
         'taxes_sum': 'Taxes',
         'liquid_cost': 'Liquid Cost',
         'realized_gain': 'Realized Gain',
@@ -229,7 +229,7 @@ def view_consolidate():
 
     old = info['finished']
     old = old[['url','currency','last_close_price','position','position_total','avg_price',
-               'cost','wages_sum','rents_wage_sum', 'taxes_sum', 'liquid_cost','realized_gain',
+               'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
                'not_realized_gain','capital_gain','rentability','rentability_by_year','age']]
     old = old.rename(columns={
         'url': 'Name',
@@ -240,7 +240,7 @@ def view_consolidate():
         'avg_price': 'Avg Price',
         'cost': 'Cost',
         'wages_sum': 'Wages',
-        'rents_wage_sum': 'Rent Wages',
+        'rent_wages_sum': 'Rent Wages',
         'taxes_sum': 'Taxes',
         'liquid_cost': 'Liquid Cost',
         'realized_gain': 'Realized Gain',

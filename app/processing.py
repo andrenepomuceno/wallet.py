@@ -113,7 +113,7 @@ def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentatio
 
     return df_merged
 
-def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info):
+def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_info):
     currency = 'BRL'
     first_buy = None
     age_years = None
@@ -137,13 +137,13 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
     avg_price = cost / buy_quantity if buy_quantity > 0 else 0
 
     wages_sum = wages['Total'].sum()
-    if rents_wage is not None:
-        rents_wages_sum = rents_wage['Total'].sum()
+    if rent_wages is not None:
+        rent_wages_sum = rent_wages['Total'].sum()
     else:
-        rents_wages_sum = 0
+        rent_wages_sum = 0
     taxes_sum = taxes['Total'].sum()
 
-    liquid_cost = cost - wages_sum - rents_wages_sum + taxes_sum
+    liquid_cost = cost - wages_sum - rent_wages_sum + taxes_sum
 
     sells_sum = abs(sells['Total'].sum())
 
@@ -210,7 +210,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
 
     not_realized_gain = (last_close_price - avg_price) * position
 
-    capital_gain = realized_gain + not_realized_gain + wages_sum + rents_wages_sum
+    capital_gain = realized_gain + not_realized_gain + wages_sum + rent_wages_sum
 
     rentability = capital_gain/liquid_cost
 
@@ -238,7 +238,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
 
     asset_info['taxes_sum'] = round(taxes_sum, 2)
     asset_info['wages_sum'] = round(wages_sum, 2)
-    asset_info['rents_wage_sum'] = round(rents_wages_sum, 2)
+    asset_info['rent_wages_sum'] = round(rent_wages_sum, 2)
 
     asset_info['liquid_cost'] = round(liquid_cost, 2)
 
@@ -576,10 +576,12 @@ def process_consolidate_request(request):
 
         cost = rate * df['cost'].sum()
         wages = rate * df['wages_sum'].sum()
-        rents = rate * df['rents_wage_sum'].sum()
+        rents = rate * df['rent_wages_sum'].sum()
         taxes = rate * df['taxes_sum'].sum()
         liquid_cost = rate * df['liquid_cost'].sum()
         position = rate * df['position_total'].sum()
+        realized_gain = rate * df['realized_gain'].sum()
+        not_realized_gain = rate * df['not_realized_gain'].sum()
         capital_gain = rate * df['capital_gain'].sum()
 
         ret['cost'] = round(cost, 2)
@@ -590,6 +592,8 @@ def process_consolidate_request(request):
         ret['liquid_cost'] = round(liquid_cost, 2)
         ret['rentability'] = round(100 * (capital_gain/liquid_cost), 2)
         ret['capital_gain'] = round(capital_gain, 2)
+        ret['realized_gain'] = round(realized_gain, 2)
+        ret['not_realized_gain'] = round(not_realized_gain, 2)
 
         return ret
 
@@ -617,6 +621,8 @@ def process_consolidate_request(request):
     taxes = brl_ret['taxes'] + usd_brl_ret['taxes']
     liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
     capital_gain = brl_ret['capital_gain'] + usd_brl_ret['capital_gain']
+    realized_gain = brl_ret['realized_gain'] + usd_brl_ret['realized_gain']
+    not_realized_gain = brl_ret['not_realized_gain'] + usd_brl_ret['not_realized_gain']
 
     ret_total['cost'] = round(cost, 2)
     ret_total['wages'] = round(wages, 2)
@@ -626,6 +632,8 @@ def process_consolidate_request(request):
     ret_total['liquid_cost'] = round(liquid_cost, 2)
     ret_total['rentability'] = round(100 * capital_gain/liquid_cost, 2)
     ret_total['capital_gain'] = round(capital_gain, 2)
+    ret_total['realized_gain'] = round(realized_gain, 2)
+    ret_total['not_realized_gain'] = round(not_realized_gain, 2)
 
     ret['TOTAL'] = ret_total
 
