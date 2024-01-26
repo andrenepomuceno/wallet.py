@@ -25,29 +25,34 @@
     <h2>Buys</h2>
     <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
     <div class="table table-striped mt-3">
-        {{ buys_events|safe }}
+        {{ buys|safe }}
     </div>
 
     <h2>Sells</h2>
     <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
     <div class="table table-striped mt-3">
-        {{ sells_events|safe }}
+        {{ sells|safe }}
     </div>
 
     <h2>Wages</h2>
     <div class="table table-striped mt-3">
-        {{ wages_events|safe }}
+        {{ wages|safe }}
+    </div>
+
+    <h2>Taxes</h2>
+    <div class="table table-striped mt-3">
+        {{ taxes|safe }}
     </div>
 
     {% if all_negotiation %}
-        <h2>All Negotiation</h2>
+        <h2>Negotiation (All)</h2>
         <div class="table table-striped mt-3">
-            {{ all_negotiation|safe }}
+            {{ negotiation|safe }}
         </div>
     {% endif %}
 
-    <h2>All Movimentations</h2>
+    <h2>Movimentation (All)</h2>
     <div class="table table-striped mt-3">
-        {{ all_movimentation|safe }}
+        {{ movimentation|safe }}
     </div>
 {% endblock %}

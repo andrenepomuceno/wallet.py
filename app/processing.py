@@ -113,9 +113,7 @@ def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentatio
 
     return df_merged
 
-def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info,
-                           data_column='Date', quantity_column='Quantity',
-                           price_column='Price', total_column='Total'):
+def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info):
     currency = 'BRL'
     first_buy = None
     age_years = None
@@ -124,40 +122,40 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
     asset_class = ''
     last_sell = pd.to_datetime("today")
 
-    buy_quantity = buys[quantity_column].sum()
-    sell_quantity = sells[quantity_column].sum()
+    buy_quantity = buys['Quantity'].sum()
+    sell_quantity = sells['Quantity'].sum()
     position = round(buy_quantity - sell_quantity, 8) # avoid machine precision errors on zero
 
     if len(buys) > 0:
-        first_buy = buys.iloc[0][data_column]
+        first_buy = buys.iloc[0]['Date']
         if position <= 0 and len(sells) > 0:
-            last_sell = sells.iloc[-1][data_column]
+            last_sell = sells.iloc[-1]['Date']
         age_years = last_sell - first_buy
         age_years = age_years.days/365
 
-    cost = (buys[quantity_column] * buys[price_column]).sum()
+    cost = (buys['Quantity'] * buys['Price']).sum()
     avg_price = cost / buy_quantity if buy_quantity > 0 else 0
 
-    wages_sum = wages[total_column].sum()
+    wages_sum = wages['Total'].sum()
     if rents_wage is not None:
-        rents_wages_sum = rents_wage[total_column].sum()
+        rents_wages_sum = rents_wage['Total'].sum()
     else:
         rents_wages_sum = 0
-    taxes_sum = taxes[total_column].sum()
+    taxes_sum = taxes['Total'].sum()
 
     liquid_cost = cost - wages_sum - rents_wages_sum + taxes_sum
 
-    sells_sum = abs(sells[total_column].sum())
+    sells_sum = abs(sells['Total'].sum())
 
     realized_gain = 0
     for index, row in sells.iterrows():
-        date = row[data_column]
-        quantity = abs(row[quantity_column])
-        price = row[price_column]
+        date = row['Date']
+        quantity = abs(row['Quantity'])
+        price = row['Price']
 
-        buys_before_sell = buys.loc[buys[data_column] <= date]
-        last_buy_quantity = buys_before_sell[quantity_column].sum()
-        last_cost = (buys_before_sell[quantity_column] * buys_before_sell[price_column]).sum()
+        buys_before_sell = buys.loc[buys['Date'] <= date]
+        last_buy_quantity = buys_before_sell['Quantity'].sum()
+        last_cost = (buys_before_sell['Quantity'] * buys_before_sell['Price']).sum()
         last_avg_price = last_cost / last_buy_quantity if last_buy_quantity > 0 else 0
         realized = (price - last_avg_price) * quantity
 
@@ -223,7 +221,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_
     rented = 0 # TODO
     position = round(position + rented, 2)
 
-    buys_value_sum = buys[total_column].sum()
+    buys_value_sum = buys['Total'].sum()
 
     position_total = 0
     price_gain = -100
@@ -360,17 +358,17 @@ def process_b3_asset_request(request, asset):
          | (credit['Movimentation'] == "Rendimento")
          | (credit['Movimentation'] == "Leilão de Fração"))
     ]
-    dataframes['wages'] = wages
 
     rents_wage = credit.loc[(
         (credit['Movimentation'] == "Empréstimo")
         & (credit['Total'] > 0)
     )]
 
-    asset_info['dataframes'] = dataframes
-
     consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info)
 
+    wages = pd.concat([wages, rents_wage])
+    dataframes['wages'] = wages
+    asset_info['dataframes'] = dataframes
     asset_info['valid'] = True
     
     return asset_info
@@ -496,7 +494,7 @@ def process_generic_asset_request(request, asset):
     ]
     dataframes['wages'] = wages
 
-    consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info, 'Date', 'Quantity', 'Price', 'Total')
+    consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info)
 
     asset_info['dataframes'] = dataframes
     asset_info['valid'] = True
@@ -574,23 +572,13 @@ def process_consolidate_request(request):
     def consolidate_summary(df, rate = 1):
         ret = {}
 
-        open = df #df.loc[df['position'] > 0]
-        # finished = df.loc[df['position'] <= 0]
-
-        cost = rate * open['cost'].sum()
-        wages = rate * open['wages_sum'].sum()
-        rents = rate * open['rents_wage_sum'].sum()
-        taxes = rate * open['taxes_sum'].sum()
-        liquid_cost = rate * open['liquid_cost'].sum()
-        position = rate * open['position_total'].sum()
-        capital_gain = rate * open['capital_gain'].sum()
-
-        # if finished is not None:
-        #     cost += rate * finished['cost'].sum()
-        #     wages += rate * finished['wages_sum'].sum()
-        #     rents += rate * finished['rents_wage_sum'].sum()
-        #     taxes += rate * finished['taxes_sum'].sum()
-        #     capital_gain += rate * finished['capital_gain'].sum()
+        cost = rate * df['cost'].sum()
+        wages = rate * df['wages_sum'].sum()
+        rents = rate * df['rents_wage_sum'].sum()
+        taxes = rate * df['taxes_sum'].sum()
+        liquid_cost = rate * df['liquid_cost'].sum()
+        position = rate * df['position_total'].sum()
+        capital_gain = rate * df['capital_gain'].sum()
 
         ret['cost'] = round(cost, 2)
         ret['wages'] = round(wages, 2)
