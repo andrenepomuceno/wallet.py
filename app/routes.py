@@ -75,14 +75,25 @@ def view_asset(asset=None):
     taxes = dataframes['taxes']
     movimentation = dataframes['movimentation']
     negotiation = dataframes['negotiation']
+    rent = dataframes['rent_wages']
+
+    buys = buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
+    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
+    wages = wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
+    taxes = taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
+    movimentation = movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
+    negotiation = negotiation[['Date','Movimentation','Quantity','Price','Total','Código de Negociação']].to_html()
+    rent = rent[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
+
     return render_template(
         'view_asset.html', info=asset_info, 
-        buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
-        sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
-        wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe'),
-        taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe'),
-        negotiation=negotiation[['Date','Movimentation','Quantity','Price','Total','Código de Negociação']].to_html(),
-        movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
+        buys=buys,
+        sells=sells,
+        wages=wages,
+        taxes=taxes,
+        rent=rent,
+        negotiation=negotiation,
+        movimentation=movimentation,
     )
 
 @app.route('/extract', methods=['GET', 'POST'])
@@ -100,13 +111,19 @@ def view_extract_asset(asset=None):
     wages = dataframes['wages']
     taxes = dataframes['taxes']
     movimentation = dataframes['movimentation']
+
+    buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
+    sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
+    wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
+    taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
+    movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
     return render_template(
         'view_asset.html', info=asset_info, 
-        buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
-        sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe'),
-        wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe'),
-        taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe'),
-        movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
+        buys=buys,
+        sells=sells,
+        wages=wages,
+        taxes=taxes,
+        movimentation=movimentation
     )
 
 @app.route('/generic', methods=['GET', 'POST'])
@@ -162,13 +179,19 @@ def view_generic_asset(asset=None):
     wages = dataframes['wages']
     taxes = dataframes['taxes']
     movimentation = dataframes['movimentation']
+
+    buys=buys.to_html(classes='pandas-dataframe')
+    sells=sells.to_html(classes='pandas-dataframe')
+    wages=wages[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
+    taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
+    movimentation=movimentation.to_html(classes='pandas-dataframe')
     return render_template(
         'view_asset.html', info=asset_info, 
-        buys=buys.to_html(classes='pandas-dataframe'),
-        sells=sells.to_html(classes='pandas-dataframe'),
-        wages=wages[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe'),
-        taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe'),
-        movimentation=movimentation.to_html(classes='pandas-dataframe')
+        buys=buys,
+        sells=sells,
+        wages=wages,
+        taxes=taxes,
+        movimentation=movimentation
     )
 
 @app.route('/consolidate', methods=['GET', 'POST'])

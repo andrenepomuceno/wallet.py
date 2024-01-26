@@ -358,16 +358,16 @@ def process_b3_asset_request(request, asset):
          | (credit['Movimentation'] == "Rendimento")
          | (credit['Movimentation'] == "Leilão de Fração"))
     ]
+    dataframes['wages'] = wages
 
     rents_wage = credit.loc[(
         (credit['Movimentation'] == "Empréstimo")
         & (credit['Total'] > 0)
     )]
+    dataframes['rent_wages'] = rents_wage
 
     consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info)
-
-    wages = pd.concat([wages, rents_wage])
-    dataframes['wages'] = wages
+    
     asset_info['dataframes'] = dataframes
     asset_info['valid'] = True
     
@@ -398,7 +398,7 @@ def process_avenue_asset_request(request, asset):
         app.logger.warning(f'Extract data not found for {asset}')
         return asset_info
     
-    extract_df['Total'] = abs(extract_df['Price'])
+    extract_df['Total'] = abs(extract_df['Total'])
     
     dataframes['movimentation'] = extract_df
 
@@ -407,6 +407,8 @@ def process_avenue_asset_request(request, asset):
 
     credit = extract_df.loc[extract_df['Entrada/Saída'] == "Credito"]
     debit = extract_df.loc[extract_df['Entrada/Saída'] == "Debito"]
+
+    # print(extract_df.to_string())
 
     buys = credit.loc[
         (
