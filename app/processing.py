@@ -209,7 +209,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     anualized_rentability = 0
     if age_years is not None and age_years > 0:
-        anualized_rentability = pow((1 + rentability), 1/age_years) - 1
+        anualized_rentability = (1 + rentability)**(1/age_years) - 1
 
     rented = 0 # TODO
     position = round(position + rented, 2)

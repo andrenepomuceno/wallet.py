@@ -227,6 +227,7 @@ def view_consolidate():
     })
 
     old = consolidate.loc[consolidate['Shares'] <= 0]
+    old = old.sort_values(by='Capital Gain', ascending=False)
 
     consolidate = consolidate.loc[consolidate['Shares'] > 0]
     consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'].to_html(classes='pandas-dataframe', escape=False, index=False)
