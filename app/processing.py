@@ -79,8 +79,8 @@ def process_b3_movimentation_request(request):
     if len(df) == 0:
         return df
     
-    df['Produto_Parsed'] = parse_b3_product(df['Produto'])
-    print(df['Produto_Parsed'].value_counts())
+    df['Asset'] = parse_b3_product(df['Produto'])
+    print(df['Asset'].value_counts())
     #print(df['Produto'].value_counts())
 
     df['Ticker'] = parse_b3_ticker(df['Produto'])
@@ -507,7 +507,7 @@ def process_consolidate_request(request):
     movimentation = b3_movimentation_sql_to_df(result)
     b3_consolidate = pd.DataFrame()
     if len(movimentation) > 0:
-        movimentation['Produto_Parsed'] = parse_b3_product(movimentation['Produto'])
+        movimentation['Asset'] = parse_b3_product(movimentation['Produto'])
         movimentation['Ticker'] = parse_b3_ticker(movimentation['Produto'])
 
         products = movimentation['Ticker'].value_counts().to_frame()
