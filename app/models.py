@@ -1,16 +1,8 @@
 from app import app, db
-from flask import abort, flash
+from app.utils.parsing import parse_b3_ticker
+from flask import flash
 import pandas as pd
 import re
-
-# ENTRADA_SAIDA = 'Entrada/Saída'    
-# DATA = 'Data'
-# MOVIMENTACAO = 'Movimentação'
-# PRODUTO = 'Produto'
-# INSTITUICAO = 'Instituição'
-# QUANTIDADE = 'Quantidade'
-# PRECO_UNITARIO = 'Preço unitário'
-# VALOR_OPERACAO = 'Valor da Operação'
 
 class B3_Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -77,6 +69,10 @@ def b3_movimentation_sql_to_df(result):
         'Preço unitário': 'Price',
         'Valor da Operação': 'Total'
     })
+
+    # df['Asset'] = parse_b3_product(df['Produto'])
+    # df['Ticker'] = parse_b3_ticker(df['Produto'])
+    df['Asset'] = parse_b3_ticker(df['Produto'])
 
     return df
 
@@ -148,6 +144,7 @@ def b3_negotiation_sql_to_df(result):
                                'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
                                'Valor'])
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'])
+    df['Asset'] = parse_b3_ticker(df['Código de Negociação'])
 
     df = df.rename(columns={
         'Data do Negócio': 'Date',
@@ -194,7 +191,7 @@ def extract_fill(df):
     df['Produto'] = df['Descrição'].apply(parse_produto)
 
     def parse_movimentacao(x):
-        match = re.search(r'Câmbio|Compra|Impostos|Dividendos|Corretagem', x)
+        match = re.search(r'Câmbio|Compra|Impostos|Dividendos|Corretagem|Desdobramento', x)
         if match:
             return match.group(0)
         else:
@@ -274,14 +271,19 @@ def process_avenue_extract(df):
     return df
 
 def avenue_extract_sql_to_df(result):
-    df = pd.DataFrame([(d.data, d.hora, d.liquidacao, d.descricao, 
-                        d.valor, d.saldo,
-                        d.entrada_saida, d.produto, d.movimentacao, d.quantidade, d.preco_unitario) for d in result], 
-                      columns=['Data', 'Hora', 'Liquidação', 'Descrição',
-                               'Valor (U$)', 'Saldo da conta (U$)',
-                               'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade', 'Preço unitário'])
+    df = pd.DataFrame([(
+        d.data, d.hora, d.liquidacao, d.descricao, 
+        d.valor, d.saldo,
+        d.entrada_saida, d.produto, d.movimentacao, d.quantidade, d.preco_unitario
+    ) for d in result],
+    columns=[
+        'Data', 'Hora', 'Liquidação', 'Descrição',
+        'Valor (U$)', 'Saldo da conta (U$)',
+        'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade', 'Preço unitário'
+    ])
     df['Data'] = pd.to_datetime(df['Data'])
     df['Liquidação'] = pd.to_datetime(df['Liquidação'])
+    df['Asset'] = df['Produto']
 
     df = df.rename(columns={
         'Data': 'Date',

@@ -2,3 +2,4 @@ uploads
 instance
 venv
 __pycache__
+request_cache.sqlite

@@ -8,7 +8,7 @@ import re
 
 from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
-from app.utils.parsing import is_valid_b3_ticker, parse_b3_product, parse_b3_ticker, brl_to_float
+from app.utils.parsing import is_valid_b3_ticker, brl_to_float
 
 scrape_dict = {
     # "Tesouro Selic 2024": {
@@ -79,11 +79,8 @@ def process_b3_movimentation_request(request):
     if len(df) == 0:
         return df
     
-    df['Asset'] = parse_b3_product(df['Produto'])
     print(df['Asset'].value_counts())
     #print(df['Produto'].value_counts())
-
-    df['Ticker'] = parse_b3_ticker(df['Produto'])
 
     grouped = df[['Entrada/Saída', 'Movimentation']].groupby(['Entrada/Saída'])
     print(grouped.value_counts())
@@ -114,6 +111,12 @@ def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentatio
 
     return df_merged
 
+def calc_avg_price(df):
+    quantity = df['Quantity'].sum()
+    cost = (df['Quantity'] * df['Price']).sum()
+    avg_price = cost / quantity if quantity > 0 else 0
+    return avg_price
+
 def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_info):
     currency = 'BRL'
     first_buy = None
@@ -135,7 +138,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         age_years = age_years.days/365
 
     cost = (buys['Quantity'] * buys['Price']).sum()
-    avg_price = cost / buy_quantity if buy_quantity > 0 else 0
+    avg_price = calc_avg_price(buys)
 
     wages_sum = wages['Total'].sum()
     if rent_wages is not None:
@@ -155,9 +158,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         price = row['Price']
 
         buys_before_sell = buys.loc[buys['Date'] <= date]
-        last_buy_quantity = buys_before_sell['Quantity'].sum()
-        last_cost = (buys_before_sell['Quantity'] * buys_before_sell['Price']).sum()
-        last_avg_price = last_cost / last_buy_quantity if last_buy_quantity > 0 else 0
+        last_avg_price = calc_avg_price(buys_before_sell)
         realized = (price - last_avg_price) * quantity
 
         print(f'realized = {realized}')
@@ -285,8 +286,7 @@ def process_b3_asset_request(request, asset):
     
     dataframes['movimentation'] = movimentation_df
 
-    movimentation_df['Ticker'] = parse_b3_ticker(movimentation_df['Produto'])
-    ticker = movimentation_df['Ticker'].value_counts().index[0]
+    ticker = movimentation_df['Asset'].value_counts().index[0]
     asset_info['ticker'] = ticker
 
     credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
@@ -395,7 +395,7 @@ def process_avenue_asset_request(request, asset):
     
     dataframes['movimentation'] = extract_df
 
-    ticker = extract_df['Produto'].value_counts().index[0]
+    ticker = extract_df['Asset'].value_counts().index[0]
     asset_info['ticker'] = ticker
 
     credit = extract_df.loc[extract_df['Entrada/Saída'] == "Credito"]
@@ -501,56 +501,27 @@ def process_consolidate_request(request):
 
     ret = {}
     ret['valid'] = False
-    
-    query = B3_Movimentation.query
-    result = query.all()
-    movimentation = b3_movimentation_sql_to_df(result)
-    b3_consolidate = pd.DataFrame()
-    if len(movimentation) > 0:
-        movimentation['Asset'] = parse_b3_product(movimentation['Produto'])
-        movimentation['Ticker'] = parse_b3_ticker(movimentation['Produto'])
 
-        products = movimentation['Ticker'].value_counts().to_frame()
-        for index, product in products.iterrows():
-            asset_info = process_b3_asset_request(request, product.name)
-            new_row = pd.DataFrame([asset_info])
-            b3_consolidate = pd.concat([b3_consolidate, new_row], ignore_index=True)
+    def load_consolidate(query, sql_to_df, process, route):
+        result = query.all()
+        movimentation = sql_to_df(result)
+        consolidate = pd.DataFrame()
+        if len(movimentation) > 0:
+            products = movimentation['Asset'].value_counts().to_frame()
+            for index, product in products.iterrows():
+                if product.name == '':
+                    continue
+                asset_info = process(request, product.name)
+                new_row = pd.DataFrame([asset_info])
+                consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
-        b3_consolidate['url'] = b3_consolidate['name'].apply(lambda x: f"<a href='/view/{x}'>{x}</a>")
+            consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/{route}/{x}'>{x}</a>")
 
-    query = Avenue_Extract.query
-    result = query.all()
-    movimentation = avenue_extract_sql_to_df(result)
-    avenue_consolidate = pd.DataFrame()
-    if len(movimentation) > 0:
-        products = movimentation['Produto'].value_counts().to_frame()
-        print(products)
-        for index, product in products.iterrows():
-            if product.name == '':
-                continue
+        return consolidate
 
-            asset_info = process_avenue_asset_request(request, product.name)
-            new_row = pd.DataFrame([asset_info])
-            avenue_consolidate = pd.concat([avenue_consolidate, new_row], ignore_index=True)
-
-        avenue_consolidate['url'] = avenue_consolidate['name'].apply(lambda x: f"<a href='/extract/{x}'>{x}</a>")
-
-    query = Generic_Extract.query
-    result = query.all()
-    movimentation = generic_extract_sql_to_df(result)
-    generic_consolidate = pd.DataFrame()
-    if len(movimentation) > 0:
-        products = movimentation['Asset'].value_counts().to_frame()
-        print(products)
-        for index, product in products.iterrows():
-            if product.name == '':
-                continue
-
-            asset_info = process_generic_asset_request(request, product.name)
-            new_row = pd.DataFrame([asset_info])
-            generic_consolidate = pd.concat([generic_consolidate, new_row], ignore_index=True)
-
-        generic_consolidate['url'] = generic_consolidate['name'].apply(lambda x: f"<a href='/generic/{x}'>{x}</a>")
+    b3_consolidate = load_consolidate(B3_Movimentation.query, b3_movimentation_sql_to_df, process_b3_asset_request, 'view')
+    avenue_consolidate = load_consolidate(Avenue_Extract.query, avenue_extract_sql_to_df, process_avenue_asset_request, 'extract')
+    generic_consolidate = load_consolidate(Generic_Extract.query, generic_extract_sql_to_df, process_generic_asset_request, 'view')
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:
