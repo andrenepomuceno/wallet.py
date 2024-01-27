@@ -78,7 +78,7 @@ def view_asset(asset=None):
     rent = dataframes['rent_wages']
 
     buys = buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
-    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
+    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto', 'Realized']].to_html(classes='pandas-dataframe')
     wages = wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
     taxes = taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
     movimentation = movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')

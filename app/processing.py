@@ -117,6 +117,56 @@ def calc_avg_price(df):
     avg_price = cost / quantity if quantity > 0 else 0
     return avg_price
 
+def get_online_info(ticker):                                                                                                                                                                                                                                                                                                                                            
+    currency = 'BRL'
+    last_close_price = 0
+    long_name = ''
+    asset_class = ''
+
+    try:
+        if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
+            stock = yf.Ticker(ticker + ".SA", session=request_cache)
+            long_name = stock.info['longName']
+            last_close_price = stock.info['previousClose']
+            currency = stock.info['currency']
+            asset_class = stock.info['quoteType']
+
+        elif re.match(r'^(BTC|ETH)$', ticker):
+            app.logger.debug('Cripto data!')
+            stock = yf.Ticker(ticker + "-USD", session=request_cache)
+            info = stock.info
+            last_close_price = info['previousClose']
+            long_name = info['name']
+            rate = usd_exchange_rate('BRL')
+            last_close_price = rate * last_close_price
+            asset_class = stock.info['quoteType']
+
+        elif ticker in scrape_dict:
+            app.logger.info(f'Scraping data for {ticker}')
+            scrap_info = scrape_dict[ticker]
+            scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
+            last_close_price = brl_to_float(scraped[0])
+            asset_class = scrap_info['class']
+
+        else:
+            stock = yf.Ticker(ticker, session=request_cache)
+            last_close_price = stock.info['previousClose']
+            currency = stock.info['currency']
+            long_name = stock.info['longName']
+            asset_class = stock.info['quoteType']
+    except Exception as e:
+            app.logger.warning(f'Exception: {e}')
+            pass
+
+    data = {
+        'long_name': long_name,
+        'close_price': last_close_price,
+        'currency': currency,
+        'asset_class': asset_class
+    }
+
+    return data
+
 def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_info):
     currency = 'BRL'
     first_buy = None
@@ -152,6 +202,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     sells_sum = abs(sells['Total'].sum())
 
     realized_gain = 0
+    sells['Realized'] = 0.0
     for index, row in sells.iterrows():
         date = row['Date']
         quantity = abs(row['Quantity'])
@@ -160,47 +211,20 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         buys_before_sell = buys.loc[buys['Date'] <= date]
         last_avg_price = calc_avg_price(buys_before_sell)
         realized = (price - last_avg_price) * quantity
+        # row['Realized'] = 10.0
+
+        sells.at[index, 'Realized'] = realized
 
         print(f'realized = {realized}')
 
         realized_gain += realized
 
     if position > 0:
-        try:
-            if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
-                stock = yf.Ticker(ticker + ".SA", session=request_cache)
-                long_name = stock.info['longName']
-                last_close_price = stock.info['previousClose']
-                currency = stock.info['currency']
-                asset_class = stock.info['quoteType']
-
-            elif re.match(r'^(BTC|ETH)$', ticker):
-                app.logger.debug('Cripto data!')
-                stock = yf.Ticker(ticker + "-USD", session=request_cache)
-                info = stock.info
-                last_close_price = info['previousClose']
-                long_name = info['name']
-                rate = usd_exchange_rate('BRL')
-                last_close_price = rate * last_close_price
-                asset_class = stock.info['quoteType']
-
-            elif ticker in scrape_dict:
-                app.logger.info(f'Scraping data for {ticker}')
-                scrap_info = scrape_dict[ticker]
-                scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
-                last_close_price = brl_to_float(scraped[0])
-                asset_class = scrap_info['class']
-
-            else:
-                stock = yf.Ticker(ticker, session=request_cache)
-                last_close_price = stock.info['previousClose']
-                currency = stock.info['currency']
-                long_name = stock.info['longName']
-                asset_class = stock.info['quoteType']
-
-        except Exception as e:
-                    app.logger.warning(f'Exception: {e}')
-                    pass
+        online_data = get_online_info(ticker)
+        long_name = online_data['long_name']
+        last_close_price = online_data['close_price']
+        currency = online_data['currency']
+        asset_class = online_data['asset_class']
 
     not_realized_gain = (last_close_price - avg_price) * position
 
@@ -521,7 +545,7 @@ def process_consolidate_request(request):
 
     b3_consolidate = load_consolidate(B3_Movimentation.query, b3_movimentation_sql_to_df, process_b3_asset_request, 'view')
     avenue_consolidate = load_consolidate(Avenue_Extract.query, avenue_extract_sql_to_df, process_avenue_asset_request, 'extract')
-    generic_consolidate = load_consolidate(Generic_Extract.query, generic_extract_sql_to_df, process_generic_asset_request, 'view')
+    generic_consolidate = load_consolidate(Generic_Extract.query, generic_extract_sql_to_df, process_generic_asset_request, 'generic')
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:
