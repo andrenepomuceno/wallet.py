@@ -26,6 +26,7 @@ scrape_dict = {
     "Tesouro Selic 2029": {
         'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
+        'class': 'RENDA FIXA'
     }
 }
 
@@ -164,19 +165,15 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         realized_gain += realized
 
     if position > 0:
-        if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
-            try:
-                # stock = yf.Ticker(ticker + ".SA")
+        try:
+            if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
                 stock = yf.Ticker(ticker + ".SA", session=request_cache)
                 long_name = stock.info['longName']
                 last_close_price = stock.info['previousClose']
                 currency = stock.info['currency']
-                asset_class = 'Ação'
-            except:
-                pass
+                asset_class = stock.info['quoteType']
 
-        elif re.match(r'^(BTC|ETH)$', ticker):
-            try:
+            elif re.match(r'^(BTC|ETH)$', ticker):
                 app.logger.debug('Cripto data!')
                 stock = yf.Ticker(ticker + "-USD", session=request_cache)
                 info = stock.info
@@ -184,29 +181,25 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
                 long_name = info['name']
                 rate = usd_exchange_rate('BRL')
                 last_close_price = rate * last_close_price
-                asset_class = 'Cripto'
-            except:
-                pass
+                asset_class = stock.info['quoteType']
 
-        elif ticker in scrape_dict:
-            try:
+            elif ticker in scrape_dict:
                 app.logger.info(f'Scraping data for {ticker}')
                 scrap_info = scrape_dict[ticker]
                 scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
                 last_close_price = brl_to_float(scraped[0])
-                asset_class = 'Renda Fixa'
-            except:
-                pass
+                asset_class = scrap_info['class']
 
-        else:
-            try:
+            else:
                 stock = yf.Ticker(ticker, session=request_cache)
                 last_close_price = stock.info['previousClose']
                 currency = stock.info['currency']
                 long_name = stock.info['longName']
-                asset_class = 'Stock'
-            except:
-                pass
+                asset_class = stock.info['quoteType']
+
+        except Exception as e:
+                    app.logger.warning(f'Exception: {e}')
+                    pass
 
     not_realized_gain = (last_close_price - avg_price) * position
 
@@ -563,13 +556,8 @@ def process_consolidate_request(request):
     if len(consolidate) == 0:
         return ret
         
-    assets = consolidate.loc[consolidate['position'] > 0]
-    assets = assets.sort_values(by='rentability', ascending=False)
-    ret['consolidate'] = assets
-
-    finished = consolidate.loc[consolidate['position'] <= 0]
-    finished = finished.sort_values(by='capital_gain', ascending=False)
-    ret['finished'] = finished
+    consolidate = consolidate.sort_values(by='rentability', ascending=False)
+    ret['consolidate'] = consolidate
 
     def consolidate_summary(df, rate = 1):
         ret = {}

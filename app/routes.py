@@ -201,17 +201,16 @@ def view_consolidate():
     if not info['valid']:
         flash('Data not found! Please upload something.')
         return redirect(url_for('home'))
-
     
     consolidate = info['consolidate']
-    consolidate = consolidate[['url','currency','last_close_price','position','position_total','avg_price',
+    consolidate = consolidate[['url', 'currency','last_close_price','position','position_total','avg_price',
                                'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
                                'not_realized_gain','capital_gain','rentability','rentability_by_year','age']]
     consolidate = consolidate.rename(columns={
         'url': 'Name',
         'currency': 'Currency',
         'last_close_price': 'Close Price',
-        'position': "Position",
+        'position': "Shares",
         'position_total': 'Position',
         'avg_price': 'Avg Price',
         'cost': 'Cost',
@@ -227,30 +226,14 @@ def view_consolidate():
         'age': 'Age',
     })
 
-    old = info['finished']
-    old = old[['url','currency','last_close_price','position','position_total','avg_price',
-               'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
-               'not_realized_gain','capital_gain','rentability','rentability_by_year','age']]
-    old = old.rename(columns={
-        'url': 'Name',
-        'currency': 'Currency',
-        'last_close_price': 'Close Price',
-        'position': "Position",
-        'position_total': 'Position',
-        'avg_price': 'Avg Price',
-        'cost': 'Cost',
-        'wages_sum': 'Wages',
-        'rent_wages_sum': 'Rent Wages',
-        'taxes_sum': 'Taxes',
-        'liquid_cost': 'Liquid Cost',
-        'realized_gain': 'Realized Gain',
-        'not_realized_gain': ' Not Realized Gain',
-        'capital_gain': 'Capital Gain',
-        'rentability': 'Rentability',
-        'rentability_by_year': 'Rentability/year',
-        'age': 'Age',
-    })
+    old = consolidate.loc[consolidate['Shares'] <= 0]
+
+    consolidate = consolidate.loc[consolidate['Shares'] > 0]
+    consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'].to_html(classes='pandas-dataframe', escape=False, index=False)
+    consolidate_usd=consolidate.loc[consolidate['Currency'] == 'USD'].to_html(classes='pandas-dataframe', escape=False, index=False)
+    old=old.to_html(classes='pandas-dataframe', escape=False, index=False)
 
     return render_template('view_consolidate.html', info=info,
-                           consolidate=consolidate.to_html(classes='pandas-dataframe', escape=False, index=False), 
-                           old=old.to_html(classes='pandas-dataframe', escape=False, index=False))
+                           consolidate=consolidate_brl, 
+                           consolidate_usd=consolidate_usd, 
+                           old=old)
