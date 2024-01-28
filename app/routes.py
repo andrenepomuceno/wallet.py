@@ -78,12 +78,12 @@ def view_asset(asset=None):
     rent = dataframes['rent_wages']
 
     buys = buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
-    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto', 'Realized']].to_html(classes='pandas-dataframe')
+    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto', 'Realized Gain']].to_html(classes='pandas-dataframe')
     wages = wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
     taxes = taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
-    movimentation = movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
-    negotiation = negotiation[['Date','Movimentation','Quantity','Price','Total','Código de Negociação']].to_html()
     rent = rent[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
+    movimentation = movimentation.to_html(classes='pandas-dataframe')
+    negotiation = negotiation.to_html()
 
     return render_template(
         'view_asset.html', info=asset_info, 
@@ -205,7 +205,7 @@ def view_consolidate():
     consolidate = info['consolidate']
     consolidate = consolidate[['url', 'currency','last_close_price','position','position_total','avg_price',
                                'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
-                               'not_realized_gain','capital_gain','rentability','rentability_by_year','age']]
+                               'not_realized_gain','capital_gain','rentability','rentability_by_year','age_years']]
     consolidate = consolidate.rename(columns={
         'url': 'Name',
         'currency': 'Currency',
@@ -223,7 +223,7 @@ def view_consolidate():
         'capital_gain': 'Capital Gain',
         'rentability': 'Rentability',
         'rentability_by_year': 'Rentability/year',
-        'age': 'Age',
+        'age_years': 'Age',
     })
 
     old = consolidate.loc[consolidate['Shares'] <= 0]

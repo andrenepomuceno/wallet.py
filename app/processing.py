@@ -98,7 +98,7 @@ def process_b3_negotiation_request(request):
     return df
     
 def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentationType):
-    columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto"]
+    columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
     df1 = movimentationDf[columns]
 
     df2 = negotiationDf.copy()
@@ -202,7 +202,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     sells_sum = abs(sells['Total'].sum())
 
     realized_gain = 0
-    sells['Realized'] = 0.0
+    sells['Realized Gain'] = 0.0
     for index, row in sells.iterrows():
         date = row['Date']
         quantity = abs(row['Quantity'])
@@ -211,13 +211,10 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         buys_before_sell = buys.loc[buys['Date'] <= date]
         last_avg_price = calc_avg_price(buys_before_sell)
         realized = (price - last_avg_price) * quantity
-        # row['Realized'] = 10.0
 
-        sells.at[index, 'Realized'] = realized
+        sells.at[index, 'Realized Gain'] = realized
 
-        print(f'realized = {realized}')
-
-        realized_gain += realized
+    realized_gain = sells['Realized Gain'].sum()
 
     if position > 0:
         online_data = get_online_info(ticker)
@@ -276,7 +273,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         asset_info['last_sell'] = last_sell.strftime("%Y-%m-%d")
 
     if age_years is not None:
-        asset_info['age_years'] = age_years
+        asset_info['age_years'] = round(age_years, 2)
         asset_info['age'] = round(age_years * 365)
     
     asset_info['buys_value_sum'] = round(buys_value_sum, 2)
