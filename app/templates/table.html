@@ -1,6 +1,13 @@
 {% macro render(df) -%}
-<div class="table table-striped mt-3">
-    <table data-toggle="table" data-sticky-header="true">
+<div class="table table-sm table-striped mt-3">
+    <table
+    data-toggle="table"
+    data-sticky-header="true"
+    data-fixed-columns="true"
+    data-fixed-number="1"
+    data-show-columns="true"
+    data-show-columns-toggle-all="true"
+    >
         <thead>
             <tr>
                 {% for column in df.columns %}
