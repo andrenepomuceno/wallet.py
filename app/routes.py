@@ -230,9 +230,9 @@ def view_consolidate():
     old = old.sort_values(by='Capital Gain', ascending=False)
 
     consolidate = consolidate.loc[consolidate['Shares'] > 0]
-    consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'].to_html(classes='pandas-dataframe', escape=False, index=False)
-    consolidate_usd=consolidate.loc[consolidate['Currency'] == 'USD'].to_html(classes='pandas-dataframe', escape=False, index=False)
-    old=old.to_html(classes='pandas-dataframe', escape=False, index=False)
+    consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'] #.to_html(classes='pandas-dataframe', escape=False, index=False)
+    consolidate_usd=consolidate.loc[consolidate['Currency'] == 'USD'] #.to_html(classes='pandas-dataframe', escape=False, index=False)
+    old=old #.to_html(classes='pandas-dataframe', escape=False, index=False)
 
     return render_template('view_consolidate.html', info=info,
                            consolidate=consolidate_brl, 

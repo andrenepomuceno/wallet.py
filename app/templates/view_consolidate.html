@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import 'table.html' as table %}
 {% block content %}
     <h1>Consolidate Data</h1>
 
@@ -52,17 +53,11 @@
     </div>    
 
     <h2>BRL</h2>
-    <div class="table table-striped mt-3">
-        {{ consolidate|safe }}
-    </div>
+    {{ table.render(consolidate) }}
 
     <h2>USD</h2>
-    <div class="table table-striped mt-3">
-        {{ consolidate_usd|safe }}
-    </div>
+    {{ table.render(consolidate_usd) }}
 
     <h2>Finished</h2>
-    <div class="table table-striped mt-3">
-        {{ old|safe }}
-    </div>
+    {{ table.render(old) }}
 {% endblock %}

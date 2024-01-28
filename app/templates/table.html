@@ -1,0 +1,26 @@
+{% macro render(df) -%}
+<div class="table table-striped mt-3">
+    <table data-toggle="table" data-sticky-header="true">
+        <thead>
+            <tr>
+                {% for column in df.columns %}
+                <th data-sortable="true">
+                    {{ column|safe }}
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in df.itertuples(index=False) %}
+            <tr>
+                {% for item in row %}
+                <td>
+                    {{ item|safe }}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{%- endmacro %}
