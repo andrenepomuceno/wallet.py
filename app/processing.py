@@ -5,6 +5,7 @@ import requests
 import requests_cache
 from lxml import html
 import re
+import json 
 
 from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
@@ -98,6 +99,9 @@ def process_b3_negotiation_request(request):
     return df
     
 def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentationType):
+    if movimentationDf is None or negotiationDf is None:
+        return
+
     columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
     df1 = movimentationDf[columns]
 
@@ -117,63 +121,55 @@ def calc_avg_price(df):
     avg_price = cost / quantity if quantity > 0 else 0
     return avg_price
 
-def get_online_info(ticker):                                                                                                                                                                                                                                                                                                                                            
-    currency = 'BRL'
-    last_close_price = 0
-    long_name = ''
-    asset_class = ''
+def get_yfinance_data(ticker, asset_info):
+    stock = yf.Ticker(ticker, session=request_cache)
+    info = stock.info
+
+    last_close_price = info['previousClose']
+    currency = info['currency']
+    asset_class = info['quoteType']
+    long_name = info['longName']
+
+    asset_info['last_close_price'] = round(last_close_price, 2)
+    asset_info['currency'] = currency
+    asset_info['long_name'] = long_name
+    asset_info['asset_class'] = asset_class
+    asset_info['info'] = stock.info
+
+def get_online_info(ticker, asset_info = {}):                                                                                                                                                                                                                                                                                                                                            
+    stock = None
+
+    app.logger.info(f'Scraping data for {ticker}')
 
     try:
         if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
-            stock = yf.Ticker(ticker + ".SA", session=request_cache)
-            long_name = stock.info['longName']
-            last_close_price = stock.info['previousClose']
-            currency = stock.info['currency']
-            asset_class = stock.info['quoteType']
+            get_yfinance_data(ticker + ".SA", asset_info)
 
         elif re.match(r'^(BTC|ETH)$', ticker):
-            app.logger.debug('Cripto data!')
-            stock = yf.Ticker(ticker + "-USD", session=request_cache)
-            info = stock.info
-            last_close_price = info['previousClose']
-            long_name = info['name']
+            get_yfinance_data(ticker + "-USD", asset_info)
             rate = usd_exchange_rate('BRL')
-            last_close_price = rate * last_close_price
-            asset_class = stock.info['quoteType']
+            asset_info['last_close_price'] = round(rate * asset_info['last_close_price'], 2)
+            asset_info['currency'] = 'BRL'
 
         elif ticker in scrape_dict:
-            app.logger.info(f'Scraping data for {ticker}')
             scrap_info = scrape_dict[ticker]
             scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
-            last_close_price = brl_to_float(scraped[0])
-            asset_class = scrap_info['class']
+            asset_info['last_close_price'] = brl_to_float(scraped[0])
+            asset_info['asset_class'] = scrap_info['class']
 
         else:
-            stock = yf.Ticker(ticker, session=request_cache)
-            last_close_price = stock.info['previousClose']
-            currency = stock.info['currency']
-            long_name = stock.info['longName']
-            asset_class = stock.info['quoteType']
+            get_yfinance_data(ticker, asset_info)
+
     except Exception as e:
             app.logger.warning(f'Exception: {e}')
             pass
 
-    data = {
-        'long_name': long_name,
-        'close_price': last_close_price,
-        'currency': currency,
-        'asset_class': asset_class
-    }
-
-    return data
+    return asset_info
 
 def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_info):
-    currency = 'BRL'
     first_buy = None
     age_years = None
     last_close_price = 0
-    long_name = ''
-    asset_class = ''
     last_sell = pd.to_datetime("today")
 
     buy_quantity = buys['Quantity'].sum()
@@ -216,12 +212,15 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     realized_gain = sells['Realized Gain'].sum()
 
+    asset_info['last_close_price'] = 0
+    asset_info['currency'] = 'BRL'
+    asset_info['long_name'] = ''
+    asset_info['asset_class'] = ''
+    asset_info['info'] = {}
     if position > 0:
-        online_data = get_online_info(ticker)
-        long_name = online_data['long_name']
-        last_close_price = online_data['close_price']
-        currency = online_data['currency']
-        asset_class = online_data['asset_class']
+        online_data = get_online_info(ticker, asset_info)
+        last_close_price = online_data['last_close_price']
+
 
     not_realized_gain = (last_close_price - avg_price) * position
 
@@ -233,7 +232,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     if age_years is not None and age_years > 0:
         anualized_rentability = (1 + rentability)**(1/age_years) - 1
 
-    rented = 0 # TODO
+    rented = 0 # TODO calc rented shares from b3 movimentation data
     position = round(position + rented, 2)
 
     buys_value_sum = buys['Total'].sum()
@@ -279,21 +278,22 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     asset_info['buys_value_sum'] = round(buys_value_sum, 2)
 
     asset_info['rented'] = rented
-    
-    asset_info['last_close_price'] = round(last_close_price, 2)
-    asset_info['currency'] = currency
-    asset_info['long_name'] = long_name
-    asset_info['asset_class'] = asset_class
 
     asset_info['position_total'] = round(position_total, 2)
     
     asset_info['price_gain'] = round(price_gain, 2)
     asset_info['rentability_by_year'] = round(100 * anualized_rentability, 2)
 
-    app.logger.debug(asset_info)
+    asset_info['valid'] = True
+
+    app.logger.debug(print(json.dumps(asset_info, indent = 4)))
+
+    return asset_info
 
 def process_b3_asset_request(request, asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
+
+    columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
 
     asset_info = { 'valid': False, 'name': asset }
     dataframes = {}
@@ -301,61 +301,63 @@ def process_b3_asset_request(request, asset):
     query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
     result = query.all()
     movimentation_df = b3_movimentation_sql_to_df(result)
-    if len(movimentation_df) == 0:
+    if len(movimentation_df) > 0:
+        ticker = movimentation_df['Asset'].value_counts().index[0]
+
+        credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
+        debit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Debito"]
+
+        buys = credit.loc[
+            (
+                (credit['Movimentation'] == "Compra")
+                | (credit['Movimentation'] == "Desdobro") 
+                | (credit['Movimentation'] == "Bonificação em Ativos")
+                | (credit['Movimentation'] == "Atualização")
+            )
+        ]
+
+        sells = debit.loc[
+            (
+                (debit['Movimentation'] == "Venda")
+            )
+        ]
+    else:
         app.logger.warning(f'Movimentation data not found for {asset}')
-        return asset_info
-    
+        movimentation_df = pd.DataFrame(columns=columns)
+        buys = pd.DataFrame(columns=columns)
+        sells = pd.DataFrame(columns=columns)
+
     dataframes['movimentation'] = movimentation_df
 
-    ticker = movimentation_df['Asset'].value_counts().index[0]
-    asset_info['ticker'] = ticker
-
-    credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
-    debit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Debito"]
-
-    buys = credit.loc[
-        (
-            (credit['Movimentation'] == "Compra")
-            | (credit['Movimentation'] == "Desdobro") 
-            | (credit['Movimentation'] == "Bonificação em Ativos")
-            | (credit['Movimentation'] == "Atualização")
-        )
-    ]
-
-    sells = debit.loc[
-        (
-            (debit['Movimentation'] == "Venda")
-        )
-    ]
-
     # TODO process negotiation first 
-    query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{ticker}%')).order_by(B3_Negotiation.data.asc())
+    query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{asset}%')).order_by(B3_Negotiation.data.asc())
     result = query.all()
     negotiation = b3_negotiation_sql_to_df(result)
     if len(negotiation) > 0:
-        dataframes['negotiation'] = negotiation
+        ticker = movimentation_df['Asset'].value_counts().index[0]
 
         negotiation_buys = negotiation.loc[
             (
                 (negotiation['Movimentation'] == "Compra")
             )
         ]
-        # dataframes['negotitation_buys'] = negotiation_buys
 
         negotiation_sells = negotiation.loc[
             (
                 (negotiation['Movimentation'] == "Venda")
             )
         ]
-        # dataframes['negotitation_sells'] = negotiation_sells
-
-        buys = merge_movimentation_negotiation(buys, negotiation_buys, 'Compra')
-        sells = merge_movimentation_negotiation(sells, negotiation_sells, 'Venda')
     else:
-        app.logger.warning(f'Warning! Negotiation data not found for {asset}!')
-        dataframes['negotiation'] = pd.DataFrame(columns=['Date', 'Movimentation', 'Mercado', 'Prazo/Vencimento',
-                                                          'Instituição', 'Código de Negociação', 'Quantity', 'Price','Total'])
-        # return asset_info
+        app.logger.warning(f'Negotiation data not found for {asset}!')
+        negotiation = pd.DataFrame(columns=columns)
+        negotiation_buys = pd.DataFrame(columns=columns)
+        negotiation_sells = pd.DataFrame(columns=columns)
+
+    dataframes['negotiation'] = negotiation
+    asset_info['ticker'] = ticker
+
+    buys = merge_movimentation_negotiation(buys, negotiation_buys, 'Compra')
+    sells = merge_movimentation_negotiation(sells, negotiation_sells, 'Venda')
 
     dataframes['buys'] = buys
     dataframes['sells'] = sells
@@ -383,7 +385,6 @@ def process_b3_asset_request(request, asset):
     consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info)
     
     asset_info['dataframes'] = dataframes
-    asset_info['valid'] = True
     
     return asset_info
 
@@ -453,7 +454,6 @@ def process_avenue_asset_request(request, asset):
     consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info)
 
     asset_info['dataframes'] = dataframes
-    asset_info['valid'] = True
     return asset_info
 
 def process_generic_extract_request(request):
@@ -513,7 +513,6 @@ def process_generic_asset_request(request, asset):
     consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info)
 
     asset_info['dataframes'] = dataframes
-    asset_info['valid'] = True
 
     return asset_info
 
@@ -536,7 +535,7 @@ def process_consolidate_request(request):
                 new_row = pd.DataFrame([asset_info])
                 consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
-            consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/{route}/{x}'>{x}</a>")
+            consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/{route}/{x}' target='_blank'>{x}</a>")
 
         return consolidate
 

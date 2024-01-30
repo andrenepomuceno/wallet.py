@@ -2,53 +2,105 @@
 {% block content %}
     <h1>Asset Data for "{{ info['name'] }}"</h1>
 
-    <h2>Information</h2>
-    <p>Ticker: {{ info['ticker'] }}</p>
-    <p>Full Name: {{ info['long_name'] }}</p>
-    <p>Close Price: {{ info['currency'] }} {{ info['last_close_price'] }} ({{ info['price_gain'] }} %)</p>
-    <p>Position: {{ info['position'] }} ({{ info['rented'] }} rented)</p>
-    <p>Position: {{ info['currency'] }} {{ info['position_total'] }}</p>
-    <p>Average Price: {{ info['currency'] }} {{ info['avg_price'] }}</p>
-    <p>Cost: {{ info['currency'] }} {{ info['cost'] }}</p>
-    <p>Wages: {{ info['currency'] }} {{ info['wages_sum'] }}</p>
-    <p>Rent Wages: {{ info['currency'] }} {{ info['rent_wages_sum'] }}</p>
-    <p>Taxes: {{ info['currency'] }} {{ info['taxes_sum'] }}</p>
-    <p>Liquid Cost: {{ info['currency'] }} {{ info['liquid_cost'] }}</p>
-    <p>Sells: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
-    <p>Realized Gain: {{ info['currency'] }} {{ info['realized_gain'] }}</p>
-    <p>Not Realized Gain: {{ info['currency'] }} {{ info['not_realized_gain'] }}</p>
-    <p>Capital Gain: {{ info['currency'] }} {{ info['capital_gain'] }}</p>
-    <p>Rentabiliy: {{ info['rentability'] }} % ({{ info['anualized_rentability'] }} %/y)</p>
-    <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
-
-    <h2>Buys</h2>
-    <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
-    <div class="table table-striped mt-3">
-        {{ buys|safe }}
-    </div>
-
-    <h2>Sells</h2>
-    <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
-    <div class="table table-striped mt-3">
-        {{ sells|safe }}
-    </div>
-
-    <h2>Wages</h2>
-    <div class="table table-striped mt-3">
-        {{ wages|safe }}
-    </div>
-
-    <h2>Taxes</h2>
-    <div class="table table-striped mt-3">
-        {{ taxes|safe }}
-    </div>
-
-    {% if rent %}
-        <h2>Rent</h2>
-        <div class="table table-striped mt-3">
-            {{ rent|safe }}
+    <div class="row">
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <h2>Information</h2>
+                <p>Ticker: {{ info['ticker'] }}</p>
+                <p>Full Name: {{ info['long_name'] }}</p>
+                <p>Close Price: {{ info['currency'] }} {{ info['last_close_price'] }} ({{ info['price_gain'] }} %)</p>
+                <p>Position: {{ info['position'] }} ({{ info['rented'] }} rented)</p>
+                <p>Position: {{ info['currency'] }} {{ info['position_total'] }}</p>
+                <p>Average Price: {{ info['currency'] }} {{ info['avg_price'] }}</p>
+                <p>Cost: {{ info['currency'] }} {{ info['cost'] }}</p>
+                <p>Wages: {{ info['currency'] }} {{ info['wages_sum'] }}</p>
+                <p>Rent Wages: {{ info['currency'] }} {{ info['rent_wages_sum'] }}</p>
+                <p>Taxes: {{ info['currency'] }} {{ info['taxes_sum'] }}</p>
+                <p>Liquid Cost: {{ info['currency'] }} {{ info['liquid_cost'] }}</p>
+                <p>Sells: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
+                <p>Realized Gain: {{ info['currency'] }} {{ info['realized_gain'] }}</p>
+                <p>Not Realized Gain: {{ info['currency'] }} {{ info['not_realized_gain'] }}</p>
+                <p>Capital Gain: {{ info['currency'] }} {{ info['capital_gain'] }}</p>
+                <p>Rentabiliy: {{ info['rentability'] }} % ({{ info['anualized_rentability'] }} %/y)</p>
+                <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
+            </div>
         </div>
-    {% endif %}
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
+                <p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] }} M</p>
+                <p>dividendRate: {{ extended_info['dividendRate'] }}</p>
+                <p>dividendYield: {{ extended_info['dividendYield'] }}</p>
+                <p>payoutRatio: {{ extended_info['payoutRatio'] }}</p>
+                <p>trailingEps: {{ extended_info['trailingEps'] }}</p>
+                <p>forwardEps: {{ extended_info['forwardEps'] }}</p>
+                <p>pegRatio: {{ extended_info['pegRatio'] }}</p>
+                <p>totalCash: {{ extended_info['totalCash'] }}</p>
+                <p>ebitda: {{ extended_info['ebitda'] }}</p>
+                <p>totalDebt: {{ extended_info['totalDebt'] }}</p>
+                <p>returnOnEquity: {{ extended_info['returnOnEquity'] }}</p>
+                <p>quoteType: {{ extended_info['quoteType'] }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <p><a href="{{ extended_info['website'] }}" target="_blank">Web Site</a></p>
+                <p>industry: {{ extended_info['industry'] }}</p>
+                <p>sector: {{ extended_info['sector'] }}</p>
+                <p>{{ extended_info['longBusinessSummary'] }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="p-3 border bg-light">
+                <h2>Buys</h2>
+                <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
+                <div class="table table-striped mt-3">
+                    {{ buys|safe }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="p-3 border bg-light">
+                <h2>Sells</h2>
+                <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
+                <div class="table table-striped mt-3">
+                    {{ sells|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <h2>Wages</h2>
+                <div class="table table-striped mt-3">
+                    {{ wages|safe }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                <h2>Taxes</h2>
+                <div class="table table-striped mt-3">
+                    {{ taxes|safe }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 border bg-light">
+                {% if rent %}
+                <h2>Rent</h2>
+                <div class="table table-striped mt-3">
+                    {{ rent|safe }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     {% if negotiation %}
         <h2>Negotiation (All)</h2>

@@ -76,6 +76,7 @@ def view_asset(asset=None):
     movimentation = dataframes['movimentation']
     negotiation = dataframes['negotiation']
     rent = dataframes['rent_wages']
+    extended_info=asset_info['info']
 
     buys = buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
     sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto', 'Realized Gain']].to_html(classes='pandas-dataframe')
@@ -86,7 +87,9 @@ def view_asset(asset=None):
     negotiation = negotiation.to_html()
 
     return render_template(
-        'view_asset.html', info=asset_info, 
+        'view_asset.html', 
+        info=asset_info,
+        extended_info=extended_info,
         buys=buys,
         sells=sells,
         wages=wages,
@@ -111,6 +114,7 @@ def view_extract_asset(asset=None):
     wages = dataframes['wages']
     taxes = dataframes['taxes']
     movimentation = dataframes['movimentation']
+    extended_info=asset_info['info']
 
     buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
     sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
@@ -118,7 +122,9 @@ def view_extract_asset(asset=None):
     taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
     movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
     return render_template(
-        'view_asset.html', info=asset_info, 
+        'view_asset.html', 
+        info=asset_info, 
+        extended_info=extended_info,
         buys=buys,
         sells=sells,
         wages=wages,
@@ -179,6 +185,7 @@ def view_generic_asset(asset=None):
     wages = dataframes['wages']
     taxes = dataframes['taxes']
     movimentation = dataframes['movimentation']
+    extended_info = asset_info['info']
 
     buys=buys.to_html(classes='pandas-dataframe')
     sells=sells.to_html(classes='pandas-dataframe')
@@ -186,7 +193,9 @@ def view_generic_asset(asset=None):
     taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
     movimentation=movimentation.to_html(classes='pandas-dataframe')
     return render_template(
-        'view_asset.html', info=asset_info, 
+        'view_asset.html', 
+        info=asset_info, 
+        extended_info=extended_info,
         buys=buys,
         sells=sells,
         wages=wages,
