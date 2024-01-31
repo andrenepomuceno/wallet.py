@@ -3,7 +3,7 @@ from flask import render_template, request, redirect, url_for, flash
 import os
 from app import app, db, uploads_folder
 from app.models import Generic_Extract, process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
-from app.processing import process_generic_asset_request, process_b3_movimentation_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
+from app.processing import plot_price_history, process_generic_asset_request, process_b3_movimentation_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
 from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_generic_extract_request
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
 import pandas as pd
@@ -86,6 +86,8 @@ def view_asset(asset=None):
     movimentation = movimentation.to_html(classes='pandas-dataframe')
     negotiation = negotiation.to_html()
 
+    graph_html = plot_price_history(asset_info)
+
     return render_template(
         'view_asset.html', 
         info=asset_info,
@@ -97,6 +99,7 @@ def view_asset(asset=None):
         rent=rent,
         negotiation=negotiation,
         movimentation=movimentation,
+        graph_html=graph_html,
     )
 
 @app.route('/extract', methods=['GET', 'POST'])
@@ -121,6 +124,9 @@ def view_extract_asset(asset=None):
     wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
     taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
     movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
+
+    graph_html = plot_price_history(asset_info)
+
     return render_template(
         'view_asset.html', 
         info=asset_info, 
@@ -129,7 +135,8 @@ def view_extract_asset(asset=None):
         sells=sells,
         wages=wages,
         taxes=taxes,
-        movimentation=movimentation
+        movimentation=movimentation,
+        graph_html=graph_html,
     )
 
 @app.route('/generic', methods=['GET', 'POST'])
@@ -192,6 +199,9 @@ def view_generic_asset(asset=None):
     wages=wages[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
     taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
     movimentation=movimentation.to_html(classes='pandas-dataframe')
+
+    graph_html = plot_price_history(asset_info)
+
     return render_template(
         'view_asset.html', 
         info=asset_info, 
@@ -200,7 +210,8 @@ def view_generic_asset(asset=None):
         sells=sells,
         wages=wages,
         taxes=taxes,
-        movimentation=movimentation
+        movimentation=movimentation,
+        graph_html=graph_html,
     )
 
 @app.route('/consolidate', methods=['GET', 'POST'])

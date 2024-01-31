@@ -28,7 +28,7 @@
         <div class="col-md-4">
             <div class="p-3 border bg-light">
                 <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
-                <p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] }} M</p>
+                <p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] }}</p>
                 <p>dividendRate: {{ extended_info['dividendRate'] }}</p>
                 <p>dividendYield: {{ extended_info['dividendYield'] }}</p>
                 <p>payoutRatio: {{ extended_info['payoutRatio'] }}</p>
@@ -52,9 +52,22 @@
         </div>
     </div>
 
+    {% if graph_html %}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="p-3 m-3 border bg-light">
+                <div class="container">
+                    <h2>Price History</h2>
+                    <div>{{ graph_html|safe }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-md-6">
-            <div class="p-3 border bg-light">
+            <div class="p-3 m-3 border bg-light">
                 <h2>Buys</h2>
                 <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
                 <div class="table table-striped mt-3">
@@ -63,7 +76,7 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="p-3 border bg-light">
+            <div class="p-3 m-3 border bg-light">
                 <h2>Sells</h2>
                 <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
                 <div class="table table-striped mt-3">
@@ -75,7 +88,7 @@
 
     <div class="row">
         <div class="col-md-4">
-            <div class="p-3 border bg-light">
+            <div class="p-3 m-3 border bg-light">
                 <h2>Wages</h2>
                 <div class="table table-striped mt-3">
                     {{ wages|safe }}
@@ -83,7 +96,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 border bg-light">
+            <div class="p-3 m-3 border bg-light">
                 <h2>Taxes</h2>
                 <div class="table table-striped mt-3">
                     {{ taxes|safe }}
@@ -91,7 +104,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 border bg-light">
+            <div class="p-3 m-3 border bg-light">
                 {% if rent %}
                 <h2>Rent</h2>
                 <div class="table table-striped mt-3">

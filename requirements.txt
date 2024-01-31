@@ -9,3 +9,4 @@ yfinance_cache
 lxml
 requests
 requests_cache
+plotly

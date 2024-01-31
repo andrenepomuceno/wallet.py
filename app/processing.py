@@ -11,6 +11,9 @@ from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_valid_b3_ticker, brl_to_float
 
+import plotly.graph_objects as go
+import plotly.offline as pyo
+
 scrape_dict = {
     # "Tesouro Selic 2024": {
     #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2024/',
@@ -121,6 +124,27 @@ def calc_avg_price(df):
     avg_price = cost / quantity if quantity > 0 else 0
     return avg_price
 
+def plot_price_history(asset_info):
+    if 'info' not in asset_info:
+        return None
+    
+    info = asset_info['info']
+    if 'symbol' not in info:
+        return None
+
+    stock = yf.Ticker(asset_info['info']['symbol'], session=request_cache)
+    df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'])
+
+    fig = go.Figure(data=[go.Candlestick(x=df.index,
+                open=df['Open'],
+                high=df['High'],
+                low=df['Low'],
+                close=df['Close'])])
+    fig.update_layout(autosize=True)
+    graph_html = pyo.plot(fig, output_type='div')
+
+    return graph_html
+
 def get_yfinance_data(ticker, asset_info):
     stock = yf.Ticker(ticker, session=request_cache)
     info = stock.info
@@ -136,7 +160,7 @@ def get_yfinance_data(ticker, asset_info):
     asset_info['asset_class'] = asset_class
     asset_info['info'] = stock.info
 
-def get_online_info(ticker, asset_info = {}):                                                                                                                                                                                                                                                                                                                                            
+def get_online_info(ticker, asset_info = {}):
     stock = None
 
     app.logger.info(f'Scraping data for {ticker}')
@@ -217,10 +241,13 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     asset_info['long_name'] = ''
     asset_info['asset_class'] = ''
     asset_info['info'] = {}
+    if first_buy is not None:
+        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
+    if last_sell is not None:
+        asset_info['last_sell'] = last_sell.strftime("%Y-%m-%d")
     if position > 0:
         online_data = get_online_info(ticker, asset_info)
         last_close_price = online_data['last_close_price']
-
 
     not_realized_gain = (last_close_price - avg_price) * position
 
@@ -265,12 +292,6 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     asset_info['rentability'] = round(100 * rentability, 2)
     asset_info['anualized_rentability'] = round(100 * anualized_rentability, 2)
 
-    if first_buy is not None:
-        asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
-
-    if last_sell is not None:
-        asset_info['last_sell'] = last_sell.strftime("%Y-%m-%d")
-
     if age_years is not None:
         asset_info['age_years'] = round(age_years, 2)
         asset_info['age'] = round(age_years * 365)
@@ -286,7 +307,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     asset_info['valid'] = True
 
-    app.logger.debug(print(json.dumps(asset_info, indent = 4)))
+    # app.logger.debug(print(json.dumps(asset_info, indent = 4)))
 
     return asset_info
 
