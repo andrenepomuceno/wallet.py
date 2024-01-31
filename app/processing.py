@@ -135,12 +135,34 @@ def plot_price_history(asset_info):
     stock = yf.Ticker(asset_info['info']['symbol'], session=request_cache)
     df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'])
 
-    fig = go.Figure(data=[go.Candlestick(x=df.index,
-                open=df['Open'],
-                high=df['High'],
-                low=df['Low'],
-                close=df['Close'])])
-    fig.update_layout(autosize=True)
+    ma_size = 50
+    ma_name="MA" + str(ma_size)
+    df[ma_name] = df['Close'].rolling(50).mean()
+
+    def add_moving_average(ma_size, df, color='green'):
+        ma_name="MA" + str(ma_size)
+        df[ma_name] = df['Close'].rolling(ma_size).mean()
+        return go.Scatter(
+            x=df.index, 
+            y=df[ma_name], 
+            line=dict(color=color, width=1), 
+            name=ma_name
+        )
+
+    fig = go.Figure(data=[
+        #add_moving_average(20, df, 'lightblue'),
+        add_moving_average(50, df, 'blue'),
+        #add_moving_average(100, df, 'darkblue'),
+        go.Candlestick(
+            x=df.index,
+            open=df['Open'],
+            high=df['High'],
+            low=df['Low'],
+            close=df['Close'],
+            showlegend=False,
+        ),
+    ])
+    fig.update_layout(autosize=True, )
     graph_html = pyo.plot(fig, output_type='div')
 
     return graph_html
