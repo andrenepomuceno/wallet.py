@@ -58,12 +58,12 @@ def home():
 def view_movimentation():
     filterForm = B3MovimentationFilterForm()
     df = process_b3_movimentation_request(request)
-    return render_template('view_movimentation.html', tables=[df.to_html(classes='pandas-dataframe')], filterForm=filterForm)
+    return render_template('view_movimentation.html', tables=[df.to_html()], filterForm=filterForm)
 
 @app.route('/negotiation', methods=['GET', 'POST'])
 def view_negotiation():
     df = process_b3_negotiation_request(request)
-    return render_template('view_negotiation.html', tables=[df.to_html(classes='pandas-dataframe')])
+    return render_template('view_negotiation.html', tables=[df.to_html()])
 
 @app.route('/view/<asset>', methods=['GET', 'POST'])
 def view_asset(asset=None):
@@ -78,15 +78,15 @@ def view_asset(asset=None):
     rent = dataframes['rent_wages']
     extended_info=asset_info['info']
 
-    buys = buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
-    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto', 'Realized Gain']].to_html(classes='pandas-dataframe')
-    wages = wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
-    taxes = taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
-    rent = rent[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
-    movimentation = movimentation.to_html(classes='pandas-dataframe')
-    negotiation = negotiation.to_html()
+    graph_html = plot_price_history(asset_info, buys, sells)
 
-    graph_html = plot_price_history(asset_info)
+    buys = buys[['Date', 'Movimentation', 'Quantity', 'Price', 'Total']].to_html(index=False)
+    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Realized Gain']].to_html(index=False)
+    wages = wages[['Date', 'Total', 'Movimentation']].to_html(index=False)
+    taxes = taxes[['Date', 'Total', 'Movimentation']].to_html(index=False)
+    rent = rent[['Date', 'Total', 'Movimentation']].to_html(index=False)
+    movimentation = movimentation.to_html(index=False)
+    negotiation = negotiation.to_html(index=False)    
 
     return render_template(
         'view_asset.html', 
@@ -105,7 +105,7 @@ def view_asset(asset=None):
 @app.route('/extract', methods=['GET', 'POST'])
 def view_extract():
     df = process_avenue_extract_request(request)
-    return render_template('view_extract.html', tables=[df.to_html(classes='pandas-dataframe')])
+    return render_template('view_extract.html', tables=[df.to_html()])
 
 @app.route('/extract/<asset>', methods=['GET', 'POST'])
 def view_extract_asset(asset=None):
@@ -119,13 +119,13 @@ def view_extract_asset(asset=None):
     movimentation = dataframes['movimentation']
     extended_info=asset_info['info']
 
-    buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
-    sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html(classes='pandas-dataframe')
-    wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
-    taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html(classes='pandas-dataframe')
-    movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html(classes='pandas-dataframe')
+    graph_html = plot_price_history(asset_info, buys, sells)
 
-    graph_html = plot_price_history(asset_info)
+    buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html()
+    sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html()
+    wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html()
+    taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html()
+    movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html()
 
     return render_template(
         'view_asset.html', 
@@ -180,7 +180,7 @@ def view_generic_extract():
                 flash(f"Error validating field {getattr(addForm, field).label.text}: {error}")
 
     df = process_generic_extract_request(request)
-    return render_template('view_generic.html', tables=[df.to_html(classes='pandas-dataframe')], addForm=addForm)
+    return render_template('view_generic.html', tables=[df.to_html()], addForm=addForm)
 
 @app.route('/generic/<asset>', methods=['GET', 'POST'])
 def view_generic_asset(asset=None):
@@ -194,13 +194,13 @@ def view_generic_asset(asset=None):
     movimentation = dataframes['movimentation']
     extended_info = asset_info['info']
 
-    buys=buys.to_html(classes='pandas-dataframe')
-    sells=sells.to_html(classes='pandas-dataframe')
-    wages=wages[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
-    taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html(classes='pandas-dataframe')
-    movimentation=movimentation.to_html(classes='pandas-dataframe')
+    graph_html = plot_price_history(asset_info, buys, sells)
 
-    graph_html = plot_price_history(asset_info)
+    buys=buys.to_html()
+    sells=sells.to_html()
+    wages=wages[['Date', 'Total', 'Movimentation','Asset']].to_html()
+    taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html()
+    movimentation=movimentation.to_html()
 
     return render_template(
         'view_asset.html', 
@@ -250,9 +250,9 @@ def view_consolidate():
     old = old.sort_values(by='Capital Gain', ascending=False)
 
     consolidate = consolidate.loc[consolidate['Shares'] > 0]
-    consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'] #.to_html(classes='pandas-dataframe', escape=False, index=False)
-    consolidate_usd=consolidate.loc[consolidate['Currency'] == 'USD'] #.to_html(classes='pandas-dataframe', escape=False, index=False)
-    old=old #.to_html(classes='pandas-dataframe', escape=False, index=False)
+    consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'] #.to_html(escape=False, index=False)
+    consolidate_usd=consolidate.loc[consolidate['Currency'] == 'USD'] #.to_html(escape=False, index=False)
+    old=old #.to_html(escape=False, index=False)
 
     return render_template('view_consolidate.html', info=info,
                            consolidate=consolidate_brl, 

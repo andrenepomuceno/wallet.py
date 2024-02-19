@@ -42,11 +42,13 @@ def scrape_data(url, xpath):
         response.raise_for_status()
         tree = html.fromstring(response.content)
         elements = tree.xpath(xpath)
-        return [element.text_content().strip() for element in elements]
+        ret = [element.text_content().strip() for element in elements]
+        print('Scrap done!')
+        return ret
     except requests.RequestException as e:
-        return [f"Erro ao acessar a URL: {e}"]
+        print(f"Erro ao acessar a URL: {e}")
     except Exception as e:
-        return [f"Erro ao realizar o scraping: {e}"]
+        print(f"Erro ao realizar o scraping: {e}")
 
 def usd_exchange_rate(currency = 'BRL'):
     app.logger.info('usd_exchange_rate')
@@ -124,7 +126,7 @@ def calc_avg_price(df):
     avg_price = cost / quantity if quantity > 0 else 0
     return avg_price
 
-def plot_price_history(asset_info):
+def plot_price_history(asset_info, buys, sells):
     if 'info' not in asset_info:
         return None
     
@@ -134,10 +136,6 @@ def plot_price_history(asset_info):
 
     stock = yf.Ticker(asset_info['info']['symbol'], session=request_cache)
     df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'])
-
-    ma_size = 50
-    ma_name="MA" + str(ma_size)
-    df[ma_name] = df['Close'].rolling(50).mean()
 
     def add_moving_average(ma_size, df, color='green'):
         ma_name="MA" + str(ma_size)
@@ -149,20 +147,27 @@ def plot_price_history(asset_info):
             name=ma_name
         )
 
-    fig = go.Figure(data=[
-        #add_moving_average(20, df, 'lightblue'),
-        add_moving_average(50, df, 'blue'),
-        #add_moving_average(100, df, 'darkblue'),
-        go.Candlestick(
-            x=df.index,
-            open=df['Open'],
-            high=df['High'],
-            low=df['Low'],
-            close=df['Close'],
-            showlegend=False,
-        ),
-    ])
-    fig.update_layout(autosize=True, )
+    print(buys)
+
+    fig = go.Figure()
+    fig.add_trace(go.Candlestick(
+        x=df.index,
+        open=df['Open'],
+        high=df['High'],
+        low=df['Low'],
+        close=df['Close'],
+        showlegend=False,
+    ))
+    fig.add_trace(add_moving_average(20, df, 'blue'))
+    fig.add_trace(add_moving_average(100, df, 'cyan'))
+    # fig.add_trace(go.Bar(x=buys['Date'], y=buys['Quantity'], name='Buys', yaxis='y2', marker={'color': 'green'}))
+    # fig.add_trace(go.Bar(x=sells['Date'], y=sells['Quantity'], name='Sells', yaxis='y2', marker={'color': 'Red'}))
+    fig.update_layout(
+        #yaxis=dict(title='Price'),
+        #yaxis2=dict(title='Quantity', overlaying='y', side='right'),
+    )
+    fig.update_yaxes(autorange=True, fixedrange=False)
+    
     graph_html = pyo.plot(fig, output_type='div')
 
     return graph_html
@@ -219,12 +224,12 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     last_sell = pd.to_datetime("today")
 
     buy_quantity = buys['Quantity'].sum()
-    sell_quantity = sells['Quantity'].sum()
-    position = round(buy_quantity - sell_quantity, 8) # avoid machine precision errors on zero
+    sell_quantity = abs(sells['Quantity'].sum())
+    shares = round(buy_quantity - sell_quantity, 8) # avoid machine precision errors on zero
 
     if len(buys) > 0:
         first_buy = buys.iloc[0]['Date']
-        if position <= 0 and len(sells) > 0:
+        if shares <= 0 and len(sells) > 0:
             last_sell = sells.iloc[-1]['Date']
         age_years = last_sell - first_buy
         age_years = age_years.days/365
@@ -267,11 +272,11 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
     if last_sell is not None:
         asset_info['last_sell'] = last_sell.strftime("%Y-%m-%d")
-    if position > 0:
+    if shares > 0:
         online_data = get_online_info(ticker, asset_info)
         last_close_price = online_data['last_close_price']
 
-    not_realized_gain = (last_close_price - avg_price) * position
+    not_realized_gain = (last_close_price - avg_price) * shares
 
     capital_gain = realized_gain + not_realized_gain + wages_sum + rent_wages_sum
 
@@ -282,19 +287,19 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         anualized_rentability = (1 + rentability)**(1/age_years) - 1
 
     rented = 0 # TODO calc rented shares from b3 movimentation data
-    position = round(position + rented, 2)
+    # shares = round(shares + rented, 8)
 
     buys_value_sum = buys['Total'].sum()
 
     position_total = 0
     price_gain = -100
-    if last_close_price != None and position > 0:
-        position_total = position * last_close_price
+    if last_close_price != None and shares > 0:
+        position_total = shares * last_close_price
         price_gain = 100 * (last_close_price/avg_price - 1)
     
     asset_info['buy_quantity'] = round(buy_quantity, 2)
     asset_info['sell_quantity'] = round(sell_quantity, 2)
-    asset_info['position'] = round(position, 2)
+    asset_info['position'] = round(shares, 8)
 
     asset_info['cost'] = round(cost, 2)
     asset_info['avg_price'] = round(avg_price, 2)
@@ -416,6 +421,7 @@ def process_b3_asset_request(request, asset):
          | (credit['Movimentation'] == "Reembolso") 
          | (credit['Movimentation'] == "Rendimento")
          | (credit['Movimentation'] == "Leilão de Fração"))
+         | (credit['Movimentation'] == "Resgate")
     ]
     dataframes['wages'] = wages
 
@@ -593,7 +599,7 @@ def process_consolidate_request(request):
     consolidate = consolidate.sort_values(by='rentability', ascending=False)
     ret['consolidate'] = consolidate
 
-    def consolidate_summary(df, rate = 1):
+    def consolidate_summary(df, rate = 1, currency='BRL'):
         ret = {}
 
         cost = rate * df['cost'].sum()
@@ -606,6 +612,7 @@ def process_consolidate_request(request):
         not_realized_gain = rate * df['not_realized_gain'].sum()
         capital_gain = rate * df['capital_gain'].sum()
 
+        ret['currency'] = currency
         ret['cost'] = round(cost, 2)
         ret['wages'] = round(wages, 2)
         ret['rents'] = round(rents, 2)
@@ -618,20 +625,33 @@ def process_consolidate_request(request):
         ret['not_realized_gain'] = round(not_realized_gain, 2)
 
         return ret
+    
+    wallet_consolidate = pd.DataFrame()
 
     brl_df = consolidate.loc[consolidate['currency'] == 'BRL']
     brl_ret = consolidate_summary(brl_df)
     ret['BRL'] = brl_ret
 
+    new_row = pd.DataFrame([brl_ret])
+    wallet_consolidate = pd.concat([wallet_consolidate, new_row], ignore_index=True)
+
     usd_df = consolidate.loc[consolidate['currency'] == 'USD']
-    usd_ret = consolidate_summary(usd_df)
+    usd_ret = consolidate_summary(usd_df, currency='USD')
     ret['USD'] = usd_ret
+
+    new_row = pd.DataFrame([usd_ret])
+    wallet_consolidate = pd.concat([wallet_consolidate, new_row], ignore_index=True)
 
     rate = usd_exchange_rate('BRL')
     ret['usd_brl'] = rate
 
-    usd_brl_ret = consolidate_summary(usd_df, rate)
+    usd_brl_ret = consolidate_summary(usd_df, rate, currency='USDtoBRL')
     ret['USD/BRL'] = usd_brl_ret
+
+    new_row = pd.DataFrame([usd_brl_ret])
+    wallet_consolidate = pd.concat([wallet_consolidate, new_row], ignore_index=True)
+
+    print(wallet_consolidate.to_string())
 
     ret_total = {}
 

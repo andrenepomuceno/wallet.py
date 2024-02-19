@@ -32,6 +32,7 @@ def process_b3_movimentation(df):
     added = 0
     for _, row in df.iterrows():
         # Verifica se a entrada já existe
+        # TODO gerar uma assinatura para cada linha importada, levando em consideração o index da tabela de origem. Na tabela de origem podem existir transações válidas idênticas que são consideradas como duplicatas
         if not B3_Movimentation.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
                                           produto=row['Produto'], instituicao=row['Instituição'], quantidade=row['Quantidade']).first():
             new_entry = B3_Movimentation(
