@@ -9,7 +9,7 @@ import json
 
 from app import app, db
 from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
-from app.utils.parsing import is_valid_b3_ticker, brl_to_float
+from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, is_valid_b3_ticker, brl_to_float
 
 import plotly.graph_objects as go
 import plotly.offline as pyo
@@ -188,13 +188,19 @@ def get_yfinance_data(ticker, asset_info):
     asset_info['info'] = stock.info
 
 def get_online_info(ticker, asset_info = {}):
-    stock = None
-
     app.logger.info(f'Scraping data for {ticker}')
 
+    ticker_blacklist = ['VVAR3']
+    if ticker in ticker_blacklist:
+        return asset_info
+
     try:
-        if is_valid_b3_ticker(ticker) and (ticker != 'VVAR3'):
+        if is_b3_stock_ticker(ticker):
             get_yfinance_data(ticker + ".SA", asset_info)
+
+        elif is_b3_fii_ticker(ticker):
+            get_yfinance_data(ticker + ".SA", asset_info)
+            asset_info['asset_class'] = 'FII'
 
         elif re.match(r'^(BTC|ETH)$', ticker):
             get_yfinance_data(ticker + "-USD", asset_info)
@@ -595,7 +601,7 @@ def process_consolidate_request(request):
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:
         return ret
-        
+    
     consolidate = consolidate.sort_values(by='rentability', ascending=False)
     ret['consolidate'] = consolidate
 
@@ -627,6 +633,28 @@ def process_consolidate_request(request):
         return ret
     
     wallet_consolidate = pd.DataFrame()
+
+    grouped = consolidate.groupby(['currency','asset_class'])
+    consolidate_by_group = pd.DataFrame()
+    for name, group in grouped:
+        currency = name[0]
+        rate = 1
+        group_name = name[1] if name[1] != '' else 'SOLD'
+
+        if currency == 'USD':
+            rate = usd_exchange_rate('BRL')
+            currency = 'BRL'
+            group_name += ' (USD)'
+            
+        group_ret = consolidate_summary(group, rate, currency)
+        group_ret['group_name'] = group_name
+
+        new_row = pd.DataFrame([group_ret])
+        consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
+
+    print(consolidate_by_group.to_string())
+    consolidate_by_group = consolidate_by_group[['group_name', 'position', 'rentability', 'capital_gain', 'realized_gain', 'not_realized_gain']]
+    ret['consolidate_by_group'] = consolidate_by_group
 
     brl_df = consolidate.loc[consolidate['currency'] == 'BRL']
     brl_ret = consolidate_summary(brl_df)

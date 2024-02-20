@@ -223,7 +223,7 @@ def view_consolidate():
         return redirect(url_for('home'))
     
     consolidate = info['consolidate']
-    consolidate = consolidate[['url', 'currency','last_close_price','position','position_total','avg_price',
+    consolidate = consolidate[['url', 'currency', 'asset_class', 'last_close_price','position','position_total','avg_price',
                                'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
                                'not_realized_gain','capital_gain','rentability','rentability_by_year','age_years']]
     consolidate = consolidate.rename(columns={
