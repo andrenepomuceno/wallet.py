@@ -639,21 +639,21 @@ def process_consolidate_request(request):
     for name, group in grouped:
         currency = name[0]
         rate = 1
-        group_name = name[1] if name[1] != '' else 'SOLD'
+        asset_class = name[1] if name[1] != '' else 'SOLD'
 
         if currency == 'USD':
             rate = usd_exchange_rate('BRL')
             currency = 'BRL'
-            group_name += ' (USD)'
+            asset_class += ' (USD)'
             
         group_ret = consolidate_summary(group, rate, currency)
-        group_ret['group_name'] = group_name
+        group_ret['asset_class'] = asset_class
 
         new_row = pd.DataFrame([group_ret])
         consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
 
     print(consolidate_by_group.to_string())
-    consolidate_by_group = consolidate_by_group[['group_name', 'position', 'rentability', 'capital_gain', 'realized_gain', 'not_realized_gain']]
+    consolidate_by_group = consolidate_by_group[['asset_class', 'position', 'rentability', 'capital_gain', 'realized_gain', 'not_realized_gain']]
     ret['consolidate_by_group'] = consolidate_by_group
 
     brl_df = consolidate.loc[consolidate['currency'] == 'BRL']

@@ -2,9 +2,10 @@ from flask import render_template, request, redirect, url_for, flash
 
 import os
 from app import app, db, uploads_folder
-from app.models import Generic_Extract, process_b3_movimentation, process_b3_negotiation, process_avenue_extract, process_generic_extract
-from app.processing import plot_price_history, process_generic_asset_request, process_b3_movimentation_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
-from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_generic_extract_request
+from app.models import Generic_Extract
+from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract, import_generic_extract
+from app.processing import plot_price_history, process_generic_asset_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
+from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_b3_movimentation_request, process_generic_extract_request
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
 import pandas as pd
 
@@ -33,19 +34,19 @@ def home():
         app.logger.debug(f'File {file.filename} loaded to dataframe!')
         
         if filetype == 'B3 Movimentation':
-            process_b3_movimentation(df)
+            import_b3_movimentation(df)
             flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_movimentation'))
         elif filetype == 'B3 Negotiation':
-            process_b3_negotiation(df)
+            import_b3_negotiation(df)
             flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_negotiation'))
         elif filetype == 'Avenue Extract':
-            process_avenue_extract(df)
+            import_avenue_extract(df)
             flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_extract'))
         elif filetype == 'Generic Extract':
-            process_generic_extract(df)
+            import_generic_extract(df)
             flash(f'Successfully imported {file.filename}!')
             return redirect(url_for('view_generic_extract'))
         else:
