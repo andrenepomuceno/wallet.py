@@ -2,65 +2,14 @@
 {% import 'table.html' as table %}
 {% block content %}
     <h1>Consolidate Data</h1>
-
-    <div class="row">
-        <div class="col-md-4">
-            <div class="p-3 border bg-light">
-                <h2>BRL</h2>
-                <p>Cost: {{ info['BRL']['cost'] }}</p>
-                <p>Liquid Cost: {{ info['BRL']['liquid_cost'] }}</p>
-                <p>Position: {{ info['BRL']['position'] }}</p>
-                <p>Rentability: {{ info['BRL']['rentability'] }} %</p>
-                <p>Wages: {{ info['BRL']['wages'] }}</p>
-                <p>Rent Wages: {{ info['BRL']['rents'] }}</p>
-                <p>Taxes: {{ info['BRL']['taxes'] }}</p>
-                <p>Capital Gain: {{ info['BRL']['capital_gain'] }}</p>
-                <p>Realized Gain: {{ info['BRL']['realized_gain'] }}</p>
-                <p>Not Realized Gain: {{ info['BRL']['not_realized_gain'] }}</p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="p-3 border bg-light">
-                <h2>USD</h2>
-                <p>Cost: {{ info['USD']['cost'] }} (BRL {{ info['USD/BRL']['cost'] }})</p>
-                <p>Liquid Cost: {{ info['USD']['liquid_cost'] }} (BRL {{ info['USD/BRL']['liquid_cost'] }})</p>
-                <p>Position: {{ info['USD']['position'] }} (BRL {{ info['USD/BRL']['position'] }})</p>
-                <p>Rentability: {{ info['USD']['rentability'] }} %</p>
-                <p>Wages: {{ info['USD']['wages'] }} (BRL {{ info['USD/BRL']['wages'] }})</p>
-                <p>Rent Wages: {{ info['USD']['rents'] }} (BRL {{ info['USD/BRL']['rents'] }})</p>
-                <p>Taxes: {{ info['USD']['taxes'] }} (BRL {{ info['USD/BRL']['taxes'] }})</p>
-                <p>Capital Gain: {{ info['USD']['capital_gain'] }} (BRL {{ info['USD/BRL']['capital_gain'] }})</p>
-                <p>Realized Gain: {{ info['USD']['realized_gain'] }} (BRL {{ info['USD/BRL']['realized_gain'] }})</p>
-                <p>Not Realized Gain: {{ info['USD']['not_realized_gain'] }} (BRL {{ info['USD/BRL']['not_realized_gain'] }})</p>
-                <p>USD/BRL: {{ info['usd_brl'] }}</p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="p-3 border bg-light">
-                <h2>Consolidate BRL</h2>
-                <p>Cost: {{ info['TOTAL']['cost'] }}</p>
-                <p>Liquid Cost: {{ info['TOTAL']['liquid_cost'] }}</p>
-                <p>Position: {{ info['TOTAL']['position'] }}</p>
-                <p>Rentability: {{ info['TOTAL']['rentability'] }} %</p>
-                <p>Wages: {{ info['TOTAL']['wages'] }}</p>
-                <p>Rent Wages: {{ info['TOTAL']['rents'] }}</p>
-                <p>Taxes: {{ info['TOTAL']['taxes'] }}</p>
-                <p>Capital Gain: {{ info['TOTAL']['capital_gain'] }}</p>
-                <p>Realized Gain: {{ info['TOTAL']['realized_gain'] }}</p>
-                <p>Not Realized Gain: {{ info['TOTAL']['not_realized_gain'] }}</p>
-            </div>
-        </div>
-    </div>    
-
+    <p>USD/BRL: {{ info['usd_brl'] }}</p>
+    
     <h2>By Group</h2>
-    {{ table.render(info['consolidate_by_group']) }}
+    {{ table.render(by_group) }}
 
-    <h2>BRL</h2>
-    {{ table.render(consolidate) }}
+    {% for group in group_df %}
+        <h2>{{ group['name'] }}</h2>
+        {{ table.render(group['df']) }}
+    {% endfor %}
 
-    <h2>USD</h2>
-    {{ table.render(consolidate_usd) }}
-
-    <h2>Finished</h2>
-    {{ table.render(old) }}
 {% endblock %}

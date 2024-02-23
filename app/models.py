@@ -125,6 +125,7 @@ class Generic_Extract(db.Model):
     quantity = db.Column(db.Float)
     price = db.Column(db.Float)
     total = db.Column(db.Float)
+    # TODO currency support
 
     def __repr__(self):
         return f'<Generic_Extract {self.id}>'

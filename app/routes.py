@@ -254,8 +254,55 @@ def view_consolidate():
     consolidate_brl=consolidate.loc[consolidate['Currency'] == 'BRL'] #.to_html(escape=False, index=False)
     consolidate_usd=consolidate.loc[consolidate['Currency'] == 'USD'] #.to_html(escape=False, index=False)
     old=old #.to_html(escape=False, index=False)
+    
+    by_group = info['consolidate_by_group']
+    by_group = by_group[['asset_class', 'currency', 'position', 'rentability', 'cost', 'liquid_cost', 'wages', 'rents', 'taxes', 'capital_gain', 'realized_gain', 'not_realized_gain']]
+    by_group = by_group.rename(columns={
+        'asset_class': 'Class',
+        'currency': 'Currency',
+        'position': 'Position',
+        'cost': 'Cost',
+        'wages': 'Wages',
+        'rents': 'Rent Wages',
+        'taxes': 'Taxes',
+        'liquid_cost': 'Liquid Cost',
+        'realized_gain': 'Realized Gain',
+        'not_realized_gain': ' Not Realized Gain',
+        'capital_gain': 'Capital Gain',
+        'rentability': 'Rentability'
+    })
+
+    group_df = info['group_df']
+    for group in group_df:
+        df = group['df']
+        df = df[['url', 'currency', 'last_close_price', 'position', 'position_total','avg_price',
+                 'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
+                 'not_realized_gain','capital_gain','rentability','rentability_by_year','age_years']]
+        df = df.rename(columns={
+            'url': 'Name',
+            'currency': 'Currency',
+            'last_close_price': 'Close Price',
+            'position': "Shares",
+            'position_total': 'Position',
+            'avg_price': 'Avg Price',
+            'cost': 'Cost',
+            'wages_sum': 'Wages',
+            'rent_wages_sum': 'Rent Wages',
+            'taxes_sum': 'Taxes',
+            'liquid_cost': 'Liquid Cost',
+            'realized_gain': 'Realized Gain',
+            'not_realized_gain': ' Not Realized Gain',
+            'capital_gain': 'Capital Gain',
+            'rentability': 'Rentability',
+            'rentability_by_year': 'Rentability/year',
+            'age_years': 'Age',
+        })
+
+        group['df'] = df
 
     return render_template('view_consolidate.html', info=info,
                            consolidate=consolidate_brl, 
                            consolidate_usd=consolidate_usd, 
-                           old=old)
+                           old=old,
+                           by_group=by_group,
+                           group_df=group_df)

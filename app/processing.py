@@ -176,10 +176,13 @@ def get_yfinance_data(ticker, asset_info):
     stock = yf.Ticker(ticker, session=request_cache)
     info = stock.info
 
-    last_close_price = info['previousClose']
+    # last_close_price = info['previousClose']
     currency = info['currency']
     asset_class = info['quoteType']
     long_name = info['longName']
+
+    data = stock.history(period='1d')
+    last_close_price = data['Close'][0]
 
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
@@ -605,37 +608,20 @@ def process_consolidate_request(request):
     consolidate = consolidate.sort_values(by='rentability', ascending=False)
     ret['consolidate'] = consolidate
 
-    def consolidate_summary(df, rate = 1, currency='BRL'):
-        ret = {}
+    def consolidate_total(df, rate = 1.0, currency='BRL', asset_class=''):
+        total = df.select_dtypes(include=['number']).sum() * rate
 
-        cost = rate * df['cost'].sum()
-        wages = rate * df['wages_sum'].sum()
-        rents = rate * df['rent_wages_sum'].sum()
-        taxes = rate * df['taxes_sum'].sum()
-        liquid_cost = rate * df['liquid_cost'].sum()
-        position = rate * df['position_total'].sum()
-        realized_gain = rate * df['realized_gain'].sum()
-        not_realized_gain = rate * df['not_realized_gain'].sum()
-        capital_gain = rate * df['capital_gain'].sum()
+        total['rentability'] = 100 * (total['capital_gain']/total['liquid_cost'])
+        total = total.round(2)
 
-        ret['currency'] = currency
-        ret['cost'] = round(cost, 2)
-        ret['wages'] = round(wages, 2)
-        ret['rents'] = round(rents, 2)
-        ret['position'] = round(position, 2)
-        ret['taxes'] = round(taxes, 2)
-        ret['liquid_cost'] = round(liquid_cost, 2)
-        ret['rentability'] = round(100 * (capital_gain/liquid_cost), 2)
-        ret['capital_gain'] = round(capital_gain, 2)
-        ret['realized_gain'] = round(realized_gain, 2)
-        ret['not_realized_gain'] = round(not_realized_gain, 2)
+        total['currency'] = currency
+        total['asset_class'] = asset_class
 
-        return ret
-    
-    wallet_consolidate = pd.DataFrame()
+        return total
 
     grouped = consolidate.groupby(['currency','asset_class'])
     consolidate_by_group = pd.DataFrame()
+    group_df = []
     for name, group in grouped:
         currency = name[0]
         rate = 1
@@ -645,67 +631,33 @@ def process_consolidate_request(request):
             rate = usd_exchange_rate('BRL')
             currency = 'BRL'
             asset_class += ' (USD)'
-            
-        group_ret = consolidate_summary(group, rate, currency)
-        group_ret['asset_class'] = asset_class
 
-        new_row = pd.DataFrame([group_ret])
+        group_consolidate = group[['cost', 'wages_sum', 'rent_wages_sum', 'taxes_sum', 'liquid_cost', 'position_total', 'realized_gain', 'not_realized_gain', 'capital_gain']]
+        group_consolidate = group_consolidate.rename(columns={
+            'wages_sum': 'wages',
+            'rent_wages_sum': 'rents',
+            'taxes_sum': 'taxes',
+            'position_total': 'position'
+        })            
+        group_consolidate = consolidate_total(group_consolidate, rate, currency, asset_class)
+        group_df += [{'name': asset_class, 'df': group, 'consolidate': group_consolidate}]
+
+        new_row = pd.DataFrame([group_consolidate])
         consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
 
-    print(consolidate_by_group.to_string())
-    consolidate_by_group = consolidate_by_group[['asset_class', 'position', 'rentability', 'capital_gain', 'realized_gain', 'not_realized_gain']]
+    consolidate_by_group['relative_position'] = round(consolidate_by_group['position']/consolidate_by_group['position'].sum() * 100, 2)
+
+    total = consolidate_total(consolidate_by_group, 1, 'BRL', 'TOTAL')
+    new_row = pd.DataFrame([total])
+    consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
+
+    consolidate_by_group = consolidate_by_group.sort_values(by='position', ascending=False)
     ret['consolidate_by_group'] = consolidate_by_group
 
-    brl_df = consolidate.loc[consolidate['currency'] == 'BRL']
-    brl_ret = consolidate_summary(brl_df)
-    ret['BRL'] = brl_ret
+    group_df = sorted(group_df, key=lambda x: x['consolidate']['position'], reverse=True)
+    ret['group_df'] = group_df
 
-    new_row = pd.DataFrame([brl_ret])
-    wallet_consolidate = pd.concat([wallet_consolidate, new_row], ignore_index=True)
-
-    usd_df = consolidate.loc[consolidate['currency'] == 'USD']
-    usd_ret = consolidate_summary(usd_df, currency='USD')
-    ret['USD'] = usd_ret
-
-    new_row = pd.DataFrame([usd_ret])
-    wallet_consolidate = pd.concat([wallet_consolidate, new_row], ignore_index=True)
-
-    rate = usd_exchange_rate('BRL')
-    ret['usd_brl'] = rate
-
-    usd_brl_ret = consolidate_summary(usd_df, rate, currency='USDtoBRL')
-    ret['USD/BRL'] = usd_brl_ret
-
-    new_row = pd.DataFrame([usd_brl_ret])
-    wallet_consolidate = pd.concat([wallet_consolidate, new_row], ignore_index=True)
-
-    print(wallet_consolidate.to_string())
-
-    ret_total = {}
-
-    cost = brl_ret['cost'] + usd_brl_ret['cost']
-    wages = brl_ret['wages'] + usd_brl_ret['wages']
-    rents = brl_ret['rents'] + usd_brl_ret['rents']
-    position = brl_ret['position'] + usd_brl_ret['position']
-    liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
-    taxes = brl_ret['taxes'] + usd_brl_ret['taxes']
-    liquid_cost = brl_ret['liquid_cost'] + usd_brl_ret['liquid_cost']
-    capital_gain = brl_ret['capital_gain'] + usd_brl_ret['capital_gain']
-    realized_gain = brl_ret['realized_gain'] + usd_brl_ret['realized_gain']
-    not_realized_gain = brl_ret['not_realized_gain'] + usd_brl_ret['not_realized_gain']
-
-    ret_total['cost'] = round(cost, 2)
-    ret_total['wages'] = round(wages, 2)
-    ret_total['rents'] = round(rents, 2)
-    ret_total['position'] = round(position, 2)
-    ret_total['taxes'] = round(taxes, 2)
-    ret_total['liquid_cost'] = round(liquid_cost, 2)
-    ret_total['rentability'] = round(100 * capital_gain/liquid_cost, 2)
-    ret_total['capital_gain'] = round(capital_gain, 2)
-    ret_total['realized_gain'] = round(realized_gain, 2)
-    ret_total['not_realized_gain'] = round(not_realized_gain, 2)
-
-    ret['TOTAL'] = ret_total
+    ret['usd_brl'] = usd_exchange_rate('BRL')
 
     ret['valid'] = True
 
