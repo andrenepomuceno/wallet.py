@@ -256,7 +256,7 @@ def view_consolidate():
     old=old #.to_html(escape=False, index=False)
     
     by_group = info['consolidate_by_group']
-    by_group = by_group[['asset_class', 'currency', 'position', 'rentability', 'cost', 'liquid_cost', 'wages', 'rents', 'taxes', 'capital_gain', 'realized_gain', 'not_realized_gain']]
+    by_group = by_group[['asset_class', 'currency', 'position', 'rentability', 'cost', 'liquid_cost', 'wages', 'rents', 'taxes', 'capital_gain', 'realized_gain', 'not_realized_gain', 'relative_position']]
     by_group = by_group.rename(columns={
         'asset_class': 'Class',
         'currency': 'Currency',
@@ -269,7 +269,8 @@ def view_consolidate():
         'realized_gain': 'Realized Gain',
         'not_realized_gain': ' Not Realized Gain',
         'capital_gain': 'Capital Gain',
-        'rentability': 'Rentability'
+        'rentability': 'Rentability',
+        'relative_position': 'Rel. Position'
     })
 
     group_df = info['group_df']

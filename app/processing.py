@@ -30,7 +30,7 @@ scrape_dict = {
     "Tesouro Selic 2029": {
         'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
-        'class': 'RENDA FIXA'
+        'class': 'Renda Fixa'
     }
 }
 
@@ -200,6 +200,7 @@ def get_online_info(ticker, asset_info = {}):
     try:
         if is_b3_stock_ticker(ticker):
             get_yfinance_data(ticker + ".SA", asset_info)
+            asset_info['asset_class'] = 'Equity'
 
         elif is_b3_fii_ticker(ticker):
             get_yfinance_data(ticker + ".SA", asset_info)
@@ -210,6 +211,7 @@ def get_online_info(ticker, asset_info = {}):
             rate = usd_exchange_rate('BRL')
             asset_info['last_close_price'] = round(rate * asset_info['last_close_price'], 2)
             asset_info['currency'] = 'BRL'
+            asset_info['asset_class'] = 'Cripto'
 
         elif ticker in scrape_dict:
             scrap_info = scrape_dict[ticker]
@@ -625,7 +627,7 @@ def process_consolidate_request(request):
     for name, group in grouped:
         currency = name[0]
         rate = 1
-        asset_class = name[1] if name[1] != '' else 'SOLD'
+        asset_class = name[1] if name[1] != '' else 'Sold'
 
         if currency == 'USD':
             rate = usd_exchange_rate('BRL')
@@ -647,7 +649,7 @@ def process_consolidate_request(request):
 
     consolidate_by_group['relative_position'] = round(consolidate_by_group['position']/consolidate_by_group['position'].sum() * 100, 2)
 
-    total = consolidate_total(consolidate_by_group, 1, 'BRL', 'TOTAL')
+    total = consolidate_total(consolidate_by_group, 1, 'BRL', 'Total')
     new_row = pd.DataFrame([total])
     consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
 
