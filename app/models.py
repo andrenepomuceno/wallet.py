@@ -6,6 +6,8 @@ import re
 
 class B3_Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    originId = db.Column(db.String)
+
     entrada_saida = db.Column(db.String)
     data = db.Column(db.String)
     movimentacao = db.Column(db.String)
@@ -41,6 +43,8 @@ def b3_movimentation_sql_to_df(result):
 
 class B3_Negotiation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    originId = db.Column(db.String)
+
     data = db.Column(db.String)
     tipo = db.Column(db.String)
     mercado = db.Column(db.String)

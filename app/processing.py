@@ -383,8 +383,11 @@ def process_b3_asset_request(request, asset):
     else:
         app.logger.warning(f'Movimentation data not found for {asset}')
         movimentation_df = pd.DataFrame(columns=columns)
+        credit = pd.DataFrame(columns=columns)
+        debit = pd.DataFrame(columns=columns)
         buys = pd.DataFrame(columns=columns)
         sells = pd.DataFrame(columns=columns)
+        
 
     dataframes['movimentation'] = movimentation_df
 
@@ -393,7 +396,7 @@ def process_b3_asset_request(request, asset):
     result = query.all()
     negotiation = b3_negotiation_sql_to_df(result)
     if len(negotiation) > 0:
-        ticker = movimentation_df['Asset'].value_counts().index[0]
+        ticker = negotiation['Asset'].value_counts().index[0]
 
         negotiation_buys = negotiation.loc[
             (
@@ -582,33 +585,49 @@ def process_consolidate_request(request):
     ret = {}
     ret['valid'] = False
 
-    def load_consolidate(query, sql_to_df, process, route):
+    def load_products(query, sql_to_df):
         result = query.all()
-        movimentation = sql_to_df(result)
-        consolidate = pd.DataFrame()
-        if len(movimentation) > 0:
-            products = movimentation['Asset'].value_counts().to_frame()
-            for index, product in products.iterrows():
-                if product.name == '':
-                    continue
-                asset_info = process(request, product.name)
-                new_row = pd.DataFrame([asset_info])
-                consolidate = pd.concat([consolidate, new_row], ignore_index=True)
+        df = sql_to_df(result)
+        products = pd.DataFrame()
+        if len(df) <= 0:
+            return products
+        
+        products = df['Asset'].unique().tolist()
+        return products
 
-            consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/{route}/{x}' target='_blank'>{x}</a>")
+    def load_consolidate(products, process, route):
+        consolidate = pd.DataFrame()
+        if len(products) <= 0:
+            return consolidate
+
+        for product in products:
+            if product == '':
+                continue
+            asset_info = process(request, product)
+            new_row = pd.DataFrame([asset_info])
+            consolidate = pd.concat([consolidate, new_row], ignore_index=True)
+
+        consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/{route}/{x}' target='_blank'>{x}</a>")
 
         return consolidate
 
-    b3_consolidate = load_consolidate(B3_Movimentation.query, b3_movimentation_sql_to_df, process_b3_asset_request, 'view/b3')
-    avenue_consolidate = load_consolidate(Avenue_Extract.query, avenue_extract_sql_to_df, process_avenue_asset_request, 'view/avenue')
-    generic_consolidate = load_consolidate(Generic_Extract.query, generic_extract_sql_to_df, process_generic_asset_request, 'view/generic')
+    products_neg = load_products(B3_Negotiation.query, b3_negotiation_sql_to_df)
+    products_mov = load_products(B3_Movimentation.query, b3_movimentation_sql_to_df)
+    b3_products = list(set(products_neg) | set(products_mov))
+    b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'view/b3')
+
+    avenue_products = load_products(Avenue_Extract.query, avenue_extract_sql_to_df)
+    avenue_consolidate = load_consolidate(avenue_products, process_avenue_asset_request, 'view/avenue')
+
+    generic_products = load_products(Generic_Extract.query, generic_extract_sql_to_df)
+    generic_consolidate = load_consolidate(generic_products, process_generic_asset_request, 'view/generic')
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:
         return ret
     
     consolidate = consolidate.sort_values(by='rentability', ascending=False)
-    ret['consolidate'] = consolidate
+    # ret['consolidate'] = consolidate
 
     def consolidate_total(df, rate = 1.0, currency='BRL', asset_class=''):
         total = df.select_dtypes(include=['number']).sum() * rate

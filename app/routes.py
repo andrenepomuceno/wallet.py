@@ -165,10 +165,10 @@ def view_asset_helper(asset_info):
         sells=sells,
         wages=wages,
         taxes=taxes,
-        rent=rent,
-        negotiation=negotiation,
         movimentation=movimentation,
         graph_html=graph_html,
+        rent=rent,
+        negotiation=negotiation,
     )
 
 @app.route('/view/<db>/<asset>', methods=['GET', 'POST'])

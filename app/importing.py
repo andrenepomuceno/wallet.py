@@ -4,6 +4,17 @@ from app.utils.parsing import parse_b3_ticker
 from flask import flash
 import pandas as pd
 import re
+import hashlib
+
+def gen_hash(filepath):
+    file = open(filepath, 'rb')
+    sha256 = hashlib.sha256()
+    while True:
+        chunk = file.read(1024)
+        if not chunk:
+            break
+        sha256.update(chunk)
+    return sha256.hexdigest()
 
 def import_b3_movimentation(df, filepath):
     app.logger.info(f'Processing B3 Movimentation...')
@@ -17,12 +28,19 @@ def import_b3_movimentation(df, filepath):
     app.logger.info('Inserting data into database...')
     duplicates = 0
     added = 0
-    for _, row in df.iterrows():
+
+    file_hash = gen_hash(filepath)
+
+    for index, row in df.iterrows():
         # Verifica se a entrada já existe
         # TODO gerar uma assinatura para cada linha importada, levando em consideração o index da tabela de origem. Na tabela de origem podem existir transações válidas idênticas que são consideradas como duplicatas
-        if not B3_Movimentation.query.filter_by(entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
+
+        originId = f'{filepath}:{file_hash}:{index}'
+
+        if not B3_Movimentation.query.filter_by(originId=originId, entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
                                           produto=row['Produto'], instituicao=row['Instituição'], quantidade=row['Quantidade']).first():
             new_entry = B3_Movimentation(
+                originId=originId,
                 entrada_saida=row['Entrada/Saída'],
                 data=row['Data'],
                 movimentacao=row['Movimentação'],
@@ -54,8 +72,11 @@ def import_b3_negotiation(df, filepath):
     app.logger.info('Inserting data into database...')
     duplicates = 0
     added = 0
-    for _, row in df.iterrows():
+    file_hash = gen_hash(filepath)
+    for index, row in df.iterrows():
+        originId = f'{filepath}:{file_hash}:{index}'
         if not B3_Negotiation.query.filter_by(
+            originId=originId,
             data=row['Data do Negócio'],                                  
             tipo=row['Tipo de Movimentação'],
             mercado=row['Mercado'],
@@ -67,6 +88,7 @@ def import_b3_negotiation(df, filepath):
             valor=row['Valor']
         ).first():
             new_entry = B3_Negotiation(
+                originId=originId,
                 data=row['Data do Negócio'],
                 tipo=row['Tipo de Movimentação'],
                 mercado=row['Mercado'],
