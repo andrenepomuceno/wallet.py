@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash, abort
 
 import os
 from app import app, db, uploads_folder
@@ -166,8 +166,7 @@ def view_asset(db=None, asset=None):
     elif db == 'generic':
         asset_info = process_generic_asset_request(request, asset)
     else:
-        flash('View not found!')
-        return 404
+        abort(404)
 
     return view_asset_helper(asset_info)
 
