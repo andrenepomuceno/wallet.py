@@ -599,9 +599,9 @@ def process_consolidate_request(request):
 
         return consolidate
 
-    b3_consolidate = load_consolidate(B3_Movimentation.query, b3_movimentation_sql_to_df, process_b3_asset_request, 'view')
-    avenue_consolidate = load_consolidate(Avenue_Extract.query, avenue_extract_sql_to_df, process_avenue_asset_request, 'extract')
-    generic_consolidate = load_consolidate(Generic_Extract.query, generic_extract_sql_to_df, process_generic_asset_request, 'generic')
+    b3_consolidate = load_consolidate(B3_Movimentation.query, b3_movimentation_sql_to_df, process_b3_asset_request, 'view/b3')
+    avenue_consolidate = load_consolidate(Avenue_Extract.query, avenue_extract_sql_to_df, process_avenue_asset_request, 'view/avenue')
+    generic_consolidate = load_consolidate(Generic_Extract.query, generic_extract_sql_to_df, process_generic_asset_request, 'view/generic')
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:

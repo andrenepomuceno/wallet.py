@@ -55,103 +55,21 @@ def home():
         
     return render_template('index.html')
 
-@app.route('/movimentation', methods=['GET', 'POST'])
+@app.route('/b3_movimentation', methods=['GET', 'POST'])
 def view_movimentation():
     filterForm = B3MovimentationFilterForm()
     df = process_b3_movimentation_request(request)
     return render_template('view_movimentation.html', table=df.to_html(classes='table table-striped'), filterForm=filterForm)
 
-@app.route('/negotiation', methods=['GET', 'POST'])
+@app.route('/b3_negotiation', methods=['GET', 'POST'])
 def view_negotiation():
     df = process_b3_negotiation_request(request)
     return render_template('view_negotiation.html', table=df.to_html(classes='table table-striped'))
 
-def view_asset_helper(asset_info):
-    dataframes = asset_info['dataframes']
-    buys = dataframes['buys']
-    sells = dataframes['sells']
-    wages = dataframes['wages']
-    taxes = dataframes['taxes']
-    movimentation = dataframes['movimentation']
-    extended_info=asset_info['info']
-
-    classes='table table-striped'
-
-    buys = buys[['Date', 'Movimentation', 'Quantity', 'Price', 'Total']].to_html(classes=classes, index=False)
-    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Realized Gain']].to_html(classes=classes, index=False)
-    wages = wages[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
-    taxes = taxes[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
-    movimentation = movimentation.to_html(classes=classes, index=False)
-
-    graph_html = plot_price_history(asset_info, buys, sells)
-
-    negotiation = None
-    if 'negotiation' in dataframes:
-        negotiation = dataframes['negotiation'] 
-        negotiation = negotiation.to_html(classes=classes, index=False)
-
-    rent = None    
-    if 'rent_wages' in dataframes:
-        rent = dataframes['rent_wages']
-        rent = rent[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
-
-    return render_template(
-        'view_asset.html', 
-        info=asset_info,
-        extended_info=extended_info,
-        buys=buys,
-        sells=sells,
-        wages=wages,
-        taxes=taxes,
-        rent=rent,
-        negotiation=negotiation,
-        movimentation=movimentation,
-        graph_html=graph_html,
-    )
-
-@app.route('/view/<asset>', methods=['GET', 'POST'])
-def view_asset(asset=None):
-    asset_info = process_b3_asset_request(request, asset)
-    return view_asset_helper(asset_info)
-
-@app.route('/extract', methods=['GET', 'POST'])
+@app.route('/avenue', methods=['GET', 'POST'])
 def view_extract():
     df = process_avenue_extract_request(request)
     return render_template('view_extract.html', table=df.to_html(classes="table table-striped"))
-
-@app.route('/extract/<asset>', methods=['GET', 'POST'])
-def view_extract_asset(asset=None):
-    # TODO unify with view_asset
-    asset_info = process_avenue_asset_request(request, asset)
-    return view_asset_helper(asset_info)
-
-    dataframes = asset_info['dataframes']
-    buys = dataframes['buys']
-    sells = dataframes['sells']
-    wages = dataframes['wages']
-    taxes = dataframes['taxes']
-    movimentation = dataframes['movimentation']
-    extended_info=asset_info['info']
-
-    graph_html = plot_price_history(asset_info, buys, sells)
-
-    buys=buys[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html()
-    sells=sells[['Date','Movimentation','Quantity','Price', 'Total', 'Produto']].to_html()
-    wages=wages[['Date', 'Total', 'Movimentation','Produto']].to_html()
-    taxes=taxes[['Date', 'Total', 'Movimentation','Produto']].to_html()
-    movimentation=movimentation[['Date','Entrada/Saída','Movimentation', 'Quantity', 'Price', 'Total','Produto']].to_html()
-
-    return render_template(
-        'view_asset.html', 
-        info=asset_info, 
-        extended_info=extended_info,
-        buys=buys,
-        sells=sells,
-        wages=wages,
-        taxes=taxes,
-        movimentation=movimentation,
-        graph_html=graph_html,
-    )
 
 @app.route('/generic', methods=['GET', 'POST'])
 def view_generic_extract():
@@ -196,39 +114,62 @@ def view_generic_extract():
     df = process_generic_extract_request(request)
     return render_template('view_generic.html', table=df.to_html(classes='table table-striped'), addForm=addForm)
 
-@app.route('/generic/<asset>', methods=['GET', 'POST'])
-def view_generic_asset(asset=None):
-    # TODO unify with view_asset
-    asset_info = process_generic_asset_request(request, asset)
-    return view_asset_helper(asset_info)
-
+def view_asset_helper(asset_info):
     dataframes = asset_info['dataframes']
     buys = dataframes['buys']
     sells = dataframes['sells']
     wages = dataframes['wages']
     taxes = dataframes['taxes']
     movimentation = dataframes['movimentation']
-    extended_info = asset_info['info']
+    extended_info=asset_info['info']
+
+    classes='table table-striped'
+
+    buys = buys[['Date', 'Movimentation', 'Quantity', 'Price', 'Total']].to_html(classes=classes, index=False)
+    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Realized Gain']].to_html(classes=classes, index=False)
+    wages = wages[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
+    taxes = taxes[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
+    movimentation = movimentation.to_html(classes=classes, index=False)
 
     graph_html = plot_price_history(asset_info, buys, sells)
 
-    buys=buys.to_html()
-    sells=sells.to_html()
-    wages=wages[['Date', 'Total', 'Movimentation','Asset']].to_html()
-    taxes=taxes[['Date', 'Total', 'Movimentation','Asset']].to_html()
-    movimentation=movimentation.to_html()
+    negotiation = None
+    if 'negotiation' in dataframes:
+        negotiation = dataframes['negotiation'] 
+        negotiation = negotiation.to_html(classes=classes, index=False)
+
+    rent = None    
+    if 'rent_wages' in dataframes:
+        rent = dataframes['rent_wages']
+        rent = rent[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
 
     return render_template(
         'view_asset.html', 
-        info=asset_info, 
+        info=asset_info,
         extended_info=extended_info,
         buys=buys,
         sells=sells,
         wages=wages,
         taxes=taxes,
+        rent=rent,
+        negotiation=negotiation,
         movimentation=movimentation,
         graph_html=graph_html,
     )
+
+@app.route('/view/<db>/<asset>', methods=['GET', 'POST'])
+def view_asset(db=None, asset=None):
+    if db == 'b3':
+        asset_info = process_b3_asset_request(request, asset)
+    elif db == 'avenue':
+        asset_info = process_avenue_asset_request(request, asset)
+    elif db == 'generic':
+        asset_info = process_generic_asset_request(request, asset)
+    else:
+        flash('View not found!')
+        return 404
+
+    return view_asset_helper(asset_info)
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
