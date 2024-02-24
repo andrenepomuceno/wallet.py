@@ -28,18 +28,18 @@
         <div class="col-md-4">
             <div class="p-3 border bg-light">
                 <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
-                <p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] }}</p>
+                <p>quoteType: {{ extended_info['quoteType'] }}</p>
+                {% if 'marketCap' in extended_info %}<p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
+                {% if 'totalCash' in extended_info %}<p>totalCash: {{ info['currency'] }} {{ extended_info['totalCash'] | format_money }}</p>{% endif %}
+                {% if 'totalDebt' in extended_info %}<p>totalDebt: {{ info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</p>{% endif %}
+                {% if 'ebitda' in extended_info %}<p>ebitda: {{ info['currency'] }} {{ extended_info['ebitda'] | format_money }}</p>{% endif %}
                 <p>dividendRate: {{ extended_info['dividendRate'] }}</p>
                 <p>dividendYield: {{ extended_info['dividendYield'] }}</p>
                 <p>payoutRatio: {{ extended_info['payoutRatio'] }}</p>
                 <p>trailingEps: {{ extended_info['trailingEps'] }}</p>
                 <p>forwardEps: {{ extended_info['forwardEps'] }}</p>
                 <p>pegRatio: {{ extended_info['pegRatio'] }}</p>
-                <p>totalCash: {{ extended_info['totalCash'] }}</p>
-                <p>ebitda: {{ extended_info['ebitda'] }}</p>
-                <p>totalDebt: {{ extended_info['totalDebt'] }}</p>
                 <p>returnOnEquity: {{ extended_info['returnOnEquity'] }}</p>
-                <p>quoteType: {{ extended_info['quoteType'] }}</p>
             </div>
         </div>
         <div class="col-md-4">

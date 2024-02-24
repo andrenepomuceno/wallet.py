@@ -9,6 +9,20 @@ from app.processing import process_avenue_extract_request, process_avenue_asset_
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
 import pandas as pd
 
+def format_money(value):
+    if value >= 1e12:  # Trilhão
+        return f"{value / 1e12:.2f} T"
+    elif value >= 1e9:  # Bilhão
+        return f"{value / 1e9:.2f} B"
+    elif value >= 1e6:  # Milhão
+        return f"{value / 1e6:.2f} M"
+    elif value >= 1e3:  # Mil
+        return f"{value / 1e3:.2f} K"
+    else:
+        return str(value)
+    
+app.jinja_env.filters['format_money'] = format_money
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     if request.method == 'POST':
