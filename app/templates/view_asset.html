@@ -70,7 +70,7 @@
             <div class="p-3 m-3 border bg-light">
                 <h2>Buys</h2>
                 <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
-                <div class="table table-striped mt-3">
+                <div class="container-fluid">
                     {{ buys|safe }}
                 </div>
             </div>
@@ -79,7 +79,7 @@
             <div class="p-3 m-3 border bg-light">
                 <h2>Sells</h2>
                 <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
-                <div class="table table-striped mt-3">
+                <div class="container-fluid">
                     {{ sells|safe }}
                 </div>
             </div>
@@ -90,7 +90,7 @@
         <div class="col-md-4">
             <div class="p-3 m-3 border bg-light">
                 <h2>Wages</h2>
-                <div class="table table-striped mt-3">
+                <div class="container-fluid">
                     {{ wages|safe }}
                 </div>
             </div>
@@ -98,7 +98,7 @@
         <div class="col-md-4">
             <div class="p-3 m-3 border bg-light">
                 <h2>Taxes</h2>
-                <div class="table table-striped mt-3">
+                <div class="container-fluid">
                     {{ taxes|safe }}
                 </div>
             </div>
@@ -107,7 +107,7 @@
             <div class="p-3 m-3 border bg-light">
                 {% if rent %}
                 <h2>Rent</h2>
-                <div class="table table-striped mt-3">
+                <div class="container-fluid">
                     {{ rent|safe }}
                 </div>
                 {% endif %}
@@ -117,13 +117,13 @@
 
     {% if negotiation %}
         <h2>Negotiation (All)</h2>
-        <div class="table table-striped mt-3">
+        <div class="container-fluid">
             {{ negotiation|safe }}
         </div>
     {% endif %}
 
     <h2>Movimentation (All)</h2>
-    <div class="table table-striped mt-3">
+    <div class="container-fluid">
         {{ movimentation|safe }}
     </div>
 {% endblock %}

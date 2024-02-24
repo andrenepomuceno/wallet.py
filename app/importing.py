@@ -5,7 +5,7 @@ from flask import flash
 import pandas as pd
 import re
 
-def import_b3_movimentation(df):
+def import_b3_movimentation(df, filepath):
     app.logger.info(f'Processing B3 Movimentation...')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
@@ -43,7 +43,7 @@ def import_b3_movimentation(df):
 
     return df
 
-def import_b3_negotiation(df):
+def import_b3_negotiation(df, filepath):
     app.logger.info(f'Processing B3 Negotiation...')
     
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
@@ -130,7 +130,7 @@ def extract_fill(df):
 
     return df
 
-def import_avenue_extract(df):
+def import_avenue_extract(df, filepath):
     app.logger.info(f'Processing Avenue Extract file...')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
@@ -184,7 +184,7 @@ def import_avenue_extract(df):
 
     return df
 
-def import_generic_extract(df):
+def import_generic_extract(df, filepath):
     app.logger.info(f'Processing Generic Extract file...')
 
     df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d').dt.strftime('%Y-%m-%d')

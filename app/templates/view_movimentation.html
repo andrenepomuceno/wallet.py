@@ -37,11 +37,8 @@
             </div>
         </form>
     </div>
-
-    <!-- Tabela de Dados -->
-    <div class="table table-striped mt-3">
-        {% for table in tables %}
-            {{ table|safe }}
-        {% endfor %}
+    
+    <div class='container'>
+        {{ table|safe }}
     </div>
 {% endblock %}
