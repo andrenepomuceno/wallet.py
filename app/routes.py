@@ -82,19 +82,19 @@ def view_movimentation():
     filter_form = B3MovimentationFilterForm()
     df = process_b3_movimentation_request(request)
     return render_template('view_movimentation.html',
-                           table=df.to_html(classes='table table-striped'), filter_form=filter_form)
+                           df=df, filter_form=filter_form)
 
 @app.route('/b3_negotiation', methods=['GET', 'POST'])
 def view_negotiation():
     df = process_b3_negotiation_request()
     return render_template('view_negotiation.html',
-                           table=df.to_html(classes='table table-striped'))
+                           df=df)
 
 @app.route('/avenue', methods=['GET', 'POST'])
 def view_extract():
     df = process_avenue_extract_request()
     return render_template('view_extract.html',
-                           table=df.to_html(classes="table table-striped"))
+                           df=df)
 
 @app.route('/generic', methods=['GET', 'POST'])
 def view_generic_extract():
@@ -102,7 +102,7 @@ def view_generic_extract():
 
     add_form = GenericExtractAddForm()
     if add_form.validate_on_submit():
-        app.logger.info('addForm On submit.')
+        app.logger.info('add_form On submit.')
 
         existing_entry = GenericExtract.query.filter_by(
             date=add_form.date.data,
@@ -138,7 +138,7 @@ def view_generic_extract():
 
     df = process_generic_extract_request()
     return render_template('view_generic.html',
-                           table=df.to_html(classes='table table-striped'), addForm=add_form)
+                           df=df, add_form=add_form)
 
 def view_asset_helper(asset_info):
     dataframes = asset_info['dataframes']

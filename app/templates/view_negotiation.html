@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import 'table.html' as table %}
 {% block content %}
     <h1>B3 Negotiation Data</h1>
-    <div class='container'>
-        {{ table|safe }}
+    <div class='container-fluid'>
+        {{ table.render(df) }}
     </div>
 {% endblock %}
