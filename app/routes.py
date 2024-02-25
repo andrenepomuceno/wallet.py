@@ -1,13 +1,16 @@
-from flask import render_template, request, redirect, url_for, flash, abort
-
 import os
+import pandas as pd
+from flask import render_template, request, redirect, url_for, flash, abort
 from app import app, db, UPLOADS_FOLDER
 from app.models import GenericExtract
-from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract, import_generic_extract
-from app.processing import plot_price_history, process_generic_asset_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
-from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_b3_movimentation_request, process_generic_extract_request
+from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract
+from app.importing import import_generic_extract
+from app.processing import plot_price_history, process_generic_asset_request
+from app.processing import process_b3_negotiation_request, process_b3_asset_request
+from app.processing import process_consolidate_request
+from app.processing import process_avenue_extract_request, process_avenue_asset_request
+from app.processing import process_b3_movimentation_request, process_generic_extract_request
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
-import pandas as pd
 
 def format_money(value):
     if value >= 1e12:  # Trilhão
@@ -20,7 +23,7 @@ def format_money(value):
         return f"{value / 1e3:.2f} K"
     else:
         return str(value)
-    
+
 app.jinja_env.filters['format_money'] = format_money
 
 @app.route('/', methods=['GET', 'POST'])
@@ -32,7 +35,7 @@ def home():
         if not file:
             flash('Error! No file provided for upload.')
             return render_template('index.html')
-        
+
         filepath = os.path.join(UPLOADS_FOLDER, file.filename)
         file.save(filepath)
         app.logger.debug(f'File {file.filename} saved at {filepath}.')
@@ -44,9 +47,9 @@ def home():
         else:
             flash('Error! Filetype not supported.')
             return render_template('index.html')
-        
+
         app.logger.debug(f'File {file.filename} loaded to dataframe!')
-        
+
         if filetype == 'B3 Movimentation':
             import_b3_movimentation(df, filepath)
             flash(f'Successfully imported {file.filename}!')
@@ -66,7 +69,7 @@ def home():
         else:
             flash(f'Error! Failed to parse {file.filename}.')
             return render_template('index.html')
-        
+
     return render_template('index.html')
 
 @app.route('/b3_movimentation', methods=['GET', 'POST'])
@@ -89,27 +92,27 @@ def view_extract():
 def view_generic_extract():
     app.logger.info('view_generic_extract')
 
-    addForm = GenericExtractAddForm()
-    if addForm.validate_on_submit():
+    add_form = GenericExtractAddForm()
+    if add_form.validate_on_submit():
         app.logger.info('addForm On submit.')
 
         existing_entry = GenericExtract.query.filter_by(
-            date=addForm.date.data,
-            asset=addForm.asset.data,
-            movimentation=addForm.movimentation.data,
-            quantity=addForm.quantity.data,
-            price=addForm.price.data,
-            total=addForm.total.data
+            date=add_form.date.data,
+            asset=add_form.asset.data,
+            movimentation=add_form.movimentation.data,
+            quantity=add_form.quantity.data,
+            price=add_form.price.data,
+            total=add_form.total.data
         ).first()
 
         if not existing_entry:
             new_entry = GenericExtract(
-                date=addForm.date.data,
-                asset=addForm.asset.data,
-                movimentation=addForm.movimentation.data,
-                quantity=addForm.quantity.data,
-                price=addForm.price.data,
-                total=addForm.total.data
+                date=add_form.date.data,
+                asset=add_form.asset.data,
+                movimentation=add_form.movimentation.data,
+                quantity=add_form.quantity.data,
+                price=add_form.price.data,
+                total=add_form.total.data
             )
             db.session.add(new_entry)
             db.session.commit()
@@ -120,13 +123,13 @@ def view_generic_extract():
             app.logger.info('New entry already exists in the database!')
             flash('Entry already exists in the database.')
     else:
-        app.logger.debug(f'Not submit. Errors: {addForm.errors}')
-        for field, errors in addForm.errors.items():
+        app.logger.debug(f'Not submit. Errors: {add_form.errors}')
+        for field, errors in add_form.errors.items():
             for error in errors:
-                flash(f"Error validating field {getattr(addForm, field).label.text}: {error}")
+                flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
 
     df = process_generic_extract_request(request)
-    return render_template('view_generic.html', table=df.to_html(classes='table table-striped'), addForm=addForm)
+    return render_template('view_generic.html', table=df.to_html(classes='table table-striped'), addForm=add_form)
 
 def view_asset_helper(asset_info):
     dataframes = asset_info['dataframes']
@@ -145,20 +148,20 @@ def view_asset_helper(asset_info):
     taxes = taxes[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
     movimentation = movimentation.to_html(classes=classes, index=False)
 
-    graph_html = plot_price_history(asset_info, buys, sells)
+    graph_html = plot_price_history(asset_info, buys)
 
     negotiation = None
     if 'negotiation' in dataframes:
-        negotiation = dataframes['negotiation'] 
+        negotiation = dataframes['negotiation']
         negotiation = negotiation.to_html(classes=classes, index=False)
 
-    rent = None    
+    rent = None
     if 'rent_wages' in dataframes:
         rent = dataframes['rent_wages']
         rent = rent[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
 
     return render_template(
-        'view_asset.html', 
+        'view_asset.html',
         info=asset_info,
         extended_info=extended_info,
         buys=buys,
@@ -191,11 +194,11 @@ def view_consolidate():
     if not info['valid']:
         flash('Data not found! Please upload something.')
         return redirect(url_for('home'))
-    
+
     by_group = info['consolidate_by_group']
-    by_group = by_group[['asset_class', 'currency', 'position', 'rentability', 
-                         'cost', 'liquid_cost', 'wages', 'rents', 
-                         'taxes', 'capital_gain', 'realized_gain', 'not_realized_gain', 
+    by_group = by_group[['asset_class', 'currency', 'position', 'rentability',
+                         'cost', 'liquid_cost', 'wages', 'rents',
+                         'taxes', 'capital_gain', 'realized_gain', 'not_realized_gain',
                          'relative_position']]
     by_group = by_group.rename(columns={
         'asset_class': 'Class',
@@ -218,7 +221,8 @@ def view_consolidate():
         df = group['df']
         df = df[['url', 'last_close_price', 'position', 'position_total','avg_price',
                  'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
-                 'not_realized_gain','capital_gain','rentability','rentability_by_year','age_years']]
+                 'not_realized_gain','capital_gain','rentability',
+                 'rentability_by_year','age_years']]
         df = df.rename(columns={
             'url': 'Name',
              # 'currency': 'Currency',

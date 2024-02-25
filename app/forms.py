@@ -1,7 +1,7 @@
+import pandas as pd
 from flask_wtf import FlaskForm
 from wtforms import StringField, FloatField, SubmitField
 from wtforms.validators import DataRequired
-import pandas as pd
 
 class GenericExtractAddForm(FlaskForm):
     date = StringField('Date', validators=[DataRequired()], default=pd.to_datetime("today").date)

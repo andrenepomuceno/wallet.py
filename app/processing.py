@@ -121,7 +121,7 @@ def calc_avg_price(df):
     avg_price = cost / quantity if quantity > 0 else 0
     return avg_price
 
-def plot_price_history(asset_info, buys, sells):
+def plot_price_history(asset_info, buys):
     if 'info' not in asset_info:
         return None
 
@@ -294,7 +294,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     position_total = 0
     price_gain = -100
-    if last_close_price != None and shares > 0:
+    if last_close_price is not None and shares > 0:
         position_total = shares * last_close_price
         price_gain = 100 * (last_close_price/avg_price - 1)
 
@@ -443,7 +443,7 @@ def process_b3_asset_request(request, asset):
     return asset_info
 
 def process_avenue_extract_request(request):
-    app.logger.info(f'view_extract_request')
+    app.logger.info('process_avenue_extract_request')
 
     query = AvenueExtract.query.order_by(AvenueExtract.data.asc())
     result = query.all()
@@ -573,7 +573,7 @@ def process_generic_asset_request(request, asset):
     return asset_info
 
 def process_consolidate_request(request):
-    app.logger.info(f'view_consolidate_request')
+    app.logger.info('process_consolidate_request')
 
     ret = {}
     ret['valid'] = False
