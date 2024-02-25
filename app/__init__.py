@@ -1,7 +1,7 @@
 import os
+import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-import logging
 
 # Configure logging
 logging.basicConfig(
@@ -19,8 +19,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-uploads_folder = 'uploads'
-if not os.path.exists(uploads_folder):
-    os.makedirs(uploads_folder)
+UPLOADS_FOLDER = 'uploads'
+if not os.path.exists(UPLOADS_FOLDER):
+    os.makedirs(UPLOADS_FOLDER)
 
 from app import routes

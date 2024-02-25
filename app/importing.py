@@ -1,23 +1,22 @@
-from app import app, db
-from app.models import Avenue_Extract, B3_Movimentation, B3_Negotiation, Generic_Extract
-from app.utils.parsing import parse_b3_ticker
-from flask import flash
-import pandas as pd
 import re
 import hashlib
+from flask import flash
+import pandas as pd
+from app import app, db
+from app.models import Avenue_Extract, B3_Movimentation, B3_Negotiation, Generic_Extract
 
 def gen_hash(filepath):
-    file = open(filepath, 'rb')
-    sha256 = hashlib.sha256()
-    while True:
-        chunk = file.read(1024)
-        if not chunk:
-            break
-        sha256.update(chunk)
-    return sha256.hexdigest()
+    with open(filepath, 'rb') as file:
+        sha256 = hashlib.sha256()
+        while True:
+            chunk = file.read(1024)
+            if not chunk:
+                break
+            sha256.update(chunk)
+        return sha256.hexdigest()
 
 def import_b3_movimentation(df, filepath):
-    app.logger.info(f'Processing B3 Movimentation...')
+    app.logger.info('Processing B3 Movimentation...')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Preço unitário'] = pd.to_numeric(df['Preço unitário'], errors='coerce').fillna(0.0)
@@ -32,15 +31,19 @@ def import_b3_movimentation(df, filepath):
     file_hash = gen_hash(filepath)
 
     for index, row in df.iterrows():
-        # Verifica se a entrada já existe
-        # TODO gerar uma assinatura para cada linha importada, levando em consideração o index da tabela de origem. Na tabela de origem podem existir transações válidas idênticas que são consideradas como duplicatas
+        origin_id = f'{filepath}:{file_hash}:{index}'
 
-        originId = f'{filepath}:{file_hash}:{index}'
-
-        if not B3_Movimentation.query.filter_by(originId=originId, entrada_saida=row['Entrada/Saída'], data=row['Data'], movimentacao=row['Movimentação'],
-                                          produto=row['Produto'], instituicao=row['Instituição'], quantidade=row['Quantidade']).first():
+        if not B3_Movimentation.query.filter_by(
+            origin_id=origin_id,
+            entrada_saida=row['Entrada/Saída'],
+            data=row['Data'],
+            movimentacao=row['Movimentação'],
+            produto=row['Produto'],
+            instituicao=row['Instituição'],
+            quantidade=row['Quantidade']
+        ).first():
             new_entry = B3_Movimentation(
-                originId=originId,
+                origin_id=origin_id,
                 entrada_saida=row['Entrada/Saída'],
                 data=row['Data'],
                 movimentacao=row['Movimentação'],
@@ -62,9 +65,11 @@ def import_b3_movimentation(df, filepath):
     return df
 
 def import_b3_negotiation(df, filepath):
-    app.logger.info(f'Processing B3 Negotiation...')
-    
-    df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
+    app.logger.info('Processing B3 Negotiation...')
+
+    df['Data do Negócio'] = pd.to_datetime(
+        df['Data do Negócio'],
+        format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
     df['Preço'] = pd.to_numeric(df['Preço'], errors='coerce').fillna(0.0)
     df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
@@ -74,10 +79,10 @@ def import_b3_negotiation(df, filepath):
     added = 0
     file_hash = gen_hash(filepath)
     for index, row in df.iterrows():
-        originId = f'{filepath}:{file_hash}:{index}'
+        origin_id = f'{filepath}:{file_hash}:{index}'
         if not B3_Negotiation.query.filter_by(
-            originId=originId,
-            data=row['Data do Negócio'],                                  
+            origin_id=origin_id,
+            data=row['Data do Negócio'],
             tipo=row['Tipo de Movimentação'],
             mercado=row['Mercado'],
             prazo=row['Prazo/Vencimento'],
@@ -88,7 +93,7 @@ def import_b3_negotiation(df, filepath):
             valor=row['Valor']
         ).first():
             new_entry = B3_Negotiation(
-                originId=originId,
+                origin_id=origin_id,
                 data=row['Data do Negócio'],
                 tipo=row['Tipo de Movimentação'],
                 mercado=row['Mercado'],
@@ -114,51 +119,49 @@ def extract_fill(df):
     def parse_entrada_saida(x):
         if re.match(r'Câmbio Instantâneo|Câmbio Padrão|Compra|Dividendos|Estorno', x):
             return 'Credito'
-        else:
-            return 'Debito'
+        return 'Debito'
     df['Entrada/Saída'] = df['Descrição'].apply(parse_entrada_saida)
 
     def parse_produto(x):
         match = re.search(r'(Compra de [0-9.]+|Dividendos|Corretagem) ([A-Z]{1,4})', x)
         if match:
             return match.group(2)
-        else:
-            return ''
+        return ''
     df['Produto'] = df['Descrição'].apply(parse_produto)
 
     def parse_movimentacao(x):
         match = re.search(r'Câmbio|Compra|Impostos|Dividendos|Corretagem|Desdobramento', x)
         if match:
             return match.group(0)
-        else:
-            return '???'
+        return '???'
     df['Movimentação'] = df['Descrição'].apply(parse_movimentacao)
 
     def parse_quantidade(x):
         match = re.search(r'Compra de ([0-9.]+)', x)
         if match:
             return float(match.group(1))
-        else:
-            return None
+        return None
     df['Quantidade'] = df['Descrição'].apply(parse_quantidade)
 
     def parse_preco_unitario(x):
         match = re.search(r'\$ ?([0-9.]+)', x)
         if match:
             return float(match.group(1))
-        else:
-            return None
+        return None
     df['Preço unitário'] = df['Descrição'].apply(parse_preco_unitario)
 
     return df
 
 def import_avenue_extract(df, filepath):
-    app.logger.info(f'Processing Avenue Extract file...')
+    app.logger.info('Processing Avenue Extract file...')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Liquidação'] = pd.to_datetime(df['Liquidação'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Valor (U$)'] = pd.to_numeric(df['Valor (U$)'], errors='coerce').fillna(0.0)
-    df['Saldo da conta (U$)'] = pd.to_numeric(df['Saldo da conta (U$)'], errors='coerce').fillna(0.0)
+    df['Saldo da conta (U$)'] = pd.to_numeric(
+        df['Saldo da conta (U$)'],
+        errors='coerce'
+    ).fillna(0.0)
 
     df = extract_fill(df)
 
@@ -167,10 +170,10 @@ def import_avenue_extract(df, filepath):
     added = 0
     file_hash = gen_hash(filepath)
     for index, row in df.iterrows():
-        originId = f'{filepath}:{file_hash}:{index}'
+        origin_id = f'{filepath}:{file_hash}:{index}'
         if not Avenue_Extract.query.filter_by(
-            originId=originId,
-            data=row['Data'],                                  
+            origin_id=origin_id,
+            data=row['Data'],
             hora=row['Hora'],
             liquidacao=row['Liquidação'],
             descricao=row['Descrição'],
@@ -184,7 +187,7 @@ def import_avenue_extract(df, filepath):
             # preco_unitario=row['Preço unitário']
         ).first():
             new_entry = Avenue_Extract(
-                originId=originId,
+                origin_id=origin_id,
                 data=row['Data'],
                 hora=row['Hora'],
                 liquidacao=row['Liquidação'],
@@ -210,14 +213,14 @@ def import_avenue_extract(df, filepath):
     return df
 
 def import_generic_extract(df, filepath):
-    app.logger.info(f'Processing Generic Extract file...')
+    app.logger.info('Processing Generic Extract file...')
 
     df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d').dt.strftime('%Y-%m-%d')
     df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
     df['Price'] = pd.to_numeric(df['Price'], errors='coerce').fillna(0.0)
     df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0.0)
     df['Movimentation'] = df['Movimentation'].fillna('')
-    
+
     print(df.to_string())
 
     app.logger.info('Inserting data into database...')
@@ -225,9 +228,9 @@ def import_generic_extract(df, filepath):
     added = 0
     file_hash = gen_hash(filepath)
     for index, row in df.iterrows():
-        originId = f'{filepath}:{file_hash}:{index}'
+        origin_id = f'{filepath}:{file_hash}:{index}'
         if not Generic_Extract.query.filter_by(
-            originId=originId,
+            origin_id=origin_id,
             date=row['Date'],
             asset=row['Asset'],
             movimentation=row['Movimentation'],
@@ -236,7 +239,7 @@ def import_generic_extract(df, filepath):
             total=row['Total']
         ).first():
             new_entry = Generic_Extract(
-                originId=originId,
+                origin_id=origin_id,
                 date=row['Date'],
                 asset=row['Asset'],
                 movimentation=row['Movimentation'],
