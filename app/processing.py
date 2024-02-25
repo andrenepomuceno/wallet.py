@@ -4,16 +4,14 @@ import requests_cache
 import pandas as pd
 # import yfinance_cache as yf
 import yfinance as yf
+import plotly.graph_objects as go
+import plotly.offline as pyo
 from lxml import html
-
 from app import app, db
 from app.models import B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
 from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
 from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
-
-import plotly.graph_objects as go
-import plotly.offline as pyo
 
 scrape_dict = {
     "Tesouro Selic 2029": {
@@ -84,7 +82,7 @@ def process_b3_movimentation_request(request):
 
     return df
 
-def process_b3_negotiation_request(request):
+def process_b3_negotiation_request():
     app.logger.info('view_negotiation_request')
 
     query = B3Negotiation.query.order_by(B3Negotiation.data.asc())
@@ -92,14 +90,15 @@ def process_b3_negotiation_request(request):
     df = b3_negotiation_sql_to_df(result)
     return df
 
-def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentationType):
-    if movimentationDf is None or negotiationDf is None:
-        return
+def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentation_type):
+    df_merged = pd.DataFrame()
+    if movimentation_df is None or negotiation_df is None:
+        return df_merged
 
     columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
-    df1 = movimentationDf[columns]
+    df1 = movimentation_df[columns]
 
-    df2 = negotiationDf.copy()
+    df2 = negotiation_df.copy()
     df2.rename(columns={
         'Date': 'Date',
         "Preço": 'Price',
@@ -107,7 +106,7 @@ def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentatio
         "Código de Negociação":
         "Produto"
     }, inplace=True)
-    df2['Movimentation'] = movimentationType
+    df2['Movimentation'] = movimentation_type
     df2 = df2[columns]
 
     df_merged = pd.concat([df1, df2], ignore_index=True)
@@ -138,7 +137,7 @@ def plot_price_history(asset_info, buys):
         return go.Scatter(
             x=df.index,
             y=df[ma_name],
-            line=dict(color=color, width=1),
+            line={'color': color, 'width': 1},
             name=ma_name
         )
 
@@ -180,7 +179,7 @@ def get_yfinance_data(ticker, asset_info):
     asset_info['asset_class'] = asset_class
     asset_info['info'] = stock.info
 
-def get_online_info(ticker, asset_info = {}):
+def get_online_info(ticker, asset_info = None):
     app.logger.info(f'Scraping data for {ticker}')
 
     ticker_blacklist = ['VVAR3']
@@ -214,7 +213,6 @@ def get_online_info(ticker, asset_info = {}):
 
     except Exception as e:
         app.logger.warning(f'Exception: {e}')
-        pass
 
     return asset_info
 
@@ -339,7 +337,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     return asset_info
 
-def process_b3_asset_request(request, asset):
+def process_b3_asset_request(asset):
     app.logger.info(f'Processing view asset request for "{asset}".')
 
     columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
@@ -442,7 +440,7 @@ def process_b3_asset_request(request, asset):
 
     return asset_info
 
-def process_avenue_extract_request(request):
+def process_avenue_extract_request():
     app.logger.info('process_avenue_extract_request')
 
     query = AvenueExtract.query.order_by(AvenueExtract.data.asc())
@@ -451,7 +449,7 @@ def process_avenue_extract_request(request):
 
     return extract
 
-def process_avenue_asset_request(request, asset):
+def process_avenue_asset_request(asset):
     app.logger.info(f'Processing view_extract_asset_request for "{asset}".')
 
     asset_info = {}
@@ -511,8 +509,8 @@ def process_avenue_asset_request(request, asset):
     asset_info['dataframes'] = dataframes
     return asset_info
 
-def process_generic_extract_request(request):
-    app.logger.info(f'view_generic_extract')
+def process_generic_extract_request():
+    app.logger.info('process_generic_extract_request')
 
     query = GenericExtract.query.order_by(GenericExtract.date.asc())
     result = query.all()
@@ -520,7 +518,7 @@ def process_generic_extract_request(request):
 
     return extract
 
-def process_generic_asset_request(request, asset):
+def process_generic_asset_request(asset):
     app.logger.info(f'Processing view_generic_asset_request for "{asset}".')
 
     asset_info = {}
@@ -572,7 +570,7 @@ def process_generic_asset_request(request, asset):
 
     return asset_info
 
-def process_consolidate_request(request):
+def process_consolidate_request():
     app.logger.info('process_consolidate_request')
 
     ret = {}
@@ -596,7 +594,7 @@ def process_consolidate_request(request):
         for product in products:
             if product == '':
                 continue
-            asset_info = process(request, product)
+            asset_info = process(product)
             new_row = pd.DataFrame([asset_info])
             consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 

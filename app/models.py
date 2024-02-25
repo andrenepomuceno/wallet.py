@@ -1,6 +1,6 @@
+import pandas as pd
 from app import db
 from app.utils.parsing import parse_b3_ticker
-import pandas as pd
 
 class B3Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -21,73 +21,78 @@ def format_money(value):
         return f"{value / 1e6:.2f} M"
     elif value >= 1e3:  # Mil
         return f"{value / 1e3:.2f} K"
-    else:
-        return str(value)
+    return str(value)
 
 app.jinja_env.filters['format_money'] = format_money
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if request.method == 'POST':
-        file = request.files['file']
-        filetype = request.form['filetype']
+    if request.method != 'POST':
+        return render_template('index.html')
 
-        if not file:
-            flash('Error! No file provided for upload.')
-            return render_template('index.html')
+    file = request.files['file']
+    filetype = request.form['filetype']
 
-        filepath = os.path.join(UPLOADS_FOLDER, file.filename)
-        file.save(filepath)
-        app.logger.debug(f'File {file.filename} saved at {filepath}.')
+    if not file:
+        flash('Error! No file provided for upload.')
+        return render_template('index.html')
 
-        if filepath.endswith('.csv'):
-            df = pd.read_csv(filepath)
-        elif filepath.endswith('.xlsx'):
-            df = pd.read_excel(filepath)
-        else:
-            flash('Error! Filetype not supported.')
-            return render_template('index.html')
+    filepath = os.path.join(UPLOADS_FOLDER, file.filename)
+    file.save(filepath)
+    app.logger.debug(f'File {file.filename} saved at {filepath}.')
 
-        app.logger.debug(f'File {file.filename} loaded to dataframe!')
+    if filepath.endswith('.csv'):
+        df = pd.read_csv(filepath)
+    elif filepath.endswith('.xlsx'):
+        df = pd.read_excel(filepath)
+    else:
+        flash('Error! Filetype not supported.')
+        return render_template('index.html')
 
-        if filetype == 'B3 Movimentation':
-            import_b3_movimentation(df, filepath)
-            flash(f'Successfully imported {file.filename}!')
-            return redirect(url_for('view_movimentation'))
-        elif filetype == 'B3 Negotiation':
-            import_b3_negotiation(df, filepath)
-            flash(f'Successfully imported {file.filename}!')
-            return redirect(url_for('view_negotiation'))
-        elif filetype == 'Avenue Extract':
-            import_avenue_extract(df, filepath)
-            flash(f'Successfully imported {file.filename}!')
-            return redirect(url_for('view_extract'))
-        elif filetype == 'Generic Extract':
-            import_generic_extract(df, filepath)
-            flash(f'Successfully imported {file.filename}!')
-            return redirect(url_for('view_generic_extract'))
-        else:
-            flash(f'Error! Failed to parse {file.filename}.')
-            return render_template('index.html')
+    app.logger.debug(f'File {file.filename} loaded to dataframe!')
 
-    return render_template('index.html')
+    redirect_url = 'home'
+    success = False
+    if filetype == 'B3 Movimentation':
+        import_b3_movimentation(df, filepath)
+        redirect_url = 'view_movimentation'
+        success = True
+    elif filetype == 'B3 Negotiation':
+        import_b3_negotiation(df, filepath)
+        redirect_url = 'view_negotiation'
+        success = True
+    elif filetype == 'Avenue Extract':
+        import_avenue_extract(df, filepath)
+        redirect_url = 'view_extract'
+        success = True
+    elif filetype == 'Generic Extract':
+        import_generic_extract(df, filepath)
+        redirect_url = 'view_generic_extract'
+        success = True
+    else:
+        flash(f'Error! Failed to parse {file.filename}.')
+
+    if success:
+        flash(f'Successfully imported {file.filename}!')
+
+    return redirect(url_for(redirect_url))
 
 @app.route('/b3_movimentation', methods=['GET', 'POST'])
 def view_movimentation():
-    filterForm = B3MovimentationFilterForm()
+    filter_form = B3MovimentationFilterForm()
     df = process_b3_movimentation_request(request)
     return render_template('view_movimentation.html',
-                           table=df.to_html(classes='table table-striped'), filterForm=filterForm)
+                           table=df.to_html(classes='table table-striped'), filter_form=filter_form)
 
 @app.route('/b3_negotiation', methods=['GET', 'POST'])
 def view_negotiation():
-    df = process_b3_negotiation_request(request)
+    df = process_b3_negotiation_request()
     return render_template('view_negotiation.html',
                            table=df.to_html(classes='table table-striped'))
 
 @app.route('/avenue', methods=['GET', 'POST'])
 def view_extract():
-    df = process_avenue_extract_request(request)
+    df = process_avenue_extract_request()
     return render_template('view_extract.html',
                            table=df.to_html(classes="table table-striped"))
 
@@ -131,7 +136,7 @@ def view_generic_extract():
             for error in errors:
                 flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
 
-    df = process_generic_extract_request(request)
+    df = process_generic_extract_request()
     return render_template('view_generic.html',
                            table=df.to_html(classes='table table-striped'), addForm=add_form)
 
@@ -180,14 +185,14 @@ def view_asset_helper(asset_info):
         negotiation=negotiation,
     )
 
-@app.route('/view/<db>/<asset>', methods=['GET', 'POST'])
-def view_asset(db=None, asset=None):
-    if db == 'b3':
-        asset_info = process_b3_asset_request(request, asset)
-    elif db == 'avenue':
-        asset_info = process_avenue_asset_request(request, asset)
-    elif db == 'generic':
-        asset_info = process_generic_asset_request(request, asset)
+@app.route('/view/<source>/<asset>', methods=['GET', 'POST'])
+def view_asset(source=None, asset=None):
+    if source == 'b3':
+        asset_info = process_b3_asset_request(asset)
+    elif source == 'avenue':
+        asset_info = process_avenue_asset_request(asset)
+    elif source == 'generic':
+        asset_info = process_generic_asset_request(asset)
     else:
         abort(404)
 
@@ -195,7 +200,7 @@ def view_asset(db=None, asset=None):
 
 @app.route('/consolidate', methods=['GET', 'POST'])
 def view_consolidate():
-    info = process_consolidate_request(request)
+    info = process_consolidate_request()
 
     if not info['valid']:
         flash('Data not found! Please upload something.')

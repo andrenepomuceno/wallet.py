@@ -25,7 +25,7 @@ def parse_b3_ticker(column):
     result.fillna('', inplace=True)
     return result
 
-def brl_to_float(preco_str):    
+def brl_to_float(preco_str):
     preco_str = preco_str.replace("R$", "").strip()
     preco_str = preco_str.replace(".", "").replace(",", ".")
     try:

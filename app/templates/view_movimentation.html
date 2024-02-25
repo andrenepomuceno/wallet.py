@@ -3,37 +3,37 @@
     <h1>B3 Movimentation Data</h1>
 
     <!-- Botão para Mostrar/Ocultar o Formulário de Filtro -->
-    <button type="button" class="btn btn-info" onclick="toggleDisplay('filterForm')">Filter</button>
-    <div class="container" id="filterForm" style="display: none;">
+    <button type="button" class="btn btn-info" onclick="toggleDisplay('filter_form')">Filter</button>
+    <div class="container" id="filter_form" style="display: none;">
         <h2>Filter</h2>
         <form method="POST" class="form-inline">
-            {{ filterForm.hidden_tag() }}
+            {{ filter_form.hidden_tag() }}
             <div class="form-group">
-                {{ filterForm.entrada_saida.label(class="form-control-label") }} {{ filterForm.entrada_saida(class="form-control") }}
+                {{ filter_form.entrada_saida.label(class="form-control-label") }} {{ filter_form.entrada_saida(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.data.label(class="form-control-label") }} {{ filterForm.data(class="form-control") }}
+                {{ filter_form.data.label(class="form-control-label") }} {{ filter_form.data(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.movimentacao.label(class="form-control-label") }} {{ filterForm.movimentacao(class="form-control") }}
+                {{ filter_form.movimentacao.label(class="form-control-label") }} {{ filter_form.movimentacao(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.produto.label(class="form-control-label") }} {{ filterForm.produto(class="form-control") }}
+                {{ filter_form.produto.label(class="form-control-label") }} {{ filter_form.produto(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.instituicao.label(class="form-control-label") }} {{ filterForm.instituicao(class="form-control") }}
+                {{ filter_form.instituicao.label(class="form-control-label") }} {{ filter_form.instituicao(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.quantidade.label(class="form-control-label") }} {{ filterForm.quantidade(class="form-control") }}
+                {{ filter_form.quantidade.label(class="form-control-label") }} {{ filter_form.quantidade(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.preco_unitario.label(class="form-control-label") }} {{ filterForm.preco_unitario(class="form-control") }}
+                {{ filter_form.preco_unitario.label(class="form-control-label") }} {{ filter_form.preco_unitario(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.valor_operacao.label(class="form-control-label") }} {{ filterForm.valor_operacao(class="form-control") }}
+                {{ filter_form.valor_operacao.label(class="form-control-label") }} {{ filter_form.valor_operacao(class="form-control") }}
             </div>
             <div class="form-group">
-                {{ filterForm.submit(class="btn btn-primary") }}
+                {{ filter_form.submit(class="btn btn-primary") }}
             </div>
         </form>
     </div>
