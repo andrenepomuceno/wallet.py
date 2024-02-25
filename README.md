@@ -32,3 +32,11 @@ pip3 install -r requirements.txt
 ```
 
 Then access the home page at http://localhost:5000
+
+## Uploading Data
+
+Download XLSL/CSV data from (PDF not supported)
+
+[Área do Investidor > Extrato > Negociação](https://www.investidor.b3.com.br/extrato/negociacao)
+
+[Área do Investidor > Extrato > Movimentação](https://www.investidor.b3.com.br/extrato/movimentacao)

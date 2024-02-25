@@ -13,13 +13,13 @@ from app.processing import process_b3_movimentation_request, process_generic_ext
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
 
 def format_money(value):
-    if value >= 1e12:  # Trilhão
+    if value >= 1e12:
         return f"{value / 1e12:.2f} T"
-    elif value >= 1e9:  # Bilhão
+    elif value >= 1e9:
         return f"{value / 1e9:.2f} B"
-    elif value >= 1e6:  # Milhão
+    elif value >= 1e6:
         return f"{value / 1e6:.2f} M"
-    elif value >= 1e3:  # Mil
+    elif value >= 1e3:
         return f"{value / 1e3:.2f} K"
     return str(value)
 
@@ -230,13 +230,15 @@ def view_consolidate():
     group_df = info['group_df']
     for group in group_df:
         df = group['df']
-        df = df[['url', 'last_close_price', 'position', 'position_total','avg_price',
-                 'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
-                 'not_realized_gain','capital_gain','rentability',
-                 'rentability_by_year','age_years']]
+        df = df[[
+            'url', 'currency', 'last_close_price', 'position', 'position_total','avg_price',
+            'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
+            'not_realized_gain','capital_gain','rentability',
+            'rentability_by_year','age_years'
+        ]]
         df = df.rename(columns={
             'url': 'Name',
-             # 'currency': 'Currency',
+            'currency': 'Currency',
             'last_close_price': 'Close Price',
             'position': "Shares",
             'position_total': 'Position',
