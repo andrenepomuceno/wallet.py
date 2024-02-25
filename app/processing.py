@@ -1,32 +1,21 @@
+import re
+import requests
+import requests_cache
 import pandas as pd
 # import yfinance_cache as yf
 import yfinance as yf
-import requests
-import requests_cache
 from lxml import html
-import re
-import json 
 
 from app import app, db
-from app.models import B3_Movimentation, B3_Negotiation, Avenue_Extract, Generic_Extract, b3_movimentation_sql_to_df, b3_negotiation_sql_to_df, avenue_extract_sql_to_df, generic_extract_sql_to_df
-from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, is_valid_b3_ticker, brl_to_float
+from app.models import B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
+from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
+from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
+from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
 
 import plotly.graph_objects as go
 import plotly.offline as pyo
 
 scrape_dict = {
-    # "Tesouro Selic 2024": {
-    #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2024/',
-    #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-    # },
-    # "Tesouro Selic 2025": {
-    #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2025/',
-    #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-    # },
-    # "Tesouro Selic 2027": {
-    #     'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2027/',
-    #     'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span'
-    # },
     "Tesouro Selic 2029": {
         'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
@@ -65,13 +54,13 @@ def process_b3_movimentation_request(request):
     app.logger.info('view_movimentation_request')
 
     df = pd.DataFrame()
-    query = B3_Movimentation.query.order_by(B3_Movimentation.data.asc())
+    query = B3Movimentation.query.order_by(B3Movimentation.data.asc())
 
     if request.method == 'POST':
         filters = request.form.to_dict()
         for key, value in filters.items():
             if value:
-                column = getattr(B3_Movimentation, key, None)
+                column = getattr(B3Movimentation, key, None)
                 if column is not None:
                     if isinstance(column.type, db.Float):
                         # Filtragem para campos numéricos
@@ -84,7 +73,7 @@ def process_b3_movimentation_request(request):
     df = b3_movimentation_sql_to_df(result)
     if len(df) == 0:
         return df
-    
+
     print(df['Asset'].value_counts())
     #print(df['Produto'].value_counts())
 
@@ -98,11 +87,11 @@ def process_b3_movimentation_request(request):
 def process_b3_negotiation_request(request):
     app.logger.info('view_negotiation_request')
 
-    query = B3_Negotiation.query.order_by(B3_Negotiation.data.asc())
+    query = B3Negotiation.query.order_by(B3Negotiation.data.asc())
     result = query.all()
     df = b3_negotiation_sql_to_df(result)
     return df
-    
+
 def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentationType):
     if movimentationDf is None or negotiationDf is None:
         return
@@ -111,7 +100,13 @@ def merge_movimentation_negotiation(movimentationDf, negotiationDf, movimentatio
     df1 = movimentationDf[columns]
 
     df2 = negotiationDf.copy()
-    df2.rename(columns={'Date': 'Date', "Preço": 'Price', "Valor": 'Total', "Código de Negociação": "Produto"}, inplace=True)
+    df2.rename(columns={
+        'Date': 'Date',
+        "Preço": 'Price',
+        "Valor": 'Total',
+        "Código de Negociação":
+        "Produto"
+    }, inplace=True)
     df2['Movimentation'] = movimentationType
     df2 = df2[columns]
 
@@ -129,7 +124,7 @@ def calc_avg_price(df):
 def plot_price_history(asset_info, buys, sells):
     if 'info' not in asset_info:
         return None
-    
+
     info = asset_info['info']
     if 'symbol' not in info:
         return None
@@ -141,9 +136,9 @@ def plot_price_history(asset_info, buys, sells):
         ma_name="MA" + str(ma_size)
         df[ma_name] = df['Close'].rolling(ma_size).mean()
         return go.Scatter(
-            x=df.index, 
-            y=df[ma_name], 
-            line=dict(color=color, width=1), 
+            x=df.index,
+            y=df[ma_name],
+            line=dict(color=color, width=1),
             name=ma_name
         )
 
@@ -160,14 +155,9 @@ def plot_price_history(asset_info, buys, sells):
     ))
     fig.add_trace(add_moving_average(20, df, 'blue'))
     fig.add_trace(add_moving_average(100, df, 'cyan'))
-    # fig.add_trace(go.Bar(x=buys['Date'], y=buys['Quantity'], name='Buys', yaxis='y2', marker={'color': 'green'}))
-    # fig.add_trace(go.Bar(x=sells['Date'], y=sells['Quantity'], name='Sells', yaxis='y2', marker={'color': 'Red'}))
-    fig.update_layout(
-        #yaxis=dict(title='Price'),
-        #yaxis2=dict(title='Quantity', overlaying='y', side='right'),
-    )
+    fig.update_layout()
     fig.update_yaxes(autorange=True, fixedrange=False)
-    
+
     graph_html = pyo.plot(fig, output_type='div')
 
     return graph_html
@@ -223,8 +213,8 @@ def get_online_info(ticker, asset_info = {}):
             get_yfinance_data(ticker, asset_info)
 
     except Exception as e:
-            app.logger.warning(f'Exception: {e}')
-            pass
+        app.logger.warning(f'Exception: {e}')
+        pass
 
     return asset_info
 
@@ -307,7 +297,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     if last_close_price != None and shares > 0:
         position_total = shares * last_close_price
         price_gain = 100 * (last_close_price/avg_price - 1)
-    
+
     asset_info['buy_quantity'] = round(buy_quantity, 2)
     asset_info['sell_quantity'] = round(sell_quantity, 2)
     asset_info['position'] = round(shares, 8)
@@ -333,13 +323,13 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
     if age_years is not None:
         asset_info['age_years'] = round(age_years, 2)
         asset_info['age'] = round(age_years * 365)
-    
+
     asset_info['buys_value_sum'] = round(buys_value_sum, 2)
 
     asset_info['rented'] = rented
 
     asset_info['position_total'] = round(position_total, 2)
-    
+
     asset_info['price_gain'] = round(price_gain, 2)
     asset_info['rentability_by_year'] = round(100 * anualized_rentability, 2)
 
@@ -357,7 +347,8 @@ def process_b3_asset_request(request, asset):
     asset_info = { 'valid': False, 'name': asset }
     dataframes = {}
 
-    query = B3_Movimentation.query.filter(B3_Movimentation.produto.like(f'%{asset}%')).order_by(B3_Movimentation.data.asc())
+    query = B3Movimentation.query.filter(
+        B3Movimentation.produto.like(f'%{asset}%')).order_by(B3Movimentation.data.asc())
     result = query.all()
     movimentation_df = b3_movimentation_sql_to_df(result)
     if len(movimentation_df) > 0:
@@ -369,7 +360,7 @@ def process_b3_asset_request(request, asset):
         buys = credit.loc[
             (
                 (credit['Movimentation'] == "Compra")
-                | (credit['Movimentation'] == "Desdobro") 
+                | (credit['Movimentation'] == "Desdobro")
                 | (credit['Movimentation'] == "Bonificação em Ativos")
                 | (credit['Movimentation'] == "Atualização")
             )
@@ -387,12 +378,12 @@ def process_b3_asset_request(request, asset):
         debit = pd.DataFrame(columns=columns)
         buys = pd.DataFrame(columns=columns)
         sells = pd.DataFrame(columns=columns)
-        
+
 
     dataframes['movimentation'] = movimentation_df
 
-    # TODO process negotiation first 
-    query = B3_Negotiation.query.filter(B3_Negotiation.codigo.like(f'%{asset}%')).order_by(B3_Negotiation.data.asc())
+    query = B3Negotiation.query.filter(
+        B3Negotiation.codigo.like(f'%{asset}%')).order_by(B3Negotiation.data.asc())
     result = query.all()
     negotiation = b3_negotiation_sql_to_df(result)
     if len(negotiation) > 0:
@@ -430,9 +421,9 @@ def process_b3_asset_request(request, asset):
     dataframes['taxes'] = taxes
 
     wages = credit.loc[
-        ((credit['Movimentation'] == "Dividendo") 
-         | (credit['Movimentation'] == "Juros Sobre Capital Próprio") 
-         | (credit['Movimentation'] == "Reembolso") 
+        ((credit['Movimentation'] == "Dividendo")
+         | (credit['Movimentation'] == "Juros Sobre Capital Próprio")
+         | (credit['Movimentation'] == "Reembolso")
          | (credit['Movimentation'] == "Rendimento")
          | (credit['Movimentation'] == "Leilão de Fração"))
          | (credit['Movimentation'] == "Resgate")
@@ -446,15 +437,15 @@ def process_b3_asset_request(request, asset):
     dataframes['rent_wages'] = rents_wage
 
     consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info)
-    
+
     asset_info['dataframes'] = dataframes
-    
+
     return asset_info
 
 def process_avenue_extract_request(request):
     app.logger.info(f'view_extract_request')
 
-    query = Avenue_Extract.query.order_by(Avenue_Extract.data.asc())
+    query = AvenueExtract.query.order_by(AvenueExtract.data.asc())
     result = query.all()
     extract = avenue_extract_sql_to_df(result)
 
@@ -469,15 +460,16 @@ def process_avenue_asset_request(request, asset):
     asset_info['valid'] = False
     asset_info['name'] = asset
 
-    query = Avenue_Extract.query.filter(Avenue_Extract.produto.like(f'%{asset}%')).order_by(Avenue_Extract.data.asc())
+    query = AvenueExtract.query.filter(
+        AvenueExtract.produto.like(f'%{asset}%')).order_by(AvenueExtract.data.asc())
     result = query.all()
     extract_df = avenue_extract_sql_to_df(result)
     if len(extract_df) == 0:
         app.logger.warning(f'Extract data not found for {asset}')
         return asset_info
-    
+
     extract_df['Total'] = abs(extract_df['Total'])
-    
+
     dataframes['movimentation'] = extract_df
 
     ticker = extract_df['Asset'].value_counts().index[0]
@@ -522,7 +514,7 @@ def process_avenue_asset_request(request, asset):
 def process_generic_extract_request(request):
     app.logger.info(f'view_generic_extract')
 
-    query = Generic_Extract.query.order_by(Generic_Extract.date.asc())
+    query = GenericExtract.query.order_by(GenericExtract.date.asc())
     result = query.all()
     extract = generic_extract_sql_to_df(result)
 
@@ -537,13 +529,14 @@ def process_generic_asset_request(request, asset):
     asset_info['valid'] = False
     asset_info['name'] = asset
 
-    query = Generic_Extract.query.filter(Generic_Extract.asset.like(f'%{asset}%')).order_by(Generic_Extract.date.asc())
+    query = GenericExtract.query.filter(
+        GenericExtract.asset.like(f'%{asset}%')).order_by(GenericExtract.date.asc())
     result = query.all()
     extract_df = generic_extract_sql_to_df(result)
     if len(extract_df) == 0:
         app.logger.warning(f'Extract data not found for {asset}')
         return asset_info
-    
+
     dataframes['movimentation'] = extract_df
 
     ticker = extract_df['Asset'].value_counts().index[0]
@@ -562,7 +555,7 @@ def process_generic_asset_request(request, asset):
         )
     ]
     dataframes['sells'] = sells
-    
+
     taxes = extract_df.loc[
         (extract_df['Movimentation'] == "Taxes")
     ]
@@ -591,7 +584,7 @@ def process_consolidate_request(request):
         products = pd.DataFrame()
         if len(df) <= 0:
             return products
-        
+
         products = df['Asset'].unique().tolist()
         return products
 
@@ -607,25 +600,28 @@ def process_consolidate_request(request):
             new_row = pd.DataFrame([asset_info])
             consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
-        consolidate['url'] = consolidate['name'].apply(lambda x: f"<a href='/{route}/{x}' target='_blank'>{x}</a>")
+        consolidate['url'] = consolidate['name'].apply(
+            lambda x: f"<a href='/{route}/{x}' target='_blank'>{x}</a>")
 
         return consolidate
 
-    products_neg = load_products(B3_Negotiation.query, b3_negotiation_sql_to_df)
-    products_mov = load_products(B3_Movimentation.query, b3_movimentation_sql_to_df)
+    products_neg = load_products(B3Negotiation.query, b3_negotiation_sql_to_df)
+    products_mov = load_products(B3Movimentation.query, b3_movimentation_sql_to_df)
     b3_products = list(set(products_neg) | set(products_mov))
     b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'view/b3')
 
-    avenue_products = load_products(Avenue_Extract.query, avenue_extract_sql_to_df)
-    avenue_consolidate = load_consolidate(avenue_products, process_avenue_asset_request, 'view/avenue')
+    avenue_products = load_products(AvenueExtract.query, avenue_extract_sql_to_df)
+    avenue_consolidate = load_consolidate(avenue_products,
+                                          process_avenue_asset_request, 'view/avenue')
 
-    generic_products = load_products(Generic_Extract.query, generic_extract_sql_to_df)
-    generic_consolidate = load_consolidate(generic_products, process_generic_asset_request, 'view/generic')
+    generic_products = load_products(GenericExtract.query, generic_extract_sql_to_df)
+    generic_consolidate = load_consolidate(generic_products,
+                                           process_generic_asset_request, 'view/generic')
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:
         return ret
-    
+
     consolidate = consolidate.sort_values(by='rentability', ascending=False)
     # ret['consolidate'] = consolidate
 
@@ -653,20 +649,23 @@ def process_consolidate_request(request):
             currency = 'BRL'
             asset_class += ' (USD)'
 
-        group_consolidate = group[['cost', 'wages_sum', 'rent_wages_sum', 'taxes_sum', 'liquid_cost', 'position_total', 'realized_gain', 'not_realized_gain', 'capital_gain']]
+        group_consolidate = group[['cost', 'wages_sum', 'rent_wages_sum', 'taxes_sum',
+                                   'liquid_cost', 'position_total', 'realized_gain',
+                                   'not_realized_gain', 'capital_gain']]
         group_consolidate = group_consolidate.rename(columns={
             'wages_sum': 'wages',
             'rent_wages_sum': 'rents',
             'taxes_sum': 'taxes',
             'position_total': 'position'
-        })            
+        })
         group_consolidate = consolidate_total(group_consolidate, rate, currency, asset_class)
         group_df += [{'name': asset_class, 'df': group, 'consolidate': group_consolidate}]
 
         new_row = pd.DataFrame([group_consolidate])
         consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
 
-    consolidate_by_group['relative_position'] = round(consolidate_by_group['position']/consolidate_by_group['position'].sum() * 100, 2)
+    consolidate_by_group['relative_position'] = round(
+        consolidate_by_group['position']/consolidate_by_group['position'].sum() * 100, 2)
 
     total = consolidate_total(consolidate_by_group, 1, 'BRL', 'Total')
     new_row = pd.DataFrame([total])

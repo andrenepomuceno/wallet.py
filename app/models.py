@@ -1,10 +1,8 @@
-from app import app, db
+from app import db
 from app.utils.parsing import parse_b3_ticker
-from flask import flash
 import pandas as pd
-import re
 
-class B3_Movimentation(db.Model):
+class B3Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     origin_id = db.Column(db.String)
 
@@ -18,13 +16,15 @@ class B3_Movimentation(db.Model):
     valor_operacao = db.Column(db.Float)
 
     def __repr__(self):
-        return f'<B3_Movimentation {self.id}>'
+        return f'<B3Movimentation {self.id}>'
 
 def b3_movimentation_sql_to_df(result):
-    df = pd.DataFrame([(d.entrada_saida, d.data, d.movimentacao, d.produto, 
-                        d.instituicao, d.quantidade, d.preco_unitario, d.valor_operacao) for d in result], 
+    df = pd.DataFrame([(d.entrada_saida, d.data, d.movimentacao, d.produto,
+                        d.instituicao, d.quantidade, d.preco_unitario,
+                        d.valor_operacao) for d in result],
                       columns=['Entrada/Saída', 'Data', 'Movimentação', 'Produto',
-                               'Instituição', 'Quantidade', 'Preço unitário', 'Valor da Operação'])
+                               'Instituição', 'Quantidade', 'Preço unitário',
+                               'Valor da Operação'])
     df['Data'] = pd.to_datetime(df['Data'])
 
     df = df.rename(columns={
@@ -35,13 +35,11 @@ def b3_movimentation_sql_to_df(result):
         'Valor da Operação': 'Total'
     })
 
-    # df['Asset'] = parse_b3_product(df['Produto'])
-    # df['Ticker'] = parse_b3_ticker(df['Produto'])
     df['Asset'] = parse_b3_ticker(df['Produto'])
 
     return df
 
-class B3_Negotiation(db.Model):
+class B3Negotiation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     origin_id = db.Column(db.String)
 
@@ -56,15 +54,17 @@ class B3_Negotiation(db.Model):
     valor = db.Column(db.Float)
 
     def __repr__(self):
-        return f'<B3_Negotiation {self.id}>'
+        return f'<B3Negotiation {self.id}>'
 
 def b3_negotiation_sql_to_df(result):
-    df = pd.DataFrame([(d.data, d.tipo, d.mercado, d.prazo, 
+    df = pd.DataFrame([(d.data, d.tipo, d.mercado, d.prazo,
                         d.instituicao, d.codigo, d.quantidade, d.preco,
-                        d.valor) for d in result], 
-                      columns=['Data do Negócio', 'Tipo de Movimentação', 'Mercado', 'Prazo/Vencimento',
-                               'Instituição', 'Código de Negociação', 'Quantidade', 'Preço',
-                               'Valor'])
+                        d.valor) for d in result],
+                        columns=[
+                            'Data do Negócio', 'Tipo de Movimentação', 'Mercado',
+                            'Prazo/Vencimento', 'Instituição', 'Código de Negociação',
+                            'Quantidade', 'Preço', 'Valor'
+                        ])
     df['Data do Negócio'] = pd.to_datetime(df['Data do Negócio'])
     df['Asset'] = parse_b3_ticker(df['Código de Negociação'])
 
@@ -78,7 +78,7 @@ def b3_negotiation_sql_to_df(result):
 
     return df
 
-class Avenue_Extract(db.Model):
+class AvenueExtract(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     origin_id = db.Column(db.String)
 
@@ -96,18 +96,19 @@ class Avenue_Extract(db.Model):
     preco_unitario = db.Column(db.Float)
 
     def __repr__(self):
-        return f'<Avenue_Extract {self.id}>'
+        return f'<AvenueExtract {self.id}>'
 
 def avenue_extract_sql_to_df(result):
     df = pd.DataFrame([(
-        d.data, d.hora, d.liquidacao, d.descricao, 
-        d.valor, d.saldo,
-        d.entrada_saida, d.produto, d.movimentacao, d.quantidade, d.preco_unitario
+        d.data, d.hora, d.liquidacao, d.descricao,
+        d.valor, d.saldo, d.entrada_saida, d.produto,
+        d.movimentacao, d.quantidade, d.preco_unitario
     ) for d in result],
     columns=[
         'Data', 'Hora', 'Liquidação', 'Descrição',
         'Valor (U$)', 'Saldo da conta (U$)',
-        'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade', 'Preço unitário'
+        'Entrada/Saída', 'Produto', 'Movimentação', 'Quantidade',
+        'Preço unitário'
     ])
     df['Data'] = pd.to_datetime(df['Data'])
     df['Liquidação'] = pd.to_datetime(df['Liquidação'])
@@ -123,10 +124,10 @@ def avenue_extract_sql_to_df(result):
 
     return df
 
-class Generic_Extract(db.Model):
+class GenericExtract(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     origin_id = db.Column(db.String)
-    
+
     date = db.Column(db.String)
     asset = db.Column(db.String)
     movimentation = db.Column(db.String)
@@ -136,11 +137,11 @@ class Generic_Extract(db.Model):
     # TODO currency support
 
     def __repr__(self):
-        return f'<Generic_Extract {self.id}>'
+        return f'<GenericExtract {self.id}>'
 
 def generic_extract_sql_to_df(result):
-    df = pd.DataFrame([(d.date, d.asset, d.movimentation, d.quantity, 
-                        d.price, d.total) for d in result], 
+    df = pd.DataFrame([(d.date, d.asset, d.movimentation, d.quantity,
+                        d.price, d.total) for d in result],
                       columns=['Date', 'Asset', 'Movimentation', 'Quantity',
                                'Price', 'Total'])
     df['Date'] = pd.to_datetime(df['Date'])
@@ -148,9 +149,7 @@ def generic_extract_sql_to_df(result):
     def fill_movimentation(row):
         if row['Movimentation'] == '':
             return 'Buy' if row['Total'] >= 0 else 'Sell'
-        else:
-            return row['Movimentation']
+        return row['Movimentation']
     df['Movimentation'] = df.apply(fill_movimentation, axis=1)
 
     return df
-

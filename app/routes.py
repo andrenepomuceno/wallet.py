@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for, flash, abort
 
 import os
 from app import app, db, UPLOADS_FOLDER
-from app.models import Generic_Extract
+from app.models import GenericExtract
 from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract, import_generic_extract
 from app.processing import plot_price_history, process_generic_asset_request, process_b3_negotiation_request, process_b3_asset_request, process_consolidate_request
 from app.processing import process_avenue_extract_request, process_avenue_asset_request, process_b3_movimentation_request, process_generic_extract_request
@@ -93,7 +93,7 @@ def view_generic_extract():
     if addForm.validate_on_submit():
         app.logger.info('addForm On submit.')
 
-        existing_entry = Generic_Extract.query.filter_by(
+        existing_entry = GenericExtract.query.filter_by(
             date=addForm.date.data,
             asset=addForm.asset.data,
             movimentation=addForm.movimentation.data,
@@ -103,7 +103,7 @@ def view_generic_extract():
         ).first()
 
         if not existing_entry:
-            new_entry = Generic_Extract(
+            new_entry = GenericExtract(
                 date=addForm.date.data,
                 asset=addForm.asset.data,
                 movimentation=addForm.movimentation.data,

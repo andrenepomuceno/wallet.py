@@ -3,7 +3,7 @@ import hashlib
 from flask import flash
 import pandas as pd
 from app import app, db
-from app.models import Avenue_Extract, B3_Movimentation, B3_Negotiation, Generic_Extract
+from app.models import AvenueExtract, B3Movimentation, B3Negotiation, GenericExtract
 
 def gen_hash(filepath):
     with open(filepath, 'rb') as file:
@@ -33,7 +33,7 @@ def import_b3_movimentation(df, filepath):
     for index, row in df.iterrows():
         origin_id = f'{filepath}:{file_hash}:{index}'
 
-        if not B3_Movimentation.query.filter_by(
+        if not B3Movimentation.query.filter_by(
             origin_id=origin_id,
             entrada_saida=row['Entrada/Saída'],
             data=row['Data'],
@@ -42,7 +42,7 @@ def import_b3_movimentation(df, filepath):
             instituicao=row['Instituição'],
             quantidade=row['Quantidade']
         ).first():
-            new_entry = B3_Movimentation(
+            new_entry = B3Movimentation(
                 origin_id=origin_id,
                 entrada_saida=row['Entrada/Saída'],
                 data=row['Data'],
@@ -80,7 +80,7 @@ def import_b3_negotiation(df, filepath):
     file_hash = gen_hash(filepath)
     for index, row in df.iterrows():
         origin_id = f'{filepath}:{file_hash}:{index}'
-        if not B3_Negotiation.query.filter_by(
+        if not B3Negotiation.query.filter_by(
             origin_id=origin_id,
             data=row['Data do Negócio'],
             tipo=row['Tipo de Movimentação'],
@@ -92,7 +92,7 @@ def import_b3_negotiation(df, filepath):
             preco=row['Preço'],
             valor=row['Valor']
         ).first():
-            new_entry = B3_Negotiation(
+            new_entry = B3Negotiation(
                 origin_id=origin_id,
                 data=row['Data do Negócio'],
                 tipo=row['Tipo de Movimentação'],
@@ -171,7 +171,7 @@ def import_avenue_extract(df, filepath):
     file_hash = gen_hash(filepath)
     for index, row in df.iterrows():
         origin_id = f'{filepath}:{file_hash}:{index}'
-        if not Avenue_Extract.query.filter_by(
+        if not AvenueExtract.query.filter_by(
             origin_id=origin_id,
             data=row['Data'],
             hora=row['Hora'],
@@ -186,7 +186,7 @@ def import_avenue_extract(df, filepath):
             # quantidade=row['Quantidade'],
             # preco_unitario=row['Preço unitário']
         ).first():
-            new_entry = Avenue_Extract(
+            new_entry = AvenueExtract(
                 origin_id=origin_id,
                 data=row['Data'],
                 hora=row['Hora'],
@@ -229,7 +229,7 @@ def import_generic_extract(df, filepath):
     file_hash = gen_hash(filepath)
     for index, row in df.iterrows():
         origin_id = f'{filepath}:{file_hash}:{index}'
-        if not Generic_Extract.query.filter_by(
+        if not GenericExtract.query.filter_by(
             origin_id=origin_id,
             date=row['Date'],
             asset=row['Asset'],
@@ -238,7 +238,7 @@ def import_generic_extract(df, filepath):
             price=row['Price'],
             total=row['Total']
         ).first():
-            new_entry = Generic_Extract(
+            new_entry = GenericExtract(
                 origin_id=origin_id,
                 date=row['Date'],
                 asset=row['Asset'],
