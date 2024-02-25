@@ -165,9 +165,11 @@ def import_avenue_extract(df, filepath):
     app.logger.info('Inserting data into database...')
     duplicates = 0
     added = 0
-    for _, row in df.iterrows():
-        # Verifica se a entrada já existe
+    file_hash = gen_hash(filepath)
+    for index, row in df.iterrows():
+        originId = f'{filepath}:{file_hash}:{index}'
         if not Avenue_Extract.query.filter_by(
+            originId=originId,
             data=row['Data'],                                  
             hora=row['Hora'],
             liquidacao=row['Liquidação'],
@@ -175,13 +177,14 @@ def import_avenue_extract(df, filepath):
             valor=row['Valor (U$)'],
             saldo=row['Saldo da conta (U$)'],
 
-            entrada_saida=row['Entrada/Saída'],
-            produto=row['Produto'],
-            movimentacao=row['Movimentação'],
-            quantidade=row['Quantidade'],
-            preco_unitario=row['Preço unitário']
+            # entrada_saida=row['Entrada/Saída'],
+            # produto=row['Produto'],
+            # movimentacao=row['Movimentação'],
+            # quantidade=row['Quantidade'],
+            # preco_unitario=row['Preço unitário']
         ).first():
             new_entry = Avenue_Extract(
+                originId=originId,
                 data=row['Data'],
                 hora=row['Hora'],
                 liquidacao=row['Liquidação'],
@@ -220,9 +223,11 @@ def import_generic_extract(df, filepath):
     app.logger.info('Inserting data into database...')
     duplicates = 0
     added = 0
-    for _, row in df.iterrows():
-        # Verifica se a entrada já existe
+    file_hash = gen_hash(filepath)
+    for index, row in df.iterrows():
+        originId = f'{filepath}:{file_hash}:{index}'
         if not Generic_Extract.query.filter_by(
+            originId=originId,
             date=row['Date'],
             asset=row['Asset'],
             movimentation=row['Movimentation'],
@@ -231,6 +236,7 @@ def import_generic_extract(df, filepath):
             total=row['Total']
         ).first():
             new_entry = Generic_Extract(
+                originId=originId,
                 date=row['Date'],
                 asset=row['Asset'],
                 movimentation=row['Movimentation'],

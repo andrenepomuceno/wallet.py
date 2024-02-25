@@ -80,6 +80,8 @@ def b3_negotiation_sql_to_df(result):
 
 class Avenue_Extract(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    originId = db.Column(db.String)
+
     data = db.Column(db.String)
     hora = db.Column(db.String)
     liquidacao = db.Column(db.String)
@@ -123,6 +125,8 @@ def avenue_extract_sql_to_df(result):
 
 class Generic_Extract(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    originId = db.Column(db.String)
+    
     date = db.Column(db.String)
     asset = db.Column(db.String)
     movimentation = db.Column(db.String)
