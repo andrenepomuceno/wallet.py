@@ -2,20 +2,18 @@ import re
 
 def is_valid_b3_ticker(ticker):
     return is_b3_stock_ticker(ticker) or is_b3_fii_ticker(ticker)
-    
+
 def is_b3_stock_ticker(ticker):
     pattern = r'[A-Z0-9]{4}(3|4)$'
     if re.match(pattern, ticker):
         return True
-    else:
-        return False
-    
+    return False
+
 def is_b3_fii_ticker(ticker):
     pattern = r'[A-Z0-9]{4}11$'
     if re.match(pattern, ticker):
         return True
-    else:
-        return False
+    return False
 
 def parse_b3_product(column):
     result = column.str.extract(r'^([A-Z0-9]{4}|[a-zA-Z0-9 .]+)', expand=False)

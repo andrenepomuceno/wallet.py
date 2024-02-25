@@ -76,17 +76,20 @@ def home():
 def view_movimentation():
     filterForm = B3MovimentationFilterForm()
     df = process_b3_movimentation_request(request)
-    return render_template('view_movimentation.html', table=df.to_html(classes='table table-striped'), filterForm=filterForm)
+    return render_template('view_movimentation.html',
+                           table=df.to_html(classes='table table-striped'), filterForm=filterForm)
 
 @app.route('/b3_negotiation', methods=['GET', 'POST'])
 def view_negotiation():
     df = process_b3_negotiation_request(request)
-    return render_template('view_negotiation.html', table=df.to_html(classes='table table-striped'))
+    return render_template('view_negotiation.html',
+                           table=df.to_html(classes='table table-striped'))
 
 @app.route('/avenue', methods=['GET', 'POST'])
 def view_extract():
     df = process_avenue_extract_request(request)
-    return render_template('view_extract.html', table=df.to_html(classes="table table-striped"))
+    return render_template('view_extract.html',
+                           table=df.to_html(classes="table table-striped"))
 
 @app.route('/generic', methods=['GET', 'POST'])
 def view_generic_extract():
@@ -119,9 +122,9 @@ def view_generic_extract():
             app.logger.info('Added new entry to database!')
             flash('Entry added successfully!')
             return redirect(url_for('view_generic_extract'))
-        else:
-            app.logger.info('New entry already exists in the database!')
-            flash('Entry already exists in the database.')
+        
+        app.logger.info('New entry already exists in the database!')
+        flash('Entry already exists in the database.')
     else:
         app.logger.debug(f'Not submit. Errors: {add_form.errors}')
         for field, errors in add_form.errors.items():
@@ -129,7 +132,8 @@ def view_generic_extract():
                 flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
 
     df = process_generic_extract_request(request)
-    return render_template('view_generic.html', table=df.to_html(classes='table table-striped'), addForm=add_form)
+    return render_template('view_generic.html',
+                           table=df.to_html(classes='table table-striped'), addForm=add_form)
 
 def view_asset_helper(asset_info):
     dataframes = asset_info['dataframes']
@@ -142,8 +146,10 @@ def view_asset_helper(asset_info):
 
     classes='table table-striped'
 
-    buys = buys[['Date', 'Movimentation', 'Quantity', 'Price', 'Total']].to_html(classes=classes, index=False)
-    sells = sells[['Date','Movimentation','Quantity','Price', 'Total', 'Realized Gain']].to_html(classes=classes, index=False)
+    buys = buys[['Date', 'Movimentation', 'Quantity', 'Price',
+                 'Total']].to_html(classes=classes, index=False)
+    sells = sells[['Date','Movimentation','Quantity','Price',
+                   'Total', 'Realized Gain']].to_html(classes=classes, index=False)
     wages = wages[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
     taxes = taxes[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
     movimentation = movimentation.to_html(classes=classes, index=False)
