@@ -4,7 +4,7 @@
 
     <div class="row">
         <div class="col-md-4">
-            <div class="p-3 border bg-light">
+            <div class="p-3 border">
                 <h2>Information</h2>
                 <p>Ticker: {{ info['ticker'] }}</p>
                 <p>Full Name: {{ info['long_name'] }}</p>
@@ -26,7 +26,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 border bg-light">
+            <div class="p-3 border">
                 <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
                 <p>quoteType: {{ extended_info['quoteType'] }}</p>
                 {% if 'marketCap' in extended_info %}<p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
@@ -43,7 +43,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 border bg-light">
+            <div class="p-3 border">
                 <p><a href="{{ extended_info['website'] }}" target="_blank">Web Site</a></p>
                 <p>industry: {{ extended_info['industry'] }}</p>
                 <p>sector: {{ extended_info['sector'] }}</p>
@@ -55,7 +55,7 @@
     {% if graph_html %}
     <div class="row">
         <div class="col-md-12">
-            <div class="p-3 m-3 border bg-light">
+            <div class="p-3 m-3 border">
                 <div class="container">
                     <h2>Price History</h2>
                     <div>{{ graph_html|safe }}</div>
@@ -67,7 +67,7 @@
 
     <div class="row">
         <div class="col-md-6">
-            <div class="p-3 m-3 border bg-light">
+            <div class="p-3 m-3 border">
                 <h2>Buys</h2>
                 <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
                 <div class="container-fluid">
@@ -76,7 +76,7 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="p-3 m-3 border bg-light">
+            <div class="p-3 m-3 border">
                 <h2>Sells</h2>
                 <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
                 <div class="container-fluid">
@@ -88,7 +88,7 @@
 
     <div class="row">
         <div class="col-md-4">
-            <div class="p-3 m-3 border bg-light">
+            <div class="p-3 m-3 border">
                 <h2>Wages</h2>
                 <div class="container-fluid">
                     {{ wages|safe }}
@@ -96,7 +96,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 m-3 border bg-light">
+            <div class="p-3 m-3 border">
                 <h2>Taxes</h2>
                 <div class="container-fluid">
                     {{ taxes|safe }}
@@ -104,7 +104,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 m-3 border bg-light">
+            <div class="p-3 m-3 border">
                 {% if rent %}
                 <h2>Rent</h2>
                 <div class="container-fluid">
