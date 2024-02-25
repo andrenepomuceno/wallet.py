@@ -171,7 +171,7 @@ def get_yfinance_data(ticker, asset_info):
     long_name = info['longName']
 
     data = stock.history(period='1d')
-    last_close_price = data['Close'][0]
+    last_close_price = data['Close'].iloc[0]
 
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
@@ -279,7 +279,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     capital_gain = realized_gain + not_realized_gain + wages_sum + rent_wages_sum
 
-    rentability = capital_gain/liquid_cost
+    rentability = capital_gain/liquid_cost if liquid_cost > 0 else 0
 
     anualized_rentability = 0
     if age_years is not None and age_years > 0:
