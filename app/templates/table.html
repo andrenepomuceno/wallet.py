@@ -1,15 +1,23 @@
-{% macro render(df) -%}
+{% macro render(df, enable_index=False, enable_controls=False) -%}
 <div class="table table-sm table-striped mt-3">
     <table
     data-toggle="table"
+    pagination="true"
     data-sticky-header="true"
     data-fixed-columns="true"
     data-fixed-number="1"
+    {% if enable_controls %}
     data-show-columns="true"
     data-show-columns-toggle-all="true"
+    {% endif %}
     >
         <thead>
             <tr>
+                {% if enable_index %}
+                <th data-sortable="true">
+                    Index
+                </th>
+                {% endif %}
                 {% for column in df.columns %}
                 <th data-sortable="true">
                     {{ column|safe }}
@@ -18,7 +26,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for row in df.itertuples(index=False) %}
+            {% for row in df.itertuples(index=enable_index) %}
             <tr>
                 {% for item in row %}
                 <td>
