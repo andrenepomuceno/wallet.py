@@ -36,7 +36,7 @@ def scrape_data(url, xpath):
         app.logger.error("Erro ao realizar o scraping: %s", e)
 
 def usd_exchange_rate(currency = 'BRL'):
-    app.logger.info('usd_exchange_rate')
+    app.logger.debug('usd_exchange_rate')
     url = 'https://api.exchangerate-api.com/v4/latest/USD'
     try:
         response = request_cache.get(url)
@@ -433,8 +433,8 @@ def process_b3_asset_request(asset):
          | (credit['Movimentation'] == "Juros Sobre Capital Próprio")
          | (credit['Movimentation'] == "Reembolso")
          | (credit['Movimentation'] == "Rendimento")
-         | (credit['Movimentation'] == "Leilão de Fração"))
-         | (credit['Movimentation'] == "Resgate")
+         | (credit['Movimentation'] == "Leilão de Fração")
+         | (credit['Movimentation'] == "Resgate"))
     ]
     dataframes['wages'] = wages
 
@@ -529,7 +529,7 @@ def process_generic_extract_request():
     return extract
 
 def process_generic_asset_request(asset):
-    app.logger.info(f'Processing view_generic_asset_request for "{asset}".')
+    app.logger.info('Processing view_generic_asset_request for %s.', asset)
 
     asset_info = {}
     dataframes = {}
@@ -542,7 +542,7 @@ def process_generic_asset_request(asset):
     result = query.all()
     extract_df = generic_extract_sql_to_df(result)
     if len(extract_df) == 0:
-        app.logger.warning(f'Extract data not found for {asset}')
+        app.logger.warning('Extract data not found for %s', asset)
         return asset_info
 
     dataframes['movimentation'] = extract_df
@@ -580,70 +580,44 @@ def process_generic_asset_request(asset):
 
     return asset_info
 
-def process_consolidate_request():
-    app.logger.info('process_consolidate_request')
+def load_products(query, sql_to_df_func):
+    result = query.all()
+    df = sql_to_df_func(result)
+    if len(df) <= 0:
+        return []
 
-    ret = {}
-    ret['valid'] = False
+    products = df['Asset'].unique().tolist()
+    return products
 
-    def load_products(query, sql_to_df):
-        result = query.all()
-        df = sql_to_df(result)
-        products = pd.DataFrame()
-        if len(df) <= 0:
-            return products
-
-        products = df['Asset'].unique().tolist()
-        return products
-
-    def load_consolidate(products, process, route):
-        consolidate = pd.DataFrame()
-        if len(products) <= 0:
-            return consolidate
-
-        for product in products:
-            if product == '':
-                continue
-            asset_info = process(product)
-            new_row = pd.DataFrame([asset_info])
-            consolidate = pd.concat([consolidate, new_row], ignore_index=True)
-
-        consolidate['url'] = consolidate['name'].apply(
-            lambda x: f"<a href='/{route}/{x}' target='_blank'>{x}</a>")
-
+def load_consolidate(asset_list, process_asset_func, page_route):
+    consolidate = pd.DataFrame()
+    if len(asset_list) <= 0:
         return consolidate
 
-    products_neg = load_products(B3Negotiation.query, b3_negotiation_sql_to_df)
-    products_mov = load_products(B3Movimentation.query, b3_movimentation_sql_to_df)
-    b3_products = list(set(products_neg) | set(products_mov))
-    b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'view/b3')
+    for asset in asset_list:
+        if asset == '':
+            continue
+        asset_info = process_asset_func(asset)
+        new_row = pd.DataFrame([asset_info])
+        consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
-    avenue_products = load_products(AvenueExtract.query, avenue_extract_sql_to_df)
-    avenue_consolidate = load_consolidate(avenue_products,
-                                          process_avenue_asset_request, 'view/avenue')
+    consolidate['url'] = consolidate['name'].apply(
+        lambda x: f"<a href='/{page_route}/{x}' target='_blank'>{x}</a>")
 
-    generic_products = load_products(GenericExtract.query, generic_extract_sql_to_df)
-    generic_consolidate = load_consolidate(generic_products,
-                                           process_generic_asset_request, 'view/generic')
+    return consolidate
 
-    consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
-    if len(consolidate) == 0:
-        return ret
+def consolidate_total(df, rate = 1.0, currency='BRL', asset_class=''):
+    total = df.select_dtypes(include=['number']).sum() * rate
 
-    consolidate = consolidate.sort_values(by='rentability', ascending=False)
-    # ret['consolidate'] = consolidate
+    total['rentability'] = 100 * (total['capital_gain']/total['liquid_cost'])
+    total = total.round(2)
 
-    def consolidate_total(df, rate = 1.0, currency='BRL', asset_class=''):
-        total = df.select_dtypes(include=['number']).sum() * rate
+    total['currency'] = currency
+    total['asset_class'] = asset_class
 
-        total['rentability'] = 100 * (total['capital_gain']/total['liquid_cost'])
-        total = total.round(2)
+    return total
 
-        total['currency'] = currency
-        total['asset_class'] = asset_class
-
-        return total
-
+def consolidate_group(consolidate):
     grouped = consolidate.groupby(['currency','asset_class'])
     consolidate_by_group = pd.DataFrame()
     group_df = []
@@ -666,14 +640,44 @@ def process_consolidate_request():
             'taxes_sum': 'taxes',
             'position_total': 'position'
         })
-        group_consolidate = consolidate_total(group_consolidate, rate, currency, asset_class)
-        group_df += [{'name': asset_class, 'df': group, 'consolidate': group_consolidate}]
+        group_total = consolidate_total(group_consolidate, rate, currency, asset_class)
+        group_df += [{'name': asset_class, 'df': group, 'consolidate': group_total}]
 
-        new_row = pd.DataFrame([group_consolidate])
+        new_row = pd.DataFrame([group_total])
         consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
 
     consolidate_by_group['relative_position'] = round(
         consolidate_by_group['position']/consolidate_by_group['position'].sum() * 100, 2)
+
+    return consolidate_by_group, group_df
+
+def process_consolidate_request():
+    app.logger.info('process_consolidate_request')
+
+    ret = {}
+    ret['valid'] = False
+
+    products_neg = load_products(B3Negotiation.query, b3_negotiation_sql_to_df)
+    products_mov = load_products(B3Movimentation.query, b3_movimentation_sql_to_df)
+    b3_products = list(set(products_neg) | set(products_mov))
+    b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'view/b3')
+
+    avenue_products = load_products(AvenueExtract.query, avenue_extract_sql_to_df)
+    avenue_consolidate = load_consolidate(avenue_products,
+                                          process_avenue_asset_request, 'view/avenue')
+
+    generic_products = load_products(GenericExtract.query, generic_extract_sql_to_df)
+    generic_consolidate = load_consolidate(generic_products,
+                                           process_generic_asset_request, 'view/generic')
+
+    consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
+    if len(consolidate) == 0:
+        return ret
+
+    consolidate = consolidate.sort_values(by='rentability', ascending=False)
+    # ret['consolidate'] = consolidate
+
+    consolidate_by_group, group_df = consolidate_group(consolidate)
 
     total = consolidate_total(consolidate_by_group, 1, 'BRL', 'Total')
     new_row = pd.DataFrame([total])

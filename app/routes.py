@@ -195,6 +195,9 @@ def view_asset(source=None, asset=None):
     else:
         abort(404)
 
+    if not asset_info['valid']:
+        abort(404)
+
     return view_asset_helper(asset_info)
 
 @app.route('/consolidate', methods=['GET', 'POST'])
