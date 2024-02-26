@@ -47,9 +47,8 @@ def usd_exchange_rate(currency = 'BRL'):
         return f"Error getting exchange rate quotation: {e}"
 
 def process_b3_movimentation_request(request):
-    app.logger.info('view_movimentation_request')
+    app.logger.info('process_b3_movimentation_request')
 
-    df = pd.DataFrame()
     query = B3Movimentation.query.order_by(B3Movimentation.data.asc())
 
     if request.method == 'POST':
@@ -67,26 +66,33 @@ def process_b3_movimentation_request(request):
 
     result = query.all()
     df = b3_movimentation_sql_to_df(result)
-    if len(df) == 0:
-        return df
-
-    #print(df['Asset'].value_counts())
-    #print(df['Produto'].value_counts())
-
-    #grouped = df[['Entrada/Saída', 'Movimentation']].groupby(['Entrada/Saída'])
-    #print(grouped.value_counts())
-
-    # print(df['Movimentation'].value_counts())
-
     return df
 
 def process_b3_negotiation_request():
-    app.logger.info('view_negotiation_request')
+    app.logger.info('process_b3_negotiation_request')
 
     query = B3Negotiation.query.order_by(B3Negotiation.data.asc())
     result = query.all()
     df = b3_negotiation_sql_to_df(result)
     return df
+
+def process_avenue_extract_request():
+    app.logger.info('process_avenue_extract_request')
+
+    query = AvenueExtract.query.order_by(AvenueExtract.data.asc())
+    result = query.all()
+    extract = avenue_extract_sql_to_df(result)
+
+    return extract
+
+def process_generic_extract_request():
+    app.logger.info('process_generic_extract_request')
+
+    query = GenericExtract.query.order_by(GenericExtract.date.asc())
+    result = query.all()
+    extract = generic_extract_sql_to_df(result)
+
+    return extract
 
 def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentation_type):
     df_merged = pd.DataFrame()
@@ -450,15 +456,6 @@ def process_b3_asset_request(asset):
 
     return asset_info
 
-def process_avenue_extract_request():
-    app.logger.info('process_avenue_extract_request')
-
-    query = AvenueExtract.query.order_by(AvenueExtract.data.asc())
-    result = query.all()
-    extract = avenue_extract_sql_to_df(result)
-
-    return extract
-
 def process_avenue_asset_request(asset):
     app.logger.info('Processing view_extract_asset_request for "%s".', asset)
 
@@ -518,15 +515,6 @@ def process_avenue_asset_request(asset):
 
     asset_info['dataframes'] = dataframes
     return asset_info
-
-def process_generic_extract_request():
-    app.logger.info('process_generic_extract_request')
-
-    query = GenericExtract.query.order_by(GenericExtract.date.asc())
-    result = query.all()
-    extract = generic_extract_sql_to_df(result)
-
-    return extract
 
 def process_generic_asset_request(asset):
     app.logger.info('Processing view_generic_asset_request for %s.', asset)
