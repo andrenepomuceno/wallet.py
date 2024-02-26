@@ -1,0 +1,11 @@
+[MAIN]
+
+fail-under=9
+
+[MESSAGES CONTROL]
+
+disable=
+    missing-function-docstring,
+    missing-class-docstring,
+    missing-module-docstring,
+    unsubscriptable-object

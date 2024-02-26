@@ -460,7 +460,7 @@ def process_avenue_extract_request():
     return extract
 
 def process_avenue_asset_request(asset):
-    app.logger.info(f'Processing view_extract_asset_request for "{asset}".')
+    app.logger.info('Processing view_extract_asset_request for "%s".', asset)
 
     asset_info = {}
     dataframes = {}
@@ -473,7 +473,7 @@ def process_avenue_asset_request(asset):
     result = query.all()
     extract_df = avenue_extract_sql_to_df(result)
     if len(extract_df) == 0:
-        app.logger.warning(f'Extract data not found for {asset}')
+        app.logger.warning('Extract data not found for %s', asset)
         return asset_info
 
     extract_df['Total'] = abs(extract_df['Total'])
