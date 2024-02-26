@@ -232,19 +232,20 @@ def consolidate_asset_info(dataframes, asset_info):
     if 'rent_wages' in dataframes:
         rent_wages = dataframes['rent_wages']
 
-    first_buy = None
-    age_years = 0
     last_close_price = 0
-    last_sell = pd.to_datetime("today")
 
     buy_quantity = buys['Quantity'].sum()
     sell_quantity = abs(sells['Quantity'].sum())
     shares = round(buy_quantity - sell_quantity, 8) # avoid machine precision errors on zero
 
+    last_sell = pd.to_datetime("today")
+    if shares <= 0 and len(sells) > 0:
+        last_sell = sells.iloc[-1]['Date']
+
+    first_buy = None
+    age_years = 0
     if len(buys) > 0:
         first_buy = buys.iloc[0]['Date']
-        if shares <= 0 and len(sells) > 0:
-            last_sell = sells.iloc[-1]['Date']
         age_years = last_sell - first_buy
         age_years = age_years.days/365
 
@@ -252,10 +253,10 @@ def consolidate_asset_info(dataframes, asset_info):
     avg_price = calc_avg_price(buys)
 
     wages_sum = wages['Total'].sum()
+    rent_wages_sum = 0
     if rent_wages is not None:
         rent_wages_sum = rent_wages['Total'].sum()
-    else:
-        rent_wages_sum = 0
+
     taxes_sum = taxes['Total'].sum()
 
     liquid_cost = cost - wages_sum - rent_wages_sum + taxes_sum

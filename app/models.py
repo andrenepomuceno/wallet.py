@@ -98,7 +98,7 @@ class AvenueExtract(db.Model):
     def __repr__(self):
         return f'<AvenueExtract {self.id}>'
 
-def avenue_extract_sql_to_df(result):
+def avenue_extract_sql_to_df(result) -> pd.DataFrame:
     df = pd.DataFrame([(
         d.data, d.hora, d.liquidacao, d.descricao,
         d.valor, d.saldo, d.entrada_saida, d.produto,

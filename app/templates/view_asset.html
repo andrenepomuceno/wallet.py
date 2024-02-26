@@ -114,13 +114,17 @@
         </div>
     </div>
 
+    {% if not negotiation.empty %}
     <h2>Negotiation (All)</h2>
     <div class="container-fluid">
         {{ table.render(negotiation) }}
     </div>
+    {% endif %}
     
+    {% if not movimentation.empty %}
     <h2>Movimentation (All)</h2>
     <div class="container-fluid">
         {{ table.render(movimentation) }}
     </div>
+    {% endif %}
 {% endblock %}
