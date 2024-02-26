@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import 'table.html' as table %}
 {% block content %}
     <h1>Asset Data for "{{ info['name'] }}"</h1>
 
@@ -29,10 +30,10 @@
             <div class="p-3 border">
                 <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
                 <p>quoteType: {{ extended_info['quoteType'] }}</p>
-                {% if 'marketCap' in extended_info %}<p>marketCap: {{ info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
-                {% if 'totalCash' in extended_info %}<p>totalCash: {{ info['currency'] }} {{ extended_info['totalCash'] | format_money }}</p>{% endif %}
-                {% if 'totalDebt' in extended_info %}<p>totalDebt: {{ info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</p>{% endif %}
-                {% if 'ebitda' in extended_info %}<p>ebitda: {{ info['currency'] }} {{ extended_info['ebitda'] | format_money }}</p>{% endif %}
+                {% if 'marketCap' in extended_info %}<p>marketCap: {{ extended_info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
+                {% if 'totalCash' in extended_info %}<p>totalCash: {{ extended_info['currency'] }} {{ extended_info['totalCash'] | format_money }}</p>{% endif %}
+                {% if 'totalDebt' in extended_info %}<p>totalDebt: {{ extended_info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</p>{% endif %}
+                {% if 'ebitda' in extended_info %}<p>ebitda: {{ extended_info['currency'] }} {{ extended_info['ebitda'] | format_money }}</p>{% endif %}
                 <p>dividendRate: {{ extended_info['dividendRate'] }}</p>
                 <p>dividendYield: {{ extended_info['dividendYield'] }}</p>
                 <p>payoutRatio: {{ extended_info['payoutRatio'] }}</p>
@@ -71,7 +72,7 @@
                 <h2>Buys</h2>
                 <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
                 <div class="container-fluid">
-                    {{ buys|safe }}
+                    {{ table.render(buys) }}
                 </div>
             </div>
         </div>
@@ -80,7 +81,7 @@
                 <h2>Sells</h2>
                 <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
                 <div class="container-fluid">
-                    {{ sells|safe }}
+                    {{ table.render(sells) }}
                 </div>
             </div>
         </div>
@@ -91,7 +92,7 @@
             <div class="p-3 m-3 border">
                 <h2>Wages</h2>
                 <div class="container-fluid">
-                    {{ wages|safe }}
+                    {{ table.render(wages) }}
                 </div>
             </div>
         </div>
@@ -99,31 +100,27 @@
             <div class="p-3 m-3 border">
                 <h2>Taxes</h2>
                 <div class="container-fluid">
-                    {{ taxes|safe }}
+                    {{ table.render(taxes) }}
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="p-3 m-3 border">
-                {% if rent %}
                 <h2>Rent</h2>
                 <div class="container-fluid">
-                    {{ rent|safe }}
-                </div>
-                {% endif %}
+                    {{ table.render(rent) }}
+                </div>            
             </div>
         </div>
     </div>
 
-    {% if negotiation %}
-        <h2>Negotiation (All)</h2>
-        <div class="container-fluid">
-            {{ negotiation|safe }}
-        </div>
-    {% endif %}
-
+    <h2>Negotiation (All)</h2>
+    <div class="container-fluid">
+        {{ table.render(negotiation) }}
+    </div>
+    
     <h2>Movimentation (All)</h2>
     <div class="container-fluid">
-        {{ movimentation|safe }}
+        {{ table.render(movimentation) }}
     </div>
 {% endblock %}

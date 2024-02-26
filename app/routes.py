@@ -22,7 +22,6 @@ def format_money(value):
     elif value >= 1e3:
         return f"{value / 1e3:.2f} K"
     return str(value)
-
 app.jinja_env.filters['format_money'] = format_money
 
 @app.route('/', methods=['GET', 'POST'])
@@ -149,27 +148,23 @@ def view_asset_helper(asset_info):
     movimentation = dataframes['movimentation']
     extended_info=asset_info['info']
 
-    classes='table table-striped'
-
     buys = buys[['Date', 'Movimentation', 'Quantity', 'Price',
-                 'Total']].to_html(classes=classes, index=False)
+                 'Total']]
     sells = sells[['Date','Movimentation','Quantity','Price',
-                   'Total', 'Realized Gain']].to_html(classes=classes, index=False)
-    wages = wages[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
-    taxes = taxes[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
-    movimentation = movimentation.to_html(classes=classes, index=False)
+                   'Total', 'Realized Gain']]
+    wages = wages[['Date', 'Total', 'Movimentation']]
+    taxes = taxes[['Date', 'Total', 'Movimentation']]
 
-    graph_html = plot_price_history(asset_info, buys)
+    graph_html = plot_price_history(asset_info)
 
-    negotiation = None
+    negotiation = pd.DataFrame()
     if 'negotiation' in dataframes:
         negotiation = dataframes['negotiation']
-        negotiation = negotiation.to_html(classes=classes, index=False)
 
-    rent = None
+    rent = pd.DataFrame()
     if 'rent_wages' in dataframes:
         rent = dataframes['rent_wages']
-        rent = rent[['Date', 'Total', 'Movimentation']].to_html(classes=classes, index=False)
+        rent = rent[['Date', 'Total', 'Movimentation']]
 
     return render_template(
         'view_asset.html',

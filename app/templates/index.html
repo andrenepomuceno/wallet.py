@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="container">
     <h1>File Upload</h1>
-
     <form id="uploadForm" method="post" enctype="multipart/form-data">
         <div class="form-group">
             <input type="file" name="file" accept=".csv, .xlsx">
@@ -9,12 +9,13 @@
         <div class="form-group">
             <label for="filetype">File Type</label>
             <select class="form-control" id="filetype" name="filetype">
-              <option>B3 Negotiation</option>
-              <option>B3 Movimentation</option>
-              <option>Avenue Extract</option>
-              <option>Generic Extract</option>
+            <option>B3 Negotiation</option>
+            <option>B3 Movimentation</option>
+            <option>Avenue Extract</option>
+            <option>Generic Extract</option>
             </select>
-          </div>
+        </div>
         <button type="submit" class="btn btn-primary">Upload</button>
     </form>
+</div>
 {% endblock %}

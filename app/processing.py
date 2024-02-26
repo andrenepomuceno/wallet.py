@@ -30,12 +30,10 @@ def scrape_data(url, xpath):
         tree = html.fromstring(response.content)
         elements = tree.xpath(xpath)
         ret = [element.text_content().strip() for element in elements]
-        print('Scrap done!')
+        app.logger.info('Scrap done!')
         return ret
-    except requests.RequestException as e:
-        print(f"Erro ao acessar a URL: {e}")
     except Exception as e:
-        print(f"Erro ao realizar o scraping: {e}")
+        app.logger.error("Erro ao realizar o scraping: %s", e)
 
 def usd_exchange_rate(currency = 'BRL'):
     app.logger.info('usd_exchange_rate')
@@ -72,11 +70,11 @@ def process_b3_movimentation_request(request):
     if len(df) == 0:
         return df
 
-    print(df['Asset'].value_counts())
+    #print(df['Asset'].value_counts())
     #print(df['Produto'].value_counts())
 
-    grouped = df[['Entrada/Saída', 'Movimentation']].groupby(['Entrada/Saída'])
-    print(grouped.value_counts())
+    #grouped = df[['Entrada/Saída', 'Movimentation']].groupby(['Entrada/Saída'])
+    #print(grouped.value_counts())
 
     # print(df['Movimentation'].value_counts())
 
@@ -103,8 +101,7 @@ def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentat
         'Date': 'Date',
         "Preço": 'Price',
         "Valor": 'Total',
-        "Código de Negociação":
-        "Produto"
+        "Código de Negociação": "Produto"
     }, inplace=True)
     df2['Movimentation'] = movimentation_type
     df2 = df2[columns]
@@ -120,7 +117,7 @@ def calc_avg_price(df):
     avg_price = cost / quantity if quantity > 0 else 0
     return avg_price
 
-def plot_price_history(asset_info, buys):
+def plot_price_history(asset_info):
     if 'info' not in asset_info:
         return None
 
@@ -141,7 +138,7 @@ def plot_price_history(asset_info, buys):
             name=ma_name
         )
 
-    print(buys)
+    # print(buys)
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
@@ -162,6 +159,7 @@ def plot_price_history(asset_info, buys):
     return graph_html
 
 def get_yfinance_data(ticker, asset_info):
+    """Scrape yfinance online data for the specified asset"""
     stock = yf.Ticker(ticker, session=request_cache)
     info = stock.info
 
@@ -180,7 +178,8 @@ def get_yfinance_data(ticker, asset_info):
     asset_info['info'] = stock.info
 
 def get_online_info(ticker, asset_info = None):
-    app.logger.info(f'Scraping data for {ticker}')
+    """Scrape online data for the specified asset"""
+    app.logger.info('Scraping data for %s', ticker)
 
     ticker_blacklist = ['VVAR3']
     if ticker in ticker_blacklist:
@@ -212,13 +211,23 @@ def get_online_info(ticker, asset_info = None):
             get_yfinance_data(ticker, asset_info)
 
     except Exception as e:
-        app.logger.warning(f'Exception: {e}')
+        app.logger.warning('Exception: %s', e)
 
     return asset_info
 
-def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_info):
+def consolidate_asset_info(dataframes, asset_info):
+    ticker = asset_info['ticker']
+    buys = dataframes['buys']
+    sells = dataframes['sells'].copy()
+    taxes = dataframes['taxes']
+    wages = dataframes['wages']
+
+    rent_wages = None
+    if 'rent_wages' in dataframes:
+        rent_wages = dataframes['rent_wages']
+
     first_buy = None
-    age_years = None
+    age_years = 0
     last_close_price = 0
     last_sell = pd.to_datetime("today")
 
@@ -258,7 +267,7 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
         last_avg_price = calc_avg_price(buys_before_sell)
         realized = (price - last_avg_price) * quantity
 
-        sells.at[index, 'Realized Gain'] = realized
+        sells.loc[index, 'Realized Gain'] = realized
 
     realized_gain = sells['Realized Gain'].sum()
 
@@ -333,12 +342,14 @@ def consolidate_asset_info(ticker, buys, sells, taxes, wages, rent_wages, asset_
 
     asset_info['valid'] = True
 
+    dataframes['sells'] = sells
+
     # app.logger.debug(print(json.dumps(asset_info, indent = 4)))
 
     return asset_info
 
 def process_b3_asset_request(asset):
-    app.logger.info(f'Processing view asset request for "{asset}".')
+    app.logger.info('Processing view asset request for %s.', asset)
 
     columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
 
@@ -370,41 +381,40 @@ def process_b3_asset_request(asset):
             )
         ]
     else:
-        app.logger.warning(f'Movimentation data not found for {asset}')
+        app.logger.warning('Movimentation data not found for %s', asset)
         movimentation_df = pd.DataFrame(columns=columns)
         credit = pd.DataFrame(columns=columns)
         debit = pd.DataFrame(columns=columns)
         buys = pd.DataFrame(columns=columns)
         sells = pd.DataFrame(columns=columns)
 
-
     dataframes['movimentation'] = movimentation_df
 
     query = B3Negotiation.query.filter(
         B3Negotiation.codigo.like(f'%{asset}%')).order_by(B3Negotiation.data.asc())
     result = query.all()
-    negotiation = b3_negotiation_sql_to_df(result)
-    if len(negotiation) > 0:
-        ticker = negotiation['Asset'].value_counts().index[0]
+    negotiation_df = b3_negotiation_sql_to_df(result)
+    if len(negotiation_df) > 0:
+        ticker = negotiation_df['Asset'].value_counts().index[0]
 
-        negotiation_buys = negotiation.loc[
+        negotiation_buys = negotiation_df.loc[
             (
-                (negotiation['Movimentation'] == "Compra")
+                (negotiation_df['Movimentation'] == "Compra")
             )
         ]
 
-        negotiation_sells = negotiation.loc[
+        negotiation_sells = negotiation_df.loc[
             (
-                (negotiation['Movimentation'] == "Venda")
+                (negotiation_df['Movimentation'] == "Venda")
             )
         ]
     else:
-        app.logger.warning(f'Negotiation data not found for {asset}!')
-        negotiation = pd.DataFrame(columns=columns)
+        app.logger.warning('Negotiation data not found for %s!', asset)
+        negotiation_df = pd.DataFrame(columns=columns)
         negotiation_buys = pd.DataFrame(columns=columns)
         negotiation_sells = pd.DataFrame(columns=columns)
 
-    dataframes['negotiation'] = negotiation
+    dataframes['negotiation'] = negotiation_df
     asset_info['ticker'] = ticker
 
     buys = merge_movimentation_negotiation(buys, negotiation_buys, 'Compra')
@@ -434,7 +444,7 @@ def process_b3_asset_request(asset):
     )]
     dataframes['rent_wages'] = rents_wage
 
-    consolidate_asset_info(ticker, buys, sells, taxes, wages, rents_wage, asset_info)
+    consolidate_asset_info(dataframes, asset_info)
 
     asset_info['dataframes'] = dataframes
 
@@ -504,7 +514,7 @@ def process_avenue_asset_request(asset):
     ]
     dataframes['wages'] = wages
 
-    consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info)
+    consolidate_asset_info(dataframes, asset_info)
 
     asset_info['dataframes'] = dataframes
     return asset_info
@@ -564,7 +574,7 @@ def process_generic_asset_request(asset):
     ]
     dataframes['wages'] = wages
 
-    consolidate_asset_info(ticker, buys, sells, taxes, wages, None, asset_info)
+    consolidate_asset_info(dataframes, asset_info)
 
     asset_info['dataframes'] = dataframes
 

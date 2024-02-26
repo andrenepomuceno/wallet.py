@@ -221,8 +221,6 @@ def import_generic_extract(df, filepath):
     df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0.0)
     df['Movimentation'] = df['Movimentation'].fillna('')
 
-    print(df.to_string())
-
     app.logger.info('Inserting data into database...')
     duplicates = 0
     added = 0

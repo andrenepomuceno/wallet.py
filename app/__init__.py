@@ -24,3 +24,11 @@ if not os.path.exists(UPLOADS_FOLDER):
     os.makedirs(UPLOADS_FOLDER)
 
 from app import routes
+
+# for key in logging.Logger.manager.loggerDict:
+#     print(key)
+
+# logging.getLogger("requests").setLevel(logging.ERROR)
+logging.getLogger("requests_cache").setLevel(logging.ERROR)
+logging.getLogger("peewee").setLevel(logging.ERROR)
+logging.getLogger("yfinance").setLevel(logging.ERROR)
