@@ -38,7 +38,7 @@ def home():
 
     filepath = os.path.join(UPLOADS_FOLDER, file.filename)
     file.save(filepath)
-    app.logger.debug(f'File {file.filename} saved at {filepath}.')
+    app.logger.debug('File %s saved at %s.', file.filename, filepath)
 
     if filepath.endswith('.csv'):
         df = pd.read_csv(filepath)
@@ -48,7 +48,7 @@ def home():
         flash('Error! Filetype not supported.')
         return render_template('index.html')
 
-    app.logger.debug(f'File {file.filename} loaded to dataframe!')
+    app.logger.debug('File %s loaded to dataframe!', file.filename)
 
     redirect_url = 'home'
     success = False
@@ -141,12 +141,12 @@ def view_generic_extract():
 
 def view_asset_helper(asset_info):
     dataframes = asset_info['dataframes']
+    extended_info=asset_info['info']
+    
     buys = dataframes['buys']
     sells = dataframes['sells']
     wages = dataframes['wages']
     taxes = dataframes['taxes']
-    movimentation = dataframes['movimentation']
-    extended_info=asset_info['info']
 
     buys = buys[['Date', 'Movimentation', 'Quantity', 'Price',
                  'Total']]
@@ -156,6 +156,10 @@ def view_asset_helper(asset_info):
     taxes = taxes[['Date', 'Total', 'Movimentation']]
 
     graph_html = plot_price_history(asset_info)
+
+    movimentation = pd.DataFrame()
+    if 'movimentation' in dataframes:
+        movimentation = dataframes['movimentation']
 
     negotiation = pd.DataFrame()
     if 'negotiation' in dataframes:
