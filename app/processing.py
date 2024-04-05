@@ -1,3 +1,4 @@
+import json
 import re
 import requests
 import requests_cache
@@ -49,7 +50,7 @@ def usd_exchange_rate(currency = 'BRL'):
 def process_b3_movimentation_request(request):
     app.logger.info('process_b3_movimentation_request')
 
-    query = B3Movimentation.query.order_by(B3Movimentation.data.asc())
+    query = B3Movimentation.query.order_by(B3Movimentation.data.desc())
 
     if request.method == 'POST':
         filters = request.form.to_dict()
@@ -71,7 +72,7 @@ def process_b3_movimentation_request(request):
 def process_b3_negotiation_request():
     app.logger.info('process_b3_negotiation_request')
 
-    query = B3Negotiation.query.order_by(B3Negotiation.data.asc())
+    query = B3Negotiation.query.order_by(B3Negotiation.data.desc())
     result = query.all()
     df = b3_negotiation_sql_to_df(result)
     return df
@@ -79,7 +80,7 @@ def process_b3_negotiation_request():
 def process_avenue_extract_request():
     app.logger.info('process_avenue_extract_request')
 
-    query = AvenueExtract.query.order_by(AvenueExtract.data.asc())
+    query = AvenueExtract.query.order_by(AvenueExtract.data.desc())
     result = query.all()
     extract = avenue_extract_sql_to_df(result)
 
@@ -88,7 +89,7 @@ def process_avenue_extract_request():
 def process_generic_extract_request():
     app.logger.info('process_generic_extract_request')
 
-    query = GenericExtract.query.order_by(GenericExtract.date.asc())
+    query = GenericExtract.query.order_by(GenericExtract.date.desc())
     result = query.all()
     extract = generic_extract_sql_to_df(result)
 
@@ -176,12 +177,16 @@ def get_yfinance_data(ticker, asset_info):
 
     data = stock.history(period='1d')
     last_close_price = data['Close'].iloc[0]
+    # last_day_close_price = data['Close'].iloc[1]
 
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
     asset_info['long_name'] = long_name
     asset_info['asset_class'] = asset_class
     asset_info['info'] = stock.info
+    # asset_info['last_day_variation'] = round((last_close_price/last_day_close_price - 1) * 100, 2)
+
+    # print(json.dumps(stock.info, indent = 4))
 
 def get_online_info(ticker, asset_info = None):
     """Scrape online data for the specified asset"""
@@ -513,6 +518,7 @@ def process_avenue_asset_request(asset):
     dataframes['wages'] = wages
 
     consolidate_asset_info(dataframes, asset_info)
+    asset_info['currency'] = 'USD'
 
     asset_info['dataframes'] = dataframes
     return asset_info

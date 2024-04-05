@@ -35,12 +35,12 @@ def import_b3_movimentation(df, filepath):
 
         if not B3Movimentation.query.filter_by(
             origin_id=origin_id,
-            entrada_saida=row['Entrada/Saída'],
-            data=row['Data'],
-            movimentacao=row['Movimentação'],
-            produto=row['Produto'],
-            instituicao=row['Instituição'],
-            quantidade=row['Quantidade']
+            # entrada_saida=row['Entrada/Saída'],
+            # data=row['Data'],
+            # movimentacao=row['Movimentação'],
+            # produto=row['Produto'],
+            # instituicao=row['Instituição'],
+            # quantidade=row['Quantidade']
         ).first():
             new_entry = B3Movimentation(
                 origin_id=origin_id,
@@ -82,15 +82,15 @@ def import_b3_negotiation(df, filepath):
         origin_id = f'{filepath}:{file_hash}:{index}'
         if not B3Negotiation.query.filter_by(
             origin_id=origin_id,
-            data=row['Data do Negócio'],
-            tipo=row['Tipo de Movimentação'],
-            mercado=row['Mercado'],
-            prazo=row['Prazo/Vencimento'],
-            instituicao=row['Instituição'],
-            codigo=row['Código de Negociação'],
-            quantidade=row['Quantidade'],
-            preco=row['Preço'],
-            valor=row['Valor']
+            # data=row['Data do Negócio'],
+            # tipo=row['Tipo de Movimentação'],
+            # mercado=row['Mercado'],
+            # prazo=row['Prazo/Vencimento'],
+            # instituicao=row['Instituição'],
+            # codigo=row['Código de Negociação'],
+            # quantidade=row['Quantidade'],
+            # preco=row['Preço'],
+            # valor=row['Valor']
         ).first():
             new_entry = B3Negotiation(
                 origin_id=origin_id,
@@ -123,23 +123,24 @@ def extract_fill(df):
     df['Entrada/Saída'] = df['Descrição'].apply(parse_entrada_saida)
 
     def parse_produto(x):
-        match = re.search(r'(Compra de [0-9.]+|Dividendos|Corretagem) ([A-Z]{1,4})', x)
+        match = re.search(
+            r'(Compra de [0-9.]+|Venda de [0-9.]+|Dividendos|Corretagem) ([A-Z]{1,4})', x)
         if match:
             return match.group(2)
         return ''
     df['Produto'] = df['Descrição'].apply(parse_produto)
 
     def parse_movimentacao(x):
-        match = re.search(r'Câmbio|Compra|Impostos|Dividendos|Corretagem|Desdobramento', x)
+        match = re.search(r'Câmbio|Compra|Venda|Impostos|Dividendos|Corretagem|Desdobramento', x)
         if match:
             return match.group(0)
         return '???'
     df['Movimentação'] = df['Descrição'].apply(parse_movimentacao)
 
     def parse_quantidade(x):
-        match = re.search(r'Compra de ([0-9.]+)', x)
+        match = re.search(r'(Compra de|Venda de) ([0-9.]+)', x)
         if match:
-            return float(match.group(1))
+            return float(match.group(2))
         return None
     df['Quantidade'] = df['Descrição'].apply(parse_quantidade)
 
@@ -173,12 +174,12 @@ def import_avenue_extract(df, filepath):
         origin_id = f'{filepath}:{file_hash}:{index}'
         if not AvenueExtract.query.filter_by(
             origin_id=origin_id,
-            data=row['Data'],
-            hora=row['Hora'],
-            liquidacao=row['Liquidação'],
-            descricao=row['Descrição'],
-            valor=row['Valor (U$)'],
-            saldo=row['Saldo da conta (U$)'],
+            # data=row['Data'],
+            # hora=row['Hora'],
+            # liquidacao=row['Liquidação'],
+            # descricao=row['Descrição'],
+            # valor=row['Valor (U$)'],
+            # saldo=row['Saldo da conta (U$)'],
 
             # entrada_saida=row['Entrada/Saída'],
             # produto=row['Produto'],
@@ -229,12 +230,12 @@ def import_generic_extract(df, filepath):
         origin_id = f'{filepath}:{file_hash}:{index}'
         if not GenericExtract.query.filter_by(
             origin_id=origin_id,
-            date=row['Date'],
-            asset=row['Asset'],
-            movimentation=row['Movimentation'],
-            quantity=row['Quantity'],
-            price=row['Price'],
-            total=row['Total']
+            # date=row['Date'],
+            # asset=row['Asset'],
+            # movimentation=row['Movimentation'],
+            # quantity=row['Quantity'],
+            # price=row['Price'],
+            # total=row['Total']
         ).first():
             new_entry = GenericExtract(
                 origin_id=origin_id,
