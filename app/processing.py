@@ -26,7 +26,7 @@ request_cache = requests_cache.CachedSession('request_cache', expire_after=6*60*
 
 def scrape_data(url, xpath):
     try:
-        response = request_cache.get(url)
+        response = request_cache.get(url, timeout=10)
         response.raise_for_status()
         tree = html.fromstring(response.content)
         elements = tree.xpath(xpath)
