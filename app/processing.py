@@ -210,7 +210,7 @@ def get_online_info(ticker, asset_info = None):
             rate = usd_exchange_rate('BRL')
             asset_info['last_close_price'] = round(rate * asset_info['last_close_price'], 2)
             asset_info['currency'] = 'BRL'
-            asset_info['asset_class'] = 'Cripto'
+            asset_info['asset_class'] = 'Criptocurrency'
 
         elif ticker in scrape_dict:
             scrap_info = scrape_dict[ticker]
@@ -220,6 +220,7 @@ def get_online_info(ticker, asset_info = None):
 
         else:
             get_yfinance_data(ticker, asset_info)
+            asset_info['asset_class'] = asset_info['asset_class'].capitalize()
 
     except Exception as e:
         app.logger.warning('Exception: %s', e)
