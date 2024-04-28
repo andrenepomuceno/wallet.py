@@ -8,6 +8,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 import plotly.offline as pyo
 from lxml import html
+from flask import flash
 from app import app, db
 from app.models import B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
 from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
@@ -22,7 +23,7 @@ scrape_dict = {
     }
 }
 
-request_cache = requests_cache.CachedSession('request_cache', expire_after=6*60*60)
+request_cache = requests_cache.CachedSession('request_cache', expire_after=30*60)
 
 def scrape_data(url, xpath):
     try:
@@ -223,6 +224,7 @@ def get_online_info(ticker, asset_info = None):
             asset_info['asset_class'] = asset_info['asset_class'].capitalize()
 
     except Exception as e:
+        flash(f'Failed to get online data for {ticker}: {e}')
         app.logger.warning('Exception: %s', e)
 
     return asset_info
@@ -671,6 +673,7 @@ def process_consolidate_request():
         return ret
 
     consolidate = consolidate.sort_values(by='rentability', ascending=False)
+    # app.logger.debug(consolidate)
     # ret['consolidate'] = consolidate
 
     consolidate_by_group, group_df = consolidate_group(consolidate)
