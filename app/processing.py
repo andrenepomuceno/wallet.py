@@ -224,7 +224,7 @@ def get_online_info(ticker, asset_info = None):
             asset_info['asset_class'] = asset_info['asset_class'].capitalize()
 
     except Exception as e:
-        flash(f'Failed to get online data for {ticker}: {e}')
+        flash(f'Failed to get online data for {ticker}.')
         app.logger.warning('Exception: %s', e)
 
     return asset_info
