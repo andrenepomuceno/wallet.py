@@ -24,24 +24,24 @@
                 <p>Not Realized Gain: {{ info['currency'] }} {{ info['not_realized_gain'] }}</p>
                 <p>Capital Gain: {{ info['currency'] }} {{ info['capital_gain'] }}</p>
                 <p>Rentabiliy: {{ info['rentability'] }} % ({{ info['anualized_rentability'] }} %/y)</p>
-                <p>First buy: {{ info['first_buy'] }} ({{ info['age'] }} days)</p>
+                <p>First buy: {{ info['first_buy'] }} ({{ info['age_years'] }} years)</p>
             </div>
         </div>
         <div class="col-md-4">
             <div class="p-3 border">
                 <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
-                <p>quoteType: {{ extended_info['quoteType'] }}</p>
-                {% if 'marketCap' in extended_info %}<p>marketCap: {{ extended_info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
-                {% if 'totalCash' in extended_info %}<p>totalCash: {{ extended_info['currency'] }} {{ extended_info['totalCash'] | format_money }}</p>{% endif %}
-                {% if 'totalDebt' in extended_info %}<p>totalDebt: {{ extended_info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</p>{% endif %}
-                {% if 'ebitda' in extended_info %}<p>ebitda: {{ extended_info['currency'] }} {{ extended_info['ebitda'] | format_money }}</p>{% endif %}
-                <p>dividendRate: {{ extended_info['dividendRate'] }}</p>
-                <p>dividendYield: {{ extended_info['dividendYield'] }}</p>
-                <p>payoutRatio: {{ extended_info['payoutRatio'] }}</p>
-                <p>trailingEps: {{ extended_info['trailingEps'] }}</p>
-                <p>forwardEps: {{ extended_info['forwardEps'] }}</p>
-                <p>pegRatio: {{ extended_info['pegRatio'] }}</p>
-                <p>returnOnEquity: {{ extended_info['returnOnEquity'] }}</p>
+                <p>Type: {{ extended_info['quoteType'] }}</p>
+                {% if 'marketCap' in extended_info %}<p>Market Cap: {{ extended_info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
+                {% if 'totalCash' in extended_info %}<p>Total Cash: {{ extended_info['currency'] }} {{ extended_info['totalCash'] | format_money }}</p>{% endif %}
+                {% if 'totalDebt' in extended_info %}<p>Total Debt: {{ extended_info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</p>{% endif %}
+                {% if 'ebitda' in extended_info %}<p>EBITDA: {{ extended_info['currency'] }} {{ extended_info['ebitda'] | format_money }}</p>{% endif %}
+                <p>Dividend Yield: {{ extended_info['dividendYield'] }}</p>
+                <p>Dividend Rate: {{ extended_info['dividendRate'] }}</p>
+                <p>Payout Ratio: {{ extended_info['payoutRatio'] }}</p>
+                <p>Trailing EPS: {{ extended_info['trailingEps'] }}</p>
+                <p>Forward EPS: {{ extended_info['forwardEps'] }}</p>
+                <p>PEG Ratio: {{ extended_info['pegRatio'] }}</p>
+                <p>Return On Equity: {{ extended_info['returnOnEquity'] }}</p>
             </div>
         </div>
         <div class="col-md-4">
