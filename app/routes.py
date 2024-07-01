@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from flask import render_template, request, redirect, url_for, flash, abort
 from app import app, db, UPLOADS_FOLDER
-from app.models import GenericExtract
+from app.models import GenericExtract, AvenueExtract
 from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract
 from app.importing import import_generic_extract
 from app.processing import plot_price_history, process_generic_asset_request
@@ -10,7 +10,7 @@ from app.processing import process_b3_negotiation_request, process_b3_asset_requ
 from app.processing import process_consolidate_request
 from app.processing import process_avenue_extract_request, process_avenue_asset_request
 from app.processing import process_b3_movimentation_request, process_generic_extract_request
-from app.forms import B3MovimentationFilterForm, GenericExtractAddForm
+from app.forms import B3MovimentationFilterForm, GenericExtractAddForm, AvenueExtractAddForm
 
 def format_money(value):
     if value >= 1e12:
@@ -91,9 +91,62 @@ def view_negotiation():
 
 @app.route('/avenue', methods=['GET', 'POST'])
 def view_extract():
+    app.logger.info('view_extract')
+
+    add_form = AvenueExtractAddForm()
+    if add_form.validate_on_submit():
+        app.logger.info('add_form On submit.')
+
+        new_entry = AvenueExtract(
+            origin_id='FORM',
+            data=add_form.data.data,
+            hora=add_form.hora.data,
+            liquidacao=add_form.liquidacao.data,
+            descricao=add_form.descricao.data,
+            valor=add_form.valor.data,
+            saldo=add_form.saldo.data,
+
+            entrada_saida=add_form.entrada_saida.data,
+            produto=add_form.produto.data,
+            movimentacao=add_form.movimentacao.data,
+            quantidade=add_form.quantidade.data,
+            preco_unitario=add_form.preco_unitario.data
+        )
+
+        existing_entry = AvenueExtract.query.filter_by(
+            origin_id='FORM',
+            data=add_form.data.data,
+            hora=add_form.hora.data,
+            liquidacao=add_form.liquidacao.data,
+            descricao=add_form.descricao.data,
+            valor=add_form.valor.data,
+            saldo=add_form.saldo.data,
+
+            entrada_saida=add_form.entrada_saida.data,
+            produto=add_form.produto.data,
+            movimentacao=add_form.movimentacao.data,
+            quantidade=add_form.quantidade.data,
+            preco_unitario=add_form.preco_unitario.data
+        ).first()
+
+        if not existing_entry:
+            db.session.add(new_entry)
+            db.session.commit()
+            app.logger.info('Added new entry to database!')
+            flash('Entry added successfully!')
+            return redirect(url_for('view_generic_extract'))
+        
+        app.logger.info('New entry already exists in the database!')
+        flash('Entry already exists in the database.')
+    else:
+        app.logger.debug(f'Not submit. Errors: {add_form.errors}')
+        for field, errors in add_form.errors.items():
+            for error in errors:
+                flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
+
     df = process_avenue_extract_request()
     return render_template('view_extract.html',
-                           df=df)
+                           df=df, add_form=add_form)
 
 @app.route('/generic', methods=['GET', 'POST'])
 def view_generic_extract():
@@ -114,6 +167,7 @@ def view_generic_extract():
 
         if not existing_entry:
             new_entry = GenericExtract(
+                origin_id='FORM',
                 date=add_form.date.data,
                 asset=add_form.asset.data,
                 movimentation=add_form.movimentation.data,

@@ -2,6 +2,61 @@
 {% import 'table.html' as table %}
 {% block content %}
     <h1>Avenue Extract Data</h1>
+    <button type="button" class="btn btn-info" onclick="toggleDisplay('add_form')">Add Entry</button>
+    <div class="container" id="add_form" style="display: none;">
+        <h2>Add Entry</h2>
+        <form method="POST" class="form-inline">
+            {{ add_form.hidden_tag() }}
+            <div class="form-group">
+                {{ add_form.data.label(class="form-control-label") }}
+                {{ add_form.data(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.hora.label(class="form-control-label") }}
+                {{ add_form.hora(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.liquidacao.label(class="form-control-label") }}
+                {{ add_form.liquidacao(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.descricao.label(class="form-control-label") }}
+                {{ add_form.descricao(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.valor.label(class="form-control-label") }}
+                {{ add_form.valor(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.saldo.label(class="form-control-label") }}
+                {{ add_form.saldo(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.entrada_saida.label(class="form-control-label") }}
+                {{ add_form.entrada_saida(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.produto.label(class="form-control-label") }}
+                {{ add_form.produto(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.movimentacao.label(class="form-control-label") }}
+                {{ add_form.movimentacao(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.quantidade.label(class="form-control-label") }}
+                {{ add_form.quantidade(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.preco_unitario.label(class="form-control-label") }}
+                {{ add_form.preco_unitario(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+
     <div class='container-fluid'>
         {{ table.render(df, True) }}
     </div>

@@ -22,3 +22,17 @@ class B3MovimentationFilterForm(FlaskForm):
     preco_unitario = FloatField('Price')
     valor_operacao = FloatField('Total')
     submit = SubmitField('Submit')
+
+class AvenueExtractAddForm(FlaskForm):
+    data = StringField('Data', validators=[DataRequired()], default=pd.to_datetime("today"))
+    hora = StringField('Hora', validators=[DataRequired()], default=pd.to_datetime("today").time)
+    liquidacao = StringField('Liquidação', validators=[DataRequired()], default=pd.to_datetime("today").date)
+    descricao = StringField('Descrição', default='')
+    valor = FloatField('Valor (U$)', default=0)
+    saldo = FloatField('Saldo em Conta (U$)', default=0)
+    entrada_saida = StringField('Entrada/Saída', default='Credito')
+    produto = StringField('Produto')
+    movimentacao = StringField('Movimentação', validators=[DataRequired()], default='Compra')
+    quantidade = FloatField('Quantidade', default=0)
+    preco_unitario = FloatField('Preço Unitário', default=0)
+    submit = SubmitField('Submit')
