@@ -1,7 +1,5 @@
-import json
+from datetime import datetime
 import re
-import requests
-import requests_cache
 import pandas as pd
 # import yfinance_cache as yf
 import yfinance as yf
@@ -14,6 +12,7 @@ from app.models import B3Movimentation, B3Negotiation, AvenueExtract, GenericExt
 from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
 from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
+from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data, request_cache
 
 scrape_dict = {
     "Tesouro Selic 2029": {
@@ -22,31 +21,6 @@ scrape_dict = {
         'class': 'Renda Fixa'
     }
 }
-
-request_cache = requests_cache.CachedSession('request_cache', expire_after=30*60)
-
-def scrape_data(url, xpath):
-    try:
-        response = request_cache.get(url, timeout=10)
-        response.raise_for_status()
-        tree = html.fromstring(response.content)
-        elements = tree.xpath(xpath)
-        ret = [element.text_content().strip() for element in elements]
-        app.logger.info('Scrap done!')
-        return ret
-    except Exception as e:
-        app.logger.error("Erro ao realizar o scraping: %s", e)
-
-def usd_exchange_rate(currency = 'BRL'):
-    app.logger.debug('usd_exchange_rate')
-    url = 'https://api.exchangerate-api.com/v4/latest/USD'
-    try:
-        response = request_cache.get(url)
-        data = response.json()
-        rate = data['rates'][currency]
-        return rate
-    except Exception as e:
-        return f"Error getting exchange rate quotation: {e}"
 
 def process_b3_movimentation_request(request):
     app.logger.info('process_b3_movimentation_request')
@@ -166,29 +140,6 @@ def plot_price_history(asset_info):
 
     return graph_html
 
-def get_yfinance_data(ticker, asset_info):
-    """Scrape yfinance online data for the specified asset"""
-    stock = yf.Ticker(ticker, session=request_cache)
-    info = stock.info
-
-    # last_close_price = info['previousClose']
-    currency = info['currency']
-    asset_class = info['quoteType']
-    long_name = info['longName']
-
-    data = stock.history(period='1d')
-    last_close_price = data['Close'].iloc[0]
-    # last_day_close_price = data['Close'].iloc[1]
-
-    asset_info['last_close_price'] = round(last_close_price, 2)
-    asset_info['currency'] = currency
-    asset_info['long_name'] = long_name
-    asset_info['asset_class'] = asset_class
-    asset_info['info'] = stock.info
-    # asset_info['last_day_variation'] = round((last_close_price/last_day_close_price - 1) * 100, 2)
-
-    # print(json.dumps(stock.info, indent = 4))
-
 def get_online_info(ticker, asset_info = None):
     """Scrape online data for the specified asset"""
     app.logger.info('Scraping data for %s', ticker)
@@ -199,29 +150,40 @@ def get_online_info(ticker, asset_info = None):
 
     try:
         if is_b3_stock_ticker(ticker):
-            get_yfinance_data(ticker + ".SA", asset_info)
+            yfinance_ticker = ticker + ".SA"
+            online_data = get_yfinance_data(yfinance_ticker)
+            asset_info.update(online_data)
             asset_info['asset_class'] = 'Equity'
+            asset_info['yfinance_ticker'] = yfinance_ticker
 
         elif is_b3_fii_ticker(ticker):
-            get_yfinance_data(ticker + ".SA", asset_info)
+            yfinance_ticker = ticker + ".SA"
+            online_data = get_yfinance_data(yfinance_ticker)
+            asset_info.update(online_data)
             asset_info['asset_class'] = 'FII'
+            asset_info['yfinance_ticker'] = yfinance_ticker
 
         elif re.match(r'^(BTC|ETH)$', ticker):
-            get_yfinance_data(ticker + "-USD", asset_info)
+            yfinance_ticker = ticker + "-USD"
+            online_data = get_yfinance_data(yfinance_ticker)
+            asset_info.update(online_data)
             rate = usd_exchange_rate('BRL')
             asset_info['last_close_price'] = round(rate * asset_info['last_close_price'], 2)
             asset_info['currency'] = 'BRL'
             asset_info['asset_class'] = 'Criptocurrency'
+            asset_info['yfinance_ticker'] = yfinance_ticker
 
         elif ticker in scrape_dict:
-            scrap_info = scrape_dict[ticker]
+            scrap_info = scrape_dict[ticker] # TODO scrap past data
             scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
             asset_info['last_close_price'] = brl_to_float(scraped[0])
             asset_info['asset_class'] = scrap_info['class']
 
         else:
-            get_yfinance_data(ticker, asset_info)
+            online_data = get_yfinance_data(ticker)
+            asset_info.update(online_data)
             asset_info['asset_class'] = asset_info['asset_class'].capitalize()
+            asset_info['yfinance_ticker'] = ticker
 
     except Exception as e:
         flash(f'Failed to get online data for {ticker}.')
@@ -229,12 +191,20 @@ def get_online_info(ticker, asset_info = None):
 
     return asset_info
 
-def consolidate_asset_info(dataframes, asset_info):
+def consolidate_asset_info(dataframes, asset_info, until_date=datetime.now(), date_close_price = None):
     ticker = asset_info['ticker']
+
     buys = dataframes['buys']
+    buys = buys.loc[buys['Date'] <= pd.to_datetime(until_date)]
+
     sells = dataframes['sells'].copy()
+    sells = sells.loc[sells['Date'] <= pd.to_datetime(until_date)]
+
     taxes = dataframes['taxes']
+    taxes = taxes.loc[taxes['Date'] <= pd.to_datetime(until_date)]
+
     wages = dataframes['wages']
+    wages = wages.loc[wages['Date'] <= pd.to_datetime(until_date)]
 
     rent_wages = None
     if 'rent_wages' in dataframes:
@@ -246,7 +216,7 @@ def consolidate_asset_info(dataframes, asset_info):
     sell_quantity = abs(sells['Quantity'].sum())
     shares = round(buy_quantity - sell_quantity, 8) # avoid machine precision errors on zero
 
-    last_sell = pd.to_datetime("today")
+    last_sell = until_date
     if shares <= 0 and len(sells) > 0:
         last_sell = sells.iloc[-1]['Date']
 
@@ -296,8 +266,13 @@ def consolidate_asset_info(dataframes, asset_info):
     if last_sell is not None:
         asset_info['last_sell'] = last_sell.strftime("%Y-%m-%d")
     if shares > 0:
-        online_data = get_online_info(ticker, asset_info)
-        last_close_price = online_data['last_close_price']
+        if date_close_price is not None:
+            asset_info['last_close_price'] = date_close_price
+        else:
+            get_online_info(ticker, asset_info)
+    else:
+        asset_info['asset_class'] = 'Sold'
+    last_close_price = asset_info['last_close_price']
 
     not_realized_gain = (last_close_price - avg_price) * shares
 
@@ -368,7 +343,7 @@ def process_b3_asset_request(asset):
 
     columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
 
-    asset_info = { 'valid': False, 'name': asset }
+    asset_info = { 'valid': False, 'name': asset, 'source': 'b3' }
     dataframes = {}
 
     query = B3Movimentation.query.filter(
@@ -473,6 +448,7 @@ def process_avenue_asset_request(asset):
 
     asset_info['valid'] = False
     asset_info['name'] = asset
+    asset_info['source'] = 'avenue'
 
     query = AvenueExtract.query.filter(
         AvenueExtract.produto.like(f'%{asset}%')).order_by(AvenueExtract.data.asc())
@@ -534,6 +510,7 @@ def process_generic_asset_request(asset):
 
     asset_info['valid'] = False
     asset_info['name'] = asset
+    asset_info['source'] = 'generic'
 
     query = GenericExtract.query.filter(
         GenericExtract.asset.like(f'%{asset}%')).order_by(GenericExtract.date.asc())
@@ -622,12 +599,12 @@ def consolidate_group(consolidate):
     for name, group in grouped:
         currency = name[0]
         rate = 1
-        asset_class = name[1] if name[1] != '' else 'Sold'
+        asset_class = name[1]
 
         if currency == 'USD':
             rate = usd_exchange_rate('BRL')
             currency = 'BRL'
-            asset_class += ' (USD)'
+            asset_class += ' USD'
 
         group_consolidate = group[['cost', 'wages_sum', 'rent_wages_sum', 'taxes_sum',
                                    'liquid_cost', 'position_total', 'realized_gain',
@@ -692,4 +669,71 @@ def process_consolidate_request():
 
     ret['valid'] = True
 
+    return ret
+
+def adjust_for_splits(df):
+    # df = df.sort_index()
+
+    adjustment_factor = 1
+
+    # Iterate over the dataframe from the last row to the first
+    for index in reversed(df.index):
+        if df.at[index, 'Stock Splits'] != 0:
+            # Update the adjustment factor with the split value
+            adjustment_factor *= df.at[index, 'Stock Splits']
+        
+        # Adjust the closing price
+        df.at[index, 'Close'] *= adjustment_factor
+
+    return df
+
+def process_history(asset = None, source = None):
+    app.logger.info('process_consolidate_request')
+
+    ret = {}
+    ret['valid'] = False
+
+    if source == 'b3':
+        asset_info = process_b3_asset_request(asset)
+    elif source == 'avenue':
+        asset_info = process_avenue_asset_request(asset)
+    elif source == 'generic':
+        asset_info = process_generic_asset_request(asset)
+
+    ticker = asset_info['yfinance_ticker']
+    start_date = datetime.fromisoformat(asset_info['first_buy'])
+    history = pd.DataFrame()
+
+    stock = yf.Ticker(ticker, session=request_cache)
+    data = stock.history(start=start_date)
+
+    data = adjust_for_splits(data)
+    
+    if asset_info['name'] in ['BTC', 'ETH']:
+        usdbrl = usd_exchange_rate()
+        data['Close'] *= usdbrl
+
+    step = 5
+    for index in range(0, len(data), step):
+        row = data.iloc[index]
+
+        last_date = row.name.to_pydatetime()
+        last_date = datetime(last_date.year, last_date.month, last_date.day)
+        
+        last_close_price = round(row['Close'], 2)
+        
+        asset_info['date'] = last_date
+        asset_info['last_close_price'] = last_close_price
+        consolidate_asset_info(asset_info['dataframes'], asset_info, last_date, last_close_price)
+
+        new_row = pd.DataFrame([asset_info])
+        history = pd.concat([history, new_row], ignore_index=True)
+    
+    consolidate = history[['date','last_close_price','position','position_total','cost','avg_price','liquid_cost','capital_gain','rentability','anualized_rentability','age']]
+    # consolidate = consolidate.sort_values(by='date', ascending=False)
+
+    ret['history'] = history
+    ret['consolidate'] = consolidate
+
+    ret['valid'] = True
     return ret

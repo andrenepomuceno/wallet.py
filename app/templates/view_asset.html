@@ -29,6 +29,7 @@
         </div>
         <div class="col-md-4">
             <div class="p-3 border">
+                <p><a href="/history/{{ info['source'] }}/{{ info['name'] }}" target="_blank">History</a></p>
                 <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
                 <p>Type: {{ extended_info['quoteType'] }}</p>
                 {% if 'marketCap' in extended_info %}<p>Market Cap: {{ extended_info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}

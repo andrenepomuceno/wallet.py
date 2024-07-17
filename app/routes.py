@@ -7,9 +7,10 @@ from app.importing import import_b3_movimentation, import_b3_negotiation, import
 from app.importing import import_generic_extract
 from app.processing import plot_price_history, process_generic_asset_request
 from app.processing import process_b3_negotiation_request, process_b3_asset_request
-from app.processing import process_consolidate_request
 from app.processing import process_avenue_extract_request, process_avenue_asset_request
 from app.processing import process_b3_movimentation_request, process_generic_extract_request
+from app.processing import process_consolidate_request
+from app.processing import process_history
 from app.forms import B3MovimentationFilterForm, GenericExtractAddForm, AvenueExtractAddForm
 
 def format_money(value):
@@ -317,3 +318,9 @@ def view_consolidate():
     return render_template('view_consolidate.html', info=info,
                            by_group=by_group,
                            group_df=group_df)
+
+@app.route('/history/<source>/<asset>', methods=['GET', 'POST'])
+def view_history(asset=None, source=None):
+    ret = process_history(asset, source)
+    consolidate = ret['consolidate']
+    return render_template('view_table.html', title=f'History for {asset}', df=consolidate)
