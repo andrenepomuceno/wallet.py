@@ -729,7 +729,7 @@ def process_history(asset = None, source = None):
         new_row = pd.DataFrame([asset_info])
         history = pd.concat([history, new_row], ignore_index=True)
     
-    consolidate = history[['date','last_close_price','position','position_total','cost','avg_price','liquid_cost','capital_gain','rentability','anualized_rentability','age']]
+    consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','anualized_rentability','age']]
     # consolidate = consolidate.sort_values(by='date', ascending=False)
 
     ret['history'] = history

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% import 'table.html' as table %}
+{% block content %}
+    <h1>{{ title }}</h1>
+    <div class='container-fluid'>
+        {{ table.render(df, True, True) }}
+    </div>
+{% endblock %}
