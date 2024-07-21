@@ -81,13 +81,13 @@ def home():
 def view_movimentation():
     filter_form = B3MovimentationFilterForm()
     df = process_b3_movimentation_request(request)
-    return render_template('view_movimentation.html',
+    return render_template('view_movimentation.html', html_title='B3 Movimentation',
                            df=df, filter_form=filter_form)
 
 @app.route('/b3_negotiation', methods=['GET', 'POST'])
 def view_negotiation():
     df = process_b3_negotiation_request()
-    return render_template('view_negotiation.html',
+    return render_template('view_negotiation.html', html_title='B3 Negotiation',
                            df=df)
 
 @app.route('/avenue', methods=['GET', 'POST'])
@@ -146,7 +146,7 @@ def view_extract():
                 flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
 
     df = process_avenue_extract_request()
-    return render_template('view_extract.html',
+    return render_template('view_extract.html', html_title='Avenue Extract',
                            df=df, add_form=add_form)
 
 @app.route('/generic', methods=['GET', 'POST'])
@@ -191,7 +191,7 @@ def view_generic_extract():
                 flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
 
     df = process_generic_extract_request()
-    return render_template('view_generic.html',
+    return render_template('view_generic.html', html_title='Generic Extract',
                            df=df, add_form=add_form)
 
 def view_asset_helper(asset_info):
@@ -225,8 +225,9 @@ def view_asset_helper(asset_info):
         rent = dataframes['rent_wages']
         rent = rent[['Date', 'Total', 'Movimentation']]
 
+    asset = asset_info['name']
     return render_template(
-        'view_asset.html',
+        'view_asset.html', html_title=f'{asset}',
         info=asset_info,
         extended_info=extended_info,
         buys=buys,
@@ -317,7 +318,7 @@ def view_consolidate():
 
         group['df'] = df
 
-    return render_template('view_consolidate.html', info=info,
+    return render_template('view_consolidate.html', html_title='Consolidate', info=info,
                            by_group=by_group,
                            group_df=group_df)
 
@@ -326,4 +327,4 @@ def view_history(asset=None, source=None):
     ret = process_history(asset, source)
     consolidate = ret['consolidate']
     graphic = ret['graphic']
-    return render_template('view_history.html', title=f'{asset}', df=consolidate, plot=graphic)
+    return render_template('view_history.html', html_title=f'{asset} history',title=f'{asset}', df=consolidate, plot=graphic)

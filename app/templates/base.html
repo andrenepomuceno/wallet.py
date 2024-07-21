@@ -7,7 +7,11 @@
     <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.22.6/dist/bootstrap-table.min.css">
     <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.22.6/dist/extensions/sticky-header/bootstrap-table-sticky-header.css">
     <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.22.6/dist/extensions/fixed-columns/bootstrap-table-fixed-columns.css">
-    <title>wallet.py</title>
+    {% if html_title %}
+        <title>wallet.py - {{ html_title }}</title>
+    {% else %}
+        <title>wallet.py</title>
+    {% endif %}
     {% with messages = get_flashed_messages() %}
     {% if messages %}
         <ul class=flashes>
