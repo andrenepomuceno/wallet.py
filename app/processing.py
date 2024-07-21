@@ -564,7 +564,7 @@ def load_products(query, sql_to_df_func):
     products = df['Asset'].unique().tolist()
     return products
 
-def load_consolidate(asset_list, process_asset_func, page_route):
+def load_consolidate(asset_list, process_asset_func, source):
     consolidate = pd.DataFrame()
     if len(asset_list) <= 0:
         return consolidate
@@ -577,7 +577,7 @@ def load_consolidate(asset_list, process_asset_func, page_route):
         consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
     consolidate['url'] = consolidate['name'].apply(
-        lambda x: f"<a href='/{page_route}/{x}' target='_blank'>{x}</a>")
+        lambda x: f"<a href='/view/{source}/{x}' target='_blank'>Details</a> <a href='/history/{source}/{x}' target='_blank'>History</a>")
 
     return consolidate
 
@@ -635,15 +635,15 @@ def process_consolidate_request():
     products_neg = load_products(B3Negotiation.query, b3_negotiation_sql_to_df)
     products_mov = load_products(B3Movimentation.query, b3_movimentation_sql_to_df)
     b3_products = list(set(products_neg) | set(products_mov))
-    b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'view/b3')
+    b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'b3')
 
     avenue_products = load_products(AvenueExtract.query, avenue_extract_sql_to_df)
     avenue_consolidate = load_consolidate(avenue_products,
-                                          process_avenue_asset_request, 'view/avenue')
+                                          process_avenue_asset_request, 'avenue')
 
     generic_products = load_products(GenericExtract.query, generic_extract_sql_to_df)
     generic_consolidate = load_consolidate(generic_products,
-                                           process_generic_asset_request, 'view/generic')
+                                           process_generic_asset_request, 'generic')
 
     consolidate = pd.concat([b3_consolidate, avenue_consolidate, generic_consolidate])
     if len(consolidate) == 0:
@@ -686,6 +686,45 @@ def adjust_for_splits(df):
         df.at[index, 'Close'] *= adjustment_factor
 
     return df
+
+def plot_history(asset_info, history_df):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=history_df['rentability'],
+        line={'color': 'blue', 'width': 1},
+        name='Rentability',
+        yaxis='y1',
+    ))
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=history_df['position_total'],
+        line={'color': 'green', 'width': 1},
+        name='Position',
+        yaxis='y2',
+    ))
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=history_df['wages_sum'],
+        line={'color': 'lightgreen', 'width': 1},
+        name='Wages',
+        yaxis='y2',
+    ))
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=history_df['liquid_cost'],
+        line={'color': 'darkgreen', 'width': 1},
+        name='Liquid Cost',
+        yaxis='y2',
+    ))
+    fig.update_layout(title='',
+                      yaxis=dict(title=''),
+                      yaxis2=dict(title='', overlaying='y', side='right'))
+    fig.update_yaxes(autorange=True, fixedrange=False)
+
+    graphic = pyo.plot(fig, output_type='div')
+
+    return graphic
 
 def process_history(asset = None, source = None):
     app.logger.info('process_consolidate_request')
@@ -732,8 +771,11 @@ def process_history(asset = None, source = None):
     consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','anualized_rentability','age']]
     # consolidate = consolidate.sort_values(by='date', ascending=False)
 
+    graphic = plot_history(asset_info, history)
+
     ret['history'] = history
     ret['consolidate'] = consolidate
+    ret['graphic'] = graphic
 
     ret['valid'] = True
     return ret

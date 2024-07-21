@@ -288,13 +288,15 @@ def view_consolidate():
     for group in group_df:
         df = group['df']
         df = df[[
-            'url', 'currency', 'last_close_price', 'position', 'position_total','avg_price',
+            'name', 'url', 'currency', 'last_close_price', 'position', 'position_total','avg_price',
             'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
             'not_realized_gain','capital_gain','rentability',
             'rentability_by_year','age_years'
         ]]
         df = df.rename(columns={
-            'url': 'Name',
+            'name': 'Name',
+            'url': 'Links',
+            'history_url': 'History',
             'currency': 'Currency',
             'last_close_price': 'Close Price',
             'position': "Shares",
@@ -323,4 +325,5 @@ def view_consolidate():
 def view_history(asset=None, source=None):
     ret = process_history(asset, source)
     consolidate = ret['consolidate']
-    return render_template('view_table.html', title=f'History for {asset}', df=consolidate)
+    graphic = ret['graphic']
+    return render_template('view_history.html', title=f'{asset}', df=consolidate, plot=graphic)
