@@ -41,14 +41,16 @@ def get_yfinance_data(ticker):
     asset_class = info['quoteType']
     long_name = info['longName']
 
-    data = stock.history(period='1d')
-    last_close_price = data['Close'].iloc[0]
+    data = stock.history(period='2d')
+    last_close_price = data['Close'].iloc[1]
+    previous_close = data['Close'].iloc[0]
 
     asset_info['last_close_price'] = round(last_close_price, 2)
     asset_info['currency'] = currency
     asset_info['long_name'] = long_name
     asset_info['asset_class'] = asset_class
     asset_info['info'] = stock.info
+    asset_info['previous_close'] = round(previous_close, 2)
 
     # print(json.dumps(stock.info, indent = 4))
 

@@ -257,9 +257,6 @@ def consolidate_asset_info(dataframes, asset_info, until_date=datetime.now(), da
     realized_gain = sells['Realized Gain'].sum()
 
     asset_info['last_close_price'] = 0
-    asset_info['currency'] = 'BRL'
-    asset_info['long_name'] = ''
-    asset_info['asset_class'] = ''
     asset_info['info'] = {}
     if first_buy is not None:
         asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")
@@ -271,6 +268,7 @@ def consolidate_asset_info(dataframes, asset_info, until_date=datetime.now(), da
         else:
             get_online_info(ticker, asset_info)
     else:
+        asset_info['currency'] = 'BRL'
         asset_info['asset_class'] = 'Sold'
     last_close_price = asset_info['last_close_price']
 
@@ -688,6 +686,7 @@ def adjust_for_splits(df):
     return df
 
 def plot_history(asset_info, history_df):
+    currency = asset_info['currency']
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=history_df['date'],
@@ -726,8 +725,8 @@ def plot_history(asset_info, history_df):
         yaxis='y2',
     ))
     fig.update_layout(title='',
-                      yaxis=dict(title=''),
-                      yaxis2=dict(title='', overlaying='y', side='right'))
+                      yaxis=dict(title='Percent (%)'),
+                      yaxis2=dict(title=f'{currency}', overlaying='y', side='right'))
     fig.update_yaxes(autorange=True, fixedrange=False)
 
     fig1 = pyo.plot(fig, output_type='div')
@@ -749,7 +748,7 @@ def plot_history(asset_info, history_df):
     ))
 
     fig.update_layout(title='',
-                      yaxis=dict(title=''),
+                      yaxis=dict(title=f'{currency}'),
                       yaxis2=dict(title='', overlaying='y', side='right'))
     fig.update_yaxes(autorange=True, fixedrange=False)
 

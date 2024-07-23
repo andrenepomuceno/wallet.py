@@ -10,7 +10,7 @@
                 <p>Ticker: {{ info['ticker'] }}</p>
                 <p>Full Name: {{ info['long_name'] }}</p>
                 <p>Close Price: {{ info['currency'] }} {{ info['last_close_price'] }} ({{ info['price_gain'] }} %)</p>
-                <!-- <p>Last Day Variation: {{ info['currency'] }} {{ info['last_day_variation'] }} %</p> -->
+                <p>Previous Close: {{ info['currency'] }} {{ info['previous_close'] }}</p>
                 <p>Position: {{ info['position'] }} ({{ info['rented'] }} rented)</p>
                 <p>Position: {{ info['currency'] }} {{ info['position_total'] }}</p>
                 <p>Average Price: {{ info['currency'] }} {{ info['avg_price'] }}</p>
@@ -59,7 +59,7 @@
     <div class="row">
         <div class="col-md-12">
             <div class="p-3 m-3 border">
-                <div class="container">
+                <div class="container-fluid">
                     <h2>Price History</h2>
                     <div>{{ graph_html|safe }}</div>
                 </div>
