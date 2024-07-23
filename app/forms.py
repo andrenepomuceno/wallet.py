@@ -24,7 +24,7 @@ class B3MovimentationFilterForm(FlaskForm):
     submit = SubmitField('Submit')
 
 class AvenueExtractAddForm(FlaskForm):
-    data = StringField('Data', validators=[DataRequired()], default=pd.to_datetime("today"))
+    data = StringField('Data', validators=[DataRequired()], default=pd.to_datetime("today").date)
     hora = StringField('Hora', validators=[DataRequired()], default=pd.to_datetime("today").time)
     liquidacao = StringField('Liquidação', validators=[DataRequired()], default=pd.to_datetime("today").date)
     descricao = StringField('Descrição', default='')

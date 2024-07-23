@@ -326,5 +326,5 @@ def view_consolidate():
 def view_history(asset=None, source=None):
     ret = process_history(asset, source)
     consolidate = ret['consolidate']
-    graphic = ret['graphic']
-    return render_template('view_history.html', html_title=f'{asset} history',title=f'{asset}', df=consolidate, plot=graphic)
+    plots = ret['plots']
+    return render_template('view_history.html', html_title=f'{asset} history',title=f'{asset}', df=consolidate, plots=plots)

@@ -3,12 +3,11 @@
 {% block content %}
     <h1>History for {{ title }}</h1>
 
-    {% if plot %}
+    {% for plot in plots %}
         <div class="container-fluid">
-            <h2>Plot</h2>
             <div>{{ plot | safe }}</div>
         </div>
-    {% endif %}
+    {% endfor %}
 
     <div class='container-fluid'>
         {{ table.render(df, True, True) }}

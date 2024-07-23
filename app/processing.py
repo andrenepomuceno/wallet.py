@@ -696,10 +696,18 @@ def plot_history(asset_info, history_df):
         name='Rentability',
         yaxis='y1',
     ))
+    anualized_rentability = history_df['anualized_rentability'].clip(-50, 50)
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=anualized_rentability,
+        line={'color': 'lightblue', 'width': 1},
+        name='Anualized Rentability',
+        yaxis='y1',
+    ))
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['position_total'],
-        line={'color': 'green', 'width': 1},
+        line={'color': 'red', 'width': 1},
         name='Position',
         yaxis='y2',
     ))
@@ -713,7 +721,7 @@ def plot_history(asset_info, history_df):
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['liquid_cost'],
-        line={'color': 'darkgreen', 'width': 1},
+        line={'color': 'green', 'width': 1},
         name='Liquid Cost',
         yaxis='y2',
     ))
@@ -722,9 +730,32 @@ def plot_history(asset_info, history_df):
                       yaxis2=dict(title='', overlaying='y', side='right'))
     fig.update_yaxes(autorange=True, fixedrange=False)
 
-    graphic = pyo.plot(fig, output_type='div')
+    fig1 = pyo.plot(fig, output_type='div')
 
-    return graphic
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=history_df['last_close_price'],
+        line={'color': 'red', 'width': 1},
+        name='Close Price',
+        yaxis='y1',
+    ))
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
+        y=history_df['avg_price'],
+        line={'color': 'green', 'width': 1},
+        name='Average Price',
+        yaxis='y1',
+    ))
+
+    fig.update_layout(title='',
+                      yaxis=dict(title=''),
+                      yaxis2=dict(title='', overlaying='y', side='right'))
+    fig.update_yaxes(autorange=True, fixedrange=False)
+
+    fig2 = pyo.plot(fig, output_type='div')
+
+    return [fig1, fig2]
 
 def process_history(asset = None, source = None):
     app.logger.info('process_consolidate_request')
@@ -744,7 +775,7 @@ def process_history(asset = None, source = None):
     history = pd.DataFrame()
 
     stock = yf.Ticker(ticker, session=request_cache)
-    data = stock.history(start=start_date)
+    data = stock.history(start=start_date, auto_adjust=False)
 
     data = adjust_for_splits(data)
     
@@ -771,11 +802,11 @@ def process_history(asset = None, source = None):
     consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','anualized_rentability','age']]
     # consolidate = consolidate.sort_values(by='date', ascending=False)
 
-    graphic = plot_history(asset_info, history)
+    plots = plot_history(asset_info, history)
 
     ret['history'] = history
     ret['consolidate'] = consolidate
-    ret['graphic'] = graphic
+    ret['plots'] = plots
 
     ret['valid'] = True
     return ret
