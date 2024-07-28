@@ -140,7 +140,7 @@ def view_extract():
         app.logger.info('New entry already exists in the database!')
         flash('Entry already exists in the database.')
     else:
-        app.logger.debug(f'Not submit. Errors: {add_form.errors}')
+        app.logger.debug('Not submit. Errors: %s', add_form.errors)
         for field, errors in add_form.errors.items():
             for error in errors:
                 flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
@@ -185,7 +185,7 @@ def view_generic_extract():
         app.logger.info('New entry already exists in the database!')
         flash('Entry already exists in the database.')
     else:
-        app.logger.debug(f'Not submit. Errors: {add_form.errors}')
+        app.logger.debug('Not submit. Errors: %s', add_form.errors)
         for field, errors in add_form.errors.items():
             for error in errors:
                 flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
@@ -289,7 +289,8 @@ def view_consolidate():
     for group in group_df:
         df = group['df']
         df = df[[
-            'name', 'url', 'currency', 'last_close_price', 'position', 'position_total','avg_price',
+            'name', 'url', 'currency', 'last_close_price', 'last_close_variation',
+            'position', 'position_total','avg_price',
             'cost','wages_sum','rent_wages_sum', 'taxes_sum', 'liquid_cost','realized_gain',
             'not_realized_gain','capital_gain','rentability',
             'rentability_by_year','age_years'
@@ -300,6 +301,7 @@ def view_consolidate():
             'history_url': 'History',
             'currency': 'Currency',
             'last_close_price': 'Close Price',
+            'last_close_variation': 'Variation',
             'position': "Shares",
             'position_total': 'Position',
             'avg_price': 'Avg Price',
@@ -327,4 +329,5 @@ def view_history(asset=None, source=None):
     ret = process_history(asset, source)
     consolidate = ret['consolidate']
     plots = ret['plots']
-    return render_template('view_history.html', html_title=f'{asset} history',title=f'{asset}', df=consolidate, plots=plots)
+    return render_template('view_history.html', html_title=f'{asset} history',title=f'{asset}',
+                           df=consolidate, plots=plots)

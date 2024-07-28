@@ -18,7 +18,8 @@ scrape_dict = {
     "Tesouro Selic 2029": {
         'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
-        'class': 'Renda Fixa'
+        'class': 'Renda Fixa',
+        'currency': 'BRL',
     }
 }
 
@@ -178,6 +179,7 @@ def get_online_info(ticker, asset_info = None):
             scraped = scrape_data(scrap_info['url'], scrap_info['xpath'])
             asset_info['last_close_price'] = brl_to_float(scraped[0])
             asset_info['asset_class'] = scrap_info['class']
+            asset_info['currency'] = scrap_info['currency']
 
         else:
             online_data = get_yfinance_data(ticker)
