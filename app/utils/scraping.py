@@ -4,7 +4,7 @@ import yfinance as yf
 from lxml import html
 from app import app
 
-request_cache = requests_cache.CachedSession('request_cache', expire_after=30*60)
+request_cache = requests_cache.CachedSession('request_cache', expire_after=60*60)
 
 def scrape_data(url, xpath):
     try:
@@ -41,7 +41,7 @@ def get_yfinance_data(ticker):
     asset_class = info['quoteType']
     long_name = info['longName']
 
-    data = stock.history(period='5d')
+    data = stock.history(period='5d', auto_adjust=False)
     last_close_price = data['Close'].iloc[-1]
     previous_close = data['Close'].iloc[-2]
     close_5d = data['Close'].mean()

@@ -109,7 +109,7 @@ def plot_price_history(asset_info):
         return None
 
     stock = yf.Ticker(asset_info['info']['symbol'], session=request_cache)
-    df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'])
+    df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'], auto_adjust=False)
 
     def add_moving_average(ma_size, df, color='green'):
         ma_name="MA" + str(ma_size)
@@ -281,7 +281,7 @@ def consolidate_asset_info(dataframes, asset_info, until_date=datetime.now(), da
     rentability = capital_gain/liquid_cost if liquid_cost > 0 else 0
 
     anualized_rentability = 0
-    if age_years is not None and age_years > 0:
+    if age_years is not None and age_years > 0.1:
         anualized_rentability = (1 + rentability)**(1/age_years) - 1
 
     rented = 0 # TODO calc rented shares from b3 movimentation data
@@ -697,7 +697,7 @@ def plot_history(asset_info, history_df):
         name='Rentability',
         yaxis='y1',
     ))
-    anualized_rentability = history_df['anualized_rentability'].clip(-50, 50)
+    anualized_rentability = history_df['anualized_rentability']
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=anualized_rentability,
@@ -785,7 +785,8 @@ def process_history(asset = None, source = None):
         data['Close'] *= usdbrl
 
     step = 5
-    for index in range(0, len(data), step):
+    #for index in range(0, len(data), step):
+    for index in range(len(data) - 1, 0, -step):
         row = data.iloc[index]
 
         last_date = row.name.to_pydatetime()

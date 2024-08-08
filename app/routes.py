@@ -301,7 +301,7 @@ def view_consolidate():
             'history_url': 'History',
             'currency': 'Currency',
             'last_close_price': 'Close Price',
-            'last_close_variation': 'Variation',
+            'last_close_variation': '1D Variation',
             'position': "Shares",
             'position_total': 'Position',
             'avg_price': 'Avg Price',
