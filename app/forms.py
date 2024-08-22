@@ -36,3 +36,15 @@ class AvenueExtractAddForm(FlaskForm):
     quantidade = FloatField('Quantidade', default=0)
     preco_unitario = FloatField('Preço Unitário', default=0)
     submit = SubmitField('Submit')
+
+class B3NegotiationAddForm(FlaskForm):
+    date = StringField('Date', validators=[DataRequired()], default=pd.to_datetime("today").date)
+    movimentation = StringField('Movimentation', validators=[DataRequired()], default='Compra')
+    mercado = StringField('Mercado', validators=[DataRequired()], default='Mercado à Vista')
+    prazo = StringField('Prazo/Vencimento', validators=[DataRequired()], default='-')
+    instituicao = StringField('Instituição', validators=[DataRequired()], default='')
+    codigo = StringField('Código de Negociação', validators=[DataRequired()], default='')
+    quantity = FloatField('Quantity', default=0)
+    price = FloatField('Price', default=0)
+    total = FloatField('Total', default=0)
+    submit = SubmitField('Submit')

@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from flask import render_template, request, redirect, url_for, flash, abort
 from app import app, db, UPLOADS_FOLDER
-from app.models import GenericExtract, AvenueExtract
+from app.models import B3Negotiation, GenericExtract, AvenueExtract
 from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract
 from app.importing import import_generic_extract
 from app.processing import plot_price_history, process_generic_asset_request
@@ -11,7 +11,7 @@ from app.processing import process_avenue_extract_request, process_avenue_asset_
 from app.processing import process_b3_movimentation_request, process_generic_extract_request
 from app.processing import process_consolidate_request
 from app.processing import process_history
-from app.forms import B3MovimentationFilterForm, GenericExtractAddForm, AvenueExtractAddForm
+from app.forms import B3MovimentationFilterForm, B3NegotiationAddForm, GenericExtractAddForm, AvenueExtractAddForm
 
 def format_money(value):
     if value >= 1e12:
@@ -86,9 +86,56 @@ def view_movimentation():
 
 @app.route('/b3_negotiation', methods=['GET', 'POST'])
 def view_negotiation():
+    app.logger.info('view_negotiation')
+
+    add_form = B3NegotiationAddForm()
+    if add_form.validate_on_submit():
+        app.logger.info('add_form On submit.')
+
+        new_entry = B3Negotiation(
+            origin_id='FORM',
+            data=add_form.date.data,
+            tipo=add_form.movimentation.data,
+            mercado=add_form.mercado.data,
+            prazo=add_form.prazo.data,
+            instituicao=add_form.instituicao.data,
+            codigo=add_form.codigo.data,
+            quantidade=add_form.quantity.data,
+            preco=add_form.price.data,
+            valor=add_form.total.data,
+        )
+
+        existing_entry = B3Negotiation.query.filter_by(
+            origin_id='FORM',
+            data=add_form.date.data,
+            tipo=add_form.movimentation.data,
+            mercado=add_form.mercado.data,
+            prazo=add_form.prazo.data,
+            instituicao=add_form.instituicao.data,
+            codigo=add_form.codigo.data,
+            quantidade=add_form.quantity.data,
+            preco=add_form.price.data,
+            valor=add_form.total.data,
+        ).first()
+
+        if not existing_entry:
+            db.session.add(new_entry)
+            db.session.commit()
+            app.logger.info('Added new entry to database!')
+            flash('Entry added successfully!')
+            return redirect(url_for('view_generic_extract'))
+        
+        app.logger.info('New entry already exists in the database!')
+        flash('Entry already exists in the database.')
+    else:
+        app.logger.debug('Not submit. Errors: %s', add_form.errors)
+        for field, errors in add_form.errors.items():
+            for error in errors:
+                flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
+
     df = process_b3_negotiation_request()
     return render_template('view_negotiation.html', html_title='B3 Negotiation',
-                           df=df)
+                           df=df, add_form=add_form)
 
 @app.route('/avenue', methods=['GET', 'POST'])
 def view_extract():

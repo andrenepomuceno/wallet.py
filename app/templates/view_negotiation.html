@@ -2,6 +2,53 @@
 {% import 'table.html' as table %}
 {% block content %}
     <h1>B3 Negotiation Data</h1>
+    <button type="button" class="btn btn-info" onclick="toggleDisplay('add_form')">Add Entry</button>
+    <div class="container" id="add_form" style="display: none;">
+        <h2>Add Entry</h2>
+        <form method="POST" class="form-inline">
+            {{ add_form.hidden_tag() }}
+            <div class="form-group">
+                {{ add_form.date.label(class="form-control-label") }}
+                {{ add_form.date(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.movimentation.label(class="form-control-label") }}
+                {{ add_form.movimentation(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.mercado.label(class="form-control-label") }}
+                {{ add_form.mercado(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.prazo.label(class="form-control-label") }}
+                {{ add_form.prazo(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.instituicao.label(class="form-control-label") }}
+                {{ add_form.instituicao(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.codigo.label(class="form-control-label") }}
+                {{ add_form.codigo(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.quantity.label(class="form-control-label") }}
+                {{ add_form.quantity(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.price.label(class="form-control-label") }}
+                {{ add_form.price(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.total.label(class="form-control-label") }}
+                {{ add_form.total(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ add_form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+
     <div class='container-fluid'>
         {{ table.render(df, True) }}
     </div>

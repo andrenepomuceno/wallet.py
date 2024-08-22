@@ -281,7 +281,7 @@ def consolidate_asset_info(dataframes, asset_info, until_date=datetime.now(), da
     rentability = capital_gain/liquid_cost if liquid_cost > 0 else 0
 
     anualized_rentability = 0
-    if age_years is not None and age_years > 0.1:
+    if age_years is not None and age_years >= 1.0:
         anualized_rentability = (1 + rentability)**(1/age_years) - 1
 
     rented = 0 # TODO calc rented shares from b3 movimentation data
