@@ -123,7 +123,7 @@ def view_negotiation():
             db.session.commit()
             app.logger.info('Added new entry to database!')
             flash('Entry added successfully!')
-            return redirect(url_for('view_generic_extract'))
+            return redirect(url_for('view_negotiation'))
         
         app.logger.info('New entry already exists in the database!')
         flash('Entry already exists in the database.')
@@ -182,7 +182,7 @@ def view_extract():
             db.session.commit()
             app.logger.info('Added new entry to database!')
             flash('Entry added successfully!')
-            return redirect(url_for('view_generic_extract'))
+            return redirect(url_for('view_extract'))
         
         app.logger.info('New entry already exists in the database!')
         flash('Entry already exists in the database.')
