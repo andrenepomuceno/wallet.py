@@ -13,6 +13,7 @@ from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
 from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
 from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data, request_cache
+import numpy as np
 
 scrape_dict = {
     "Tesouro Selic 2029": {
@@ -693,7 +694,7 @@ def plot_history(asset_info, history_df):
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['rentability'],
-        line={'color': 'blue', 'width': 1},
+        line={'color': 'darkblue', 'width': 1},
         name='Rentability',
         yaxis='y1',
     ))
@@ -701,14 +702,21 @@ def plot_history(asset_info, history_df):
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=anualized_rentability,
-        line={'color': 'lightblue', 'width': 1},
+        line={'color': 'blue', 'width': 1},
         name='Anualized Rentability',
         yaxis='y1',
     ))
     fig.add_trace(go.Scatter(
         x=history_df['date'],
+        y=history_df['slope'],
+        line={'color': 'lightblue', 'width': 1},
+        name='Slope',
+        yaxis='y1',
+    ))
+    fig.add_trace(go.Scatter(
+        x=history_df['date'],
         y=history_df['position_total'],
-        line={'color': 'red', 'width': 1},
+        line={'color': 'darkgreen', 'width': 1},
         name='Position',
         yaxis='y2',
     ))
@@ -726,28 +734,29 @@ def plot_history(asset_info, history_df):
         name='Liquid Cost',
         yaxis='y2',
     ))
-    fig.update_layout(title='',
-                      yaxis=dict(title='Percent (%)'),
-                      yaxis2=dict(title=f'{currency}', overlaying='y', side='right'))
-    fig.update_yaxes(autorange=True, fixedrange=False)
-
-    fig1 = pyo.plot(fig, output_type='div')
-
-    fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['last_close_price'],
         line={'color': 'red', 'width': 1},
         name='Close Price',
-        yaxis='y1',
+        yaxis='y2',
     ))
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['avg_price'],
-        line={'color': 'green', 'width': 1},
+        line={'color': 'yellow', 'width': 1},
         name='Average Price',
-        yaxis='y1',
+        yaxis='y2',
     ))
+    fig.update_layout(title='',
+                      yaxis=dict(title='Percent (%)'),
+                      yaxis2=dict(title=f'{currency}', overlaying='y', side='right'),
+                      height=800)
+    fig.update_yaxes(autorange=True, fixedrange=False)
+
+    fig1 = pyo.plot(fig, output_type='div')
+
+    fig = go.Figure()
 
     fig.update_layout(title='',
                       yaxis=dict(title=f'{currency}'),
@@ -756,7 +765,8 @@ def plot_history(asset_info, history_df):
 
     fig2 = pyo.plot(fig, output_type='div')
 
-    return [fig1, fig2]
+    # return [fig1, fig2]
+    return [fig1]
 
 def process_history(asset = None, source = None):
     app.logger.info('process_consolidate_request')
@@ -800,9 +810,13 @@ def process_history(asset = None, source = None):
 
         new_row = pd.DataFrame([asset_info])
         history = pd.concat([history, new_row], ignore_index=True)
-    
-    consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','anualized_rentability','age']]
+
+    history['slope'] = -np.gradient(history.rentability).round(2)
+    history['position_slope'] = -np.gradient(history.position_total).round(2)
+
+    consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','slope','anualized_rentability','age','position_slope']]
     # consolidate = consolidate.sort_values(by='date', ascending=False)
+    # print(slope.to_string())
 
     plots = plot_history(asset_info, history)
 
