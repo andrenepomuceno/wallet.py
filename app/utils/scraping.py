@@ -13,21 +13,21 @@ def scrape_data(url, xpath):
         tree = html.fromstring(response.content)
         elements = tree.xpath(xpath)
         ret = [element.text_content().strip() for element in elements]
-        app.logger.info('Scrap done!')
+        app.logger.debug('scrape_data done!')
         return ret
     except Exception as e:
-        app.logger.error("Erro ao realizar o scraping: %s", e)
+        app.logger.error("scrape_data Exception: %s", e)
 
 def usd_exchange_rate(currency = 'BRL'):
-    app.logger.debug('usd_exchange_rate')
     url = 'https://api.exchangerate-api.com/v4/latest/USD'
     try:
         response = request_cache.get(url)
         data = response.json()
         rate = data['rates'][currency]
+        app.logger.debug('usd_exchange_rate done!')
         return rate
     except Exception as e:
-        return f"Error getting exchange rate quotation: {e}"
+        app.logger.error("usd_exchange_rate Exception: %s", e)
 
 def get_yfinance_data(ticker):
     """Scrape yfinance online data for the specified asset"""

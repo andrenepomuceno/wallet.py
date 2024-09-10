@@ -190,7 +190,7 @@ def get_online_info(ticker, asset_info = None):
 
     except Exception as e:
         flash(f'Failed to get online data for {ticker}.')
-        app.logger.warning('Exception: %s', e)
+        app.logger.error('Exception: %s', e)
 
     return asset_info
 
@@ -692,39 +692,33 @@ def plot_history(asset_info, history_df):
     currency = asset_info['currency']
     fig = go.Figure()
     fig.add_trace(go.Scatter(
+        name='Rentability',
         x=history_df['date'],
         y=history_df['rentability'],
         line={'color': 'darkblue', 'width': 1},
-        name='Rentability',
         yaxis='y1',
     ))
-    anualized_rentability = history_df['anualized_rentability']
     fig.add_trace(go.Scatter(
+        name='Rentability/yr.',
         x=history_df['date'],
-        y=anualized_rentability,
+        y=history_df['anualized_rentability'],
         line={'color': 'blue', 'width': 1},
-        name='Anualized Rentability',
         yaxis='y1',
     ))
     fig.add_trace(go.Scatter(
+        name='Rent. Slope',
         x=history_df['date'],
         y=history_df['slope'],
         line={'color': 'lightblue', 'width': 1},
-        name='Slope',
         yaxis='y1',
+        fill='tozeroy',
     ))
+
     fig.add_trace(go.Scatter(
+        name='Position',
         x=history_df['date'],
         y=history_df['position_total'],
         line={'color': 'darkgreen', 'width': 1},
-        name='Position',
-        yaxis='y2',
-    ))
-    fig.add_trace(go.Scatter(
-        x=history_df['date'],
-        y=history_df['wages_sum'],
-        line={'color': 'lightgreen', 'width': 1},
-        name='Wages',
         yaxis='y2',
     ))
     fig.add_trace(go.Scatter(
@@ -735,6 +729,28 @@ def plot_history(asset_info, history_df):
         yaxis='y2',
     ))
     fig.add_trace(go.Scatter(
+        name='Wages',
+        x=history_df['date'],
+        y=history_df['wages_sum'],
+        line={'color': 'lightgreen', 'width': 1},
+        yaxis='y2',
+    ))
+    fig.add_trace(go.Scatter(
+        name='Capital Gain',
+        x=history_df['date'],
+        y=history_df['capital_gain'],
+        line={'color': 'lime', 'width': 1},
+        yaxis='y2',
+    ))
+    fig.add_trace(go.Scatter(
+        name='Quantity',
+        x=history_df['date'],
+        y=history_df['position'],
+        line={'color': 'cyan', 'width': 1},
+        yaxis='y2',
+    ))
+    
+    fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['last_close_price'],
         line={'color': 'red', 'width': 1},
@@ -744,26 +760,54 @@ def plot_history(asset_info, history_df):
     fig.add_trace(go.Scatter(
         x=history_df['date'],
         y=history_df['avg_price'],
-        line={'color': 'yellow', 'width': 1},
+        line={'color': 'magenta', 'width': 1},
         name='Average Price',
         yaxis='y2',
     ))
+
+    rangeselector=dict(
+        buttons=list([
+            # dict(count=1,
+            #         label="1m",
+            #         step="month",
+            #         stepmode="backward"),
+            dict(count=6,
+                    label="6m",
+                    step="month",
+                    stepmode="backward"),
+            dict(count=1,
+                    label="YTD",
+                    step="year",
+                    stepmode="todate"),
+            dict(count=1,
+                    label="1y",
+                    step="year",
+                    stepmode="backward"),
+            dict(count=2,
+                    label="2y",
+                    step="year",
+                    stepmode="backward"),
+            dict(step="all")
+        ])
+    )
     fig.update_layout(title='',
-                      yaxis=dict(title='Percent (%)'),
-                      yaxis2=dict(title=f'{currency}', overlaying='y', side='right'),
+                      xaxis=dict(rangeslider=dict(visible=True), rangeselector=rangeselector),
+                      yaxis=dict(title='Percent (%)', side='right'),
+                      yaxis2=dict(title=f'{currency}', overlaying='y', side='left'),
+                      yaxis3=dict(title='Quantity', overlaying='y', side='right'),
                       height=800)
     fig.update_yaxes(autorange=True, fixedrange=False)
 
     fig1 = pyo.plot(fig, output_type='div')
 
-    fig = go.Figure()
+    # fig = go.Figure()
 
-    fig.update_layout(title='',
-                      yaxis=dict(title=f'{currency}'),
-                      yaxis2=dict(title='', overlaying='y', side='right'))
-    fig.update_yaxes(autorange=True, fixedrange=False)
+    # fig.update_layout(title='Title',
+    #                   yaxis=dict(title=f'{currency}'),
+    #                   yaxis2=dict(title='', overlaying='y', side='right'))
+    # fig.update_yaxes(autorange=True, fixedrange=False)
 
-    fig2 = pyo.plot(fig, output_type='div')
+    # fig2 = pyo.plot(fig, output_type='div')
 
     # return [fig1, fig2]
     return [fig1]
@@ -813,6 +857,9 @@ def process_history(asset = None, source = None):
 
     history['slope'] = -np.gradient(history.rentability).round(2)
     history['position_slope'] = -np.gradient(history.position_total).round(2)
+    # posMax = history['position'].max()
+    # totalMax = history['position_total'].max()
+    # history['position'] = (history['position'] * totalMax/posMax).round(0)
 
     consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','slope','anualized_rentability','age','position_slope']]
     # consolidate = consolidate.sort_values(by='date', ascending=False)
