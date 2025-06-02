@@ -31,7 +31,7 @@ def usd_exchange_rate(currency = 'BRL'):
 
 def get_yfinance_data(ticker):
     """Scrape yfinance online data for the specified asset"""
-    stock = yf.Ticker(ticker, session=request_cache)
+    stock = yf.Ticker(ticker)
     info = stock.info
 
     asset_info = {}

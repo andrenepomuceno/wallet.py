@@ -17,7 +17,7 @@ import numpy as np
 
 scrape_dict = {
     "Tesouro Selic 2029": {
-        'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
+        'url': 'https://taxas-tesouro.com/investir/tesouro-selic-2029/',
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
         'class': 'Renda Fixa',
         'currency': 'BRL',
@@ -109,7 +109,7 @@ def plot_price_history(asset_info):
     if 'symbol' not in info:
         return None
 
-    stock = yf.Ticker(asset_info['info']['symbol'], session=request_cache)
+    stock = yf.Ticker(asset_info['info']['symbol'])
     df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'], auto_adjust=False)
 
     def add_moving_average(ma_size, df, color='green'):
@@ -349,6 +349,7 @@ def process_b3_asset_request(asset):
 
     query = B3Movimentation.query.filter(
         B3Movimentation.produto.like(f'%{asset}%')).order_by(B3Movimentation.data.asc())
+    # query = query.filter(db.extract('year', B3Movimentation.data) <= 2024)
     result = query.all()
     movimentation_df = b3_movimentation_sql_to_df(result)
     if len(movimentation_df) > 0:
@@ -383,6 +384,7 @@ def process_b3_asset_request(asset):
 
     query = B3Negotiation.query.filter(
         B3Negotiation.codigo.like(f'%{asset}%')).order_by(B3Negotiation.data.asc())
+    # query = query.filter(db.extract('year', B3Negotiation.data) <= 2024)
     result = query.all()
     negotiation_df = b3_negotiation_sql_to_df(result)
     if len(negotiation_df) > 0:
