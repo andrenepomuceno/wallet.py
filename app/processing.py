@@ -5,14 +5,13 @@ import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
 import plotly.offline as pyo
-from lxml import html
 from flask import flash
 from app import app, db
 from app.models import B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
 from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
 from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
-from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data, request_cache
+from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data
 import numpy as np
 
 scrape_dict = {
@@ -78,16 +77,31 @@ def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentat
         return df_merged
 
     columns = ['Date', 'Movimentation', 'Quantity', 'Price', 'Total', "Produto", 'Asset']
-    df1 = movimentation_df[columns]
 
+    # Normalize movimentation columns
+    df1 = movimentation_df.copy()
+    for col in columns:
+        if col not in df1.columns:
+            if col == 'Produto' and 'Asset' in df1.columns:
+                df1['Produto'] = df1['Asset']
+            else:
+                df1[col] = None
+    df1 = df1[columns]
+
+    # Normalize negotiation columns (may come from different mappers naming)
     df2 = negotiation_df.copy()
-    df2.rename(columns={
-        'Date': 'Date',
+    rename_map = {
         "Preço": 'Price',
         "Valor": 'Total',
-        "Código de Negociação": "Produto"
-    }, inplace=True)
+        "Código de Negociação": "Produto",
+    }
+    df2.rename(columns={k: v for k, v in rename_map.items() if k in df2.columns}, inplace=True)
+    if 'Produto' not in df2.columns and 'Asset' in df2.columns:
+        df2['Produto'] = df2['Asset']
     df2['Movimentation'] = movimentation_type
+    for col in columns:
+        if col not in df2.columns:
+            df2[col] = None
     df2 = df2[columns]
 
     df_merged = pd.concat([df1, df2], ignore_index=True)
@@ -111,6 +125,8 @@ def plot_price_history(asset_info):
 
     stock = yf.Ticker(asset_info['info']['symbol'])
     df = stock.history(start=asset_info['first_buy'], end=asset_info['last_sell'], auto_adjust=False)
+    if df is None or df.empty:
+        return None
 
     def add_moving_average(ma_size, df, color='green'):
         ma_name="MA" + str(ma_size)
@@ -170,7 +186,8 @@ def get_online_info(ticker, asset_info = None):
             online_data = get_yfinance_data(yfinance_ticker)
             asset_info.update(online_data)
             rate = usd_exchange_rate('BRL')
-            asset_info['last_close_price'] = round(rate * asset_info['last_close_price'], 2)
+            if rate:
+                asset_info['last_close_price'] = round(rate * asset_info['last_close_price'], 2)
             asset_info['currency'] = 'BRL'
             asset_info['asset_class'] = 'Criptocurrency'
             asset_info['yfinance_ticker'] = yfinance_ticker
@@ -346,6 +363,7 @@ def process_b3_asset_request(asset):
 
     asset_info = { 'valid': False, 'name': asset, 'source': 'b3' }
     dataframes = {}
+    ticker = asset  # default fallback if DB has no rows
 
     query = B3Movimentation.query.filter(
         B3Movimentation.produto.like(f'%{asset}%')).order_by(B3Movimentation.data.asc())
@@ -586,8 +604,9 @@ def load_consolidate(asset_list, process_asset_func, source):
 
 def consolidate_total(df, rate = 1.0, currency='BRL', asset_class=''):
     total = df.select_dtypes(include=['number']).sum() * rate
-
-    total['rentability'] = 100 * (total['capital_gain']/total['liquid_cost'])
+    liquid = total.get('liquid_cost', 0)
+    gain = total.get('capital_gain', 0)
+    total['rentability'] = 100 * (gain/liquid) if liquid else 0
     total = total.round(2)
 
     total['currency'] = currency
@@ -624,8 +643,9 @@ def consolidate_group(consolidate):
         new_row = pd.DataFrame([group_total])
         consolidate_by_group = pd.concat([consolidate_by_group, new_row], ignore_index=True)
 
+    pos_sum = consolidate_by_group['position'].sum()
     consolidate_by_group['relative_position'] = round(
-        consolidate_by_group['position']/consolidate_by_group['position'].sum() * 100, 2)
+        consolidate_by_group['position']/pos_sum * 100, 2) if pos_sum else 0
 
     return consolidate_by_group, group_df
 
@@ -691,7 +711,9 @@ def adjust_for_splits(df):
     return df
 
 def plot_history(asset_info, history_df):
-    currency = asset_info['currency']
+    if history_df is None or history_df.empty:
+        return [""]
+    currency = asset_info.get('currency', 'BRL')
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         name='Rentability',
@@ -815,7 +837,7 @@ def plot_history(asset_info, history_df):
     return [fig1]
 
 def process_history(asset = None, source = None):
-    app.logger.info('process_consolidate_request')
+    app.logger.info('process_history')
 
     ret = {}
     ret['valid'] = False
@@ -827,18 +849,38 @@ def process_history(asset = None, source = None):
     elif source == 'generic':
         asset_info = process_generic_asset_request(asset)
 
-    ticker = asset_info['yfinance_ticker']
+    # Ensure required fields
+    if 'first_buy' not in asset_info or not asset_info['first_buy']:
+        ret['history'] = pd.DataFrame()
+        ret['consolidate'] = pd.DataFrame()
+        ret['plots'] = []
+        ret['valid'] = True
+        return ret
+
+    if 'yfinance_ticker' not in asset_info:
+        try:
+            get_online_info(asset_info.get('ticker', asset), asset_info)
+        except Exception as e:
+            app.logger.warning('Could not enrich ticker for history: %s', e)
+
+    ticker = asset_info.get('yfinance_ticker', asset_info.get('ticker', asset))
     start_date = datetime.fromisoformat(asset_info['first_buy'])
     history = pd.DataFrame()
 
-    stock = yf.Ticker(ticker)
-    data = stock.history(start=start_date, auto_adjust=False)
+    try:
+        stock = yf.Ticker(ticker)
+        data = stock.history(start=start_date, auto_adjust=False)
+    except Exception as e:
+        app.logger.error('Error fetching history for %s: %s', ticker, e)
+        data = pd.DataFrame()
 
-    data = adjust_for_splits(data)
+    if not data.empty and 'Stock Splits' in data.columns:
+        data = adjust_for_splits(data)
     
-    if asset_info['name'] in ['BTC', 'ETH']:
+    if not data.empty and asset_info['name'] in ['BTC', 'ETH']:
         usdbrl = usd_exchange_rate()
-        data['Close'] *= usdbrl
+        if usdbrl:
+            data['Close'] *= usdbrl
 
     step = 5
     #for index in range(0, len(data), step):
@@ -857,13 +899,19 @@ def process_history(asset = None, source = None):
         new_row = pd.DataFrame([asset_info])
         history = pd.concat([history, new_row], ignore_index=True)
 
-    history['slope'] = -np.gradient(history.rentability).round(2)
-    history['position_slope'] = -np.gradient(history.position_total).round(2)
+    if len(history) >= 2:
+        history['slope'] = -np.gradient(history.rentability).round(2)
+        history['position_slope'] = -np.gradient(history.position_total).round(2)
+    else:
+        history['slope'] = 0
+        history['position_slope'] = 0
     # posMax = history['position'].max()
     # totalMax = history['position_total'].max()
     # history['position'] = (history['position'] * totalMax/posMax).round(0)
 
-    consolidate = history[['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','slope','anualized_rentability','age','position_slope']]
+    cols = ['date','last_close_price','avg_price','position','position_total','cost','wages_sum','liquid_cost','capital_gain','rentability','slope','anualized_rentability','age','position_slope']
+    existing_cols = [c for c in cols if c in history.columns]
+    consolidate = history[existing_cols]
     # consolidate = consolidate.sort_values(by='date', ascending=False)
     # print(slope.to_string())
 
