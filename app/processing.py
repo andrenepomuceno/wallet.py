@@ -17,7 +17,7 @@ import numpy as np
 
 scrape_dict = {
     "Tesouro Selic 2029": {
-        'url': 'https://taxas-tesouro.com/investir/tesouro-selic-2029/',
+        'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
         'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
         'class': 'Renda Fixa',
         'currency': 'BRL',
@@ -831,7 +831,7 @@ def process_history(asset = None, source = None):
     start_date = datetime.fromisoformat(asset_info['first_buy'])
     history = pd.DataFrame()
 
-    stock = yf.Ticker(ticker, session=request_cache)
+    stock = yf.Ticker(ticker)
     data = stock.history(start=start_date, auto_adjust=False)
 
     data = adjust_for_splits(data)
