@@ -123,14 +123,25 @@ def extract_fill(df):
     df['Entrada/Saída'] = df['Descrição'].apply(parse_entrada_saida)
 
     def parse_produto(x):
-        match = re.search(
-            r'(Compra de [0-9.]+|Venda de [0-9.]+|Dividendos|Corretagem) ([A-Z]{1,4})', x)
+        # Try patterns with quantity first: "Venda de 0,77 ASML", "Compra de 5 NVDA"
+        match = re.search(r'(Compra|Venda) de [0-9.,]+ ([A-Z]{1,5})', x)
+        if match:
+            return match.group(2)
+        # Then try without quantity: "Dividendos de MSFT", "Imposto sobre dividendo de MSFT"
+        match = re.search(r'(sobre dividendo de|de) ([A-Z]{1,5})', x)
+        if match:
+            return match.group(2)
+        # Old format: "Dividendos MSFT. ***..."
+        match = re.search(r'(Dividendos|Corretagem) ([A-Z]{1,4})', x)
         if match:
             return match.group(2)
         return ''
     df['Produto'] = df['Descrição'].apply(parse_produto)
 
     def parse_movimentacao(x):
+        # Check for "Imposto sobre dividendo" first (new format)
+        if re.search(r'Imposto sobre dividendo', x):
+            return 'Impostos'
         match = re.search(r'Câmbio|Compra|Venda|Impostos|Dividendos|Corretagem|Desdobramento', x)
         if match:
             return match.group(0)
@@ -138,16 +149,25 @@ def extract_fill(df):
     df['Movimentação'] = df['Descrição'].apply(parse_movimentacao)
 
     def parse_quantidade(x):
-        match = re.search(r'(Compra de|Venda de) ([0-9.]+)', x)
+        # New format: "Compra de 5 NVDA" or "Venda de 5 NVDA"
+        # Old format: "Compra de 0.051 AMZN"
+        match = re.search(r'(Compra de|Venda de) ([0-9.,]+)', x)
         if match:
-            return float(match.group(2))
+            # Replace comma with period for decimal separator
+            qty_str = match.group(2).replace(',', '.')
+            return float(qty_str)
         return None
     df['Quantidade'] = df['Descrição'].apply(parse_quantidade)
 
     def parse_preco_unitario(x):
-        match = re.search(r'\$ ?([0-9.]+)', x)
+        # Handle both period and comma as decimal separator
+        # New format: "a $ 178,24 cada"
+        # Old format: "a $ 3154.35"
+        match = re.search(r'\$ ?([0-9.,]+)', x)
         if match:
-            return float(match.group(1))
+            # Replace comma with period for decimal separator
+            price_str = match.group(1).replace(',', '.')
+            return float(price_str)
         return None
     df['Preço unitário'] = df['Descrição'].apply(parse_preco_unitario)
 
@@ -155,6 +175,22 @@ def extract_fill(df):
 
 def import_avenue_extract(df, filepath):
     app.logger.info('Processing Avenue Extract file...')
+
+    # Detect and normalize format (old vs new)
+    if 'Data transação' in df.columns:
+        # New format: Data transação, Data liquidação, Descrição, Valor, Saldo
+        app.logger.info('Detected new Avenue format')
+        df = df.rename(columns={
+            'Data transação': 'Data',
+            'Data liquidação': 'Liquidação',
+            'Descrição': 'Descrição',
+            'Valor': 'Valor (U$)',
+            'Saldo': 'Saldo da conta (U$)'
+        })
+        df['Hora'] = ''  # New format doesn't have time
+    else:
+        # Old format: Data, Hora, Liquidação, Descrição, Valor (U$), Saldo da conta (U$)
+        app.logger.info('Detected old Avenue format')
 
     df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     df['Liquidação'] = pd.to_datetime(df['Liquidação'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')

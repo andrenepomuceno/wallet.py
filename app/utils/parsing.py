@@ -27,7 +27,7 @@ def parse_b3_ticker(column):
 
 def brl_to_float(preco_str):
     preco_str = preco_str.replace("R$", "").strip()
-    preco_str = preco_str.replace(".", "").replace(",", ".")
+    # preco_str = preco_str.replace(".", "").replace(",", ".")
     try:
         return float(preco_str)
     except ValueError:

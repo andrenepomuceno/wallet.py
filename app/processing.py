@@ -17,7 +17,7 @@ import numpy as np
 scrape_dict = {
     "Tesouro Selic 2029": {
         'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
-        'xpath': '//*[@id="gatsby-focus-wrapper"]/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
+        'xpath': '/html/body/div/div/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
         'class': 'Renda Fixa',
         'currency': 'BRL',
     }
@@ -381,7 +381,7 @@ def process_b3_asset_request(asset):
                 (credit['Movimentation'] == "Compra")
                 | (credit['Movimentation'] == "Desdobro")
                 | (credit['Movimentation'] == "Bonificação em Ativos")
-                | (credit['Movimentation'] == "Atualização")
+                # | (credit['Movimentation'] == "Atualização")
             )
         ]
 
@@ -841,6 +841,8 @@ def process_history(asset = None, source = None):
 
     ret = {}
     ret['valid'] = False
+
+    asset_info = {}
 
     if source == 'b3':
         asset_info = process_b3_asset_request(asset)
