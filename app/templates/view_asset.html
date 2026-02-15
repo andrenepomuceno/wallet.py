@@ -1,132 +1,216 @@
 {% extends "base.html" %}
 {% import 'table.html' as table %}
 {% block content %}
-    <h1>Asset Data for "{{ info['name'] }}"</h1>
+    <div class="page-header d-flex align-items-center gap-3">
+        <h1><i class="bi bi-graph-up-arrow"></i> {{ info['name'] }}</h1>
+        {% if info.get('long_name') %}<span class="opacity-50">{{ info['long_name'] }}</span>{% endif %}
+    </div>
 
-    <div class="row">
-        <div class="col-md-4">
-            <div class="p-3 border">
-                <h2>Information</h2>
-                <p>Ticker: {{ info['ticker'] }}</p>
-                <p>Full Name: {{ info['long_name'] }}</p>
-                <p>Close Price: {{ info['currency'] }} {{ info['last_close_price'] }} ({{ info['price_gain'] }} %)</p>
-                <p>Previous Close: {{ info['currency'] }} {{ info['previous_close'] }}</p>
-                <p>Position: {{ info['position'] }} ({{ info['rented'] }} rented)</p>
-                <p>Position: {{ info['currency'] }} {{ info['position_total'] }}</p>
-                <p>Average Price: {{ info['currency'] }} {{ info['avg_price'] }}</p>
-                <p>Cost: {{ info['currency'] }} {{ info['cost'] }}</p>
-                <p>Wages: {{ info['currency'] }} {{ info['wages_sum'] }}</p>
-                <p>Rent Wages: {{ info['currency'] }} {{ info['rent_wages_sum'] }}</p>
-                <p>Taxes: {{ info['currency'] }} {{ info['taxes_sum'] }}</p>
-                <p>Liquid Cost: {{ info['currency'] }} {{ info['liquid_cost'] }}</p>
-                <p>Sells: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
-                <p>Realized Gain: {{ info['currency'] }} {{ info['realized_gain'] }}</p>
-                <p>Not Realized Gain: {{ info['currency'] }} {{ info['not_realized_gain'] }}</p>
-                <p>Capital Gain: {{ info['currency'] }} {{ info['capital_gain'] }}</p>
-                <p>Rentabiliy: {{ info['rentability'] }} % ({{ info['anualized_rentability'] }} %/y)</p>
-                <p>First buy: {{ info['first_buy'] }} ({{ info['age_years'] }} years)</p>
+    <!-- Top KPI row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-2">
+            <div class="card kpi-card">
+                <div class="kpi-value">{{ info['currency'] }} {{ info['last_close_price'] }}</div>
+                <div class="kpi-label">Close Price</div>
+                {% if info.get('price_gain') is not none %}
+                <small class="{% if info['price_gain'] >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                    {{ info['price_gain'] }}%
+                </small>
+                {% endif %}
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="p-3 border">
-                <p><a href="/history/{{ info['source'] }}/{{ info['name'] }}" target="_blank">History</a></p>
-                <p><a href="https://finance.yahoo.com/quote/{{ extended_info['symbol'] }}" target="_blank">Yahoo Finance</a></p>
-                <p>Type: {{ extended_info['quoteType'] }}</p>
-                {% if 'marketCap' in extended_info %}<p>Market Cap: {{ extended_info['currency'] }} {{ extended_info['marketCap'] | format_money }}</p>{% endif %}
-                {% if 'totalCash' in extended_info %}<p>Total Cash: {{ extended_info['currency'] }} {{ extended_info['totalCash'] | format_money }}</p>{% endif %}
-                {% if 'totalDebt' in extended_info %}<p>Total Debt: {{ extended_info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</p>{% endif %}
-                {% if 'ebitda' in extended_info %}<p>EBITDA: {{ extended_info['currency'] }} {{ extended_info['ebitda'] | format_money }}</p>{% endif %}
-                <p>Dividend Yield: {{ extended_info['dividendYield'] }}</p>
-                <p>Dividend Rate: {{ extended_info['dividendRate'] }}</p>
-                <p>Payout Ratio: {{ extended_info['payoutRatio'] }}</p>
-                <p>Trailing EPS: {{ extended_info['trailingEps'] }}</p>
-                <p>Forward EPS: {{ extended_info['forwardEps'] }}</p>
-                <p>PEG Ratio: {{ extended_info['pegRatio'] }}</p>
-                <p>Return On Equity: {{ extended_info['returnOnEquity'] }}</p>
+        <div class="col-6 col-md-2">
+            <div class="card kpi-card">
+                <div class="kpi-value">{{ info['position'] }}</div>
+                <div class="kpi-label">Shares</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="p-3 border">
-                <p><a href="{{ extended_info['website'] }}" target="_blank">Web Site</a></p>
-                <p>industry: {{ extended_info['industry'] }}</p>
-                <p>sector: {{ extended_info['sector'] }}</p>
-                <p>{{ extended_info['longBusinessSummary'] }}</p>
+        <div class="col-6 col-md-2">
+            <div class="card kpi-card">
+                <div class="kpi-value">{{ info['currency'] }} {{ info['position_total'] }}</div>
+                <div class="kpi-label">Position</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card kpi-card">
+                <div class="kpi-value {% if info['capital_gain'] >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                    {{ info['currency'] }} {{ info['capital_gain'] }}
+                </div>
+                <div class="kpi-label">Capital Gain</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card kpi-card">
+                <div class="kpi-value {% if info['rentability'] >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                    {{ info['rentability'] }}%
+                </div>
+                <div class="kpi-label">Rentability</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card kpi-card">
+                <div class="kpi-value {% if info.get('anualized_rentability', 0) >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                    {{ info['anualized_rentability'] }}%/y
+                </div>
+                <div class="kpi-label">Annualized</div>
             </div>
         </div>
     </div>
 
-    {% if graph_html %}
-    <div class="row">
-        <div class="col-md-12">
-            <div class="p-3 m-3 border">
-                <div class="container-fluid">
-                    <h2>Price History</h2>
-                    <div>{{ graph_html|safe }}</div>
+    <!-- Info Cards Row -->
+    <div class="row g-3 mb-4">
+        <!-- Portfolio Info -->
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-wallet2"></i> Portfolio</div>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <li><span class="info-label">Ticker</span><span class="info-value">{{ info['ticker'] }}</span></li>
+                        <li><span class="info-label">Avg Price</span><span class="info-value">{{ info['currency'] }} {{ info['avg_price'] }}</span></li>
+                        <li><span class="info-label">Cost</span><span class="info-value">{{ info['currency'] }} {{ info['cost'] }}</span></li>
+                        <li><span class="info-label">Wages</span><span class="info-value">{{ info['currency'] }} {{ info['wages_sum'] }}</span></li>
+                        <li><span class="info-label">Rent Wages</span><span class="info-value">{{ info['currency'] }} {{ info['rent_wages_sum'] }}</span></li>
+                        <li><span class="info-label">Taxes</span><span class="info-value text-negative">{{ info['currency'] }} {{ info['taxes_sum'] }}</span></li>
+                        <li><span class="info-label">Liquid Cost</span><span class="info-value">{{ info['currency'] }} {{ info['liquid_cost'] }}</span></li>
+                        <li><span class="info-label">Sells</span><span class="info-value">{{ info['currency'] }} {{ info['sells_value_sum'] }}</span></li>
+                        <li><span class="info-label">Realized Gain</span><span class="info-value {% if info['realized_gain'] >= 0 %}text-positive{% else %}text-negative{% endif %}">{{ info['currency'] }} {{ info['realized_gain'] }}</span></li>
+                        <li><span class="info-label">Unrealized Gain</span><span class="info-value {% if info['not_realized_gain'] >= 0 %}text-positive{% else %}text-negative{% endif %}">{{ info['currency'] }} {{ info['not_realized_gain'] }}</span></li>
+                        <li><span class="info-label">Previous Close</span><span class="info-value">{{ info['currency'] }} {{ info.get('previous_close', '-') }}</span></li>
+                        <li><span class="info-label">First Buy</span><span class="info-value">{{ info['first_buy'] }} ({{ info['age_years'] }}y)</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fundamentals -->
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-clipboard-data"></i> Fundamentals</div>
+                <div class="card-body">
+                    <div class="external-links mb-3">
+                        <a href="/history/{{ info['source'] }}/{{ info['name'] }}" target="_blank"><i class="bi bi-clock-history"></i> History</a>
+                        <a href="https://finance.yahoo.com/quote/{{ extended_info.get('symbol', '') }}" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Yahoo Finance</a>
+                    </div>
+                    <ul class="info-list">
+                        <li><span class="info-label">Type</span><span class="info-value">{{ extended_info.get('quoteType', '-') }}</span></li>
+                        {% if 'marketCap' in extended_info %}<li><span class="info-label">Market Cap</span><span class="info-value">{{ extended_info['currency'] }} {{ extended_info['marketCap'] | format_money }}</span></li>{% endif %}
+                        {% if 'totalCash' in extended_info %}<li><span class="info-label">Total Cash</span><span class="info-value">{{ extended_info['currency'] }} {{ extended_info['totalCash'] | format_money }}</span></li>{% endif %}
+                        {% if 'totalDebt' in extended_info %}<li><span class="info-label">Total Debt</span><span class="info-value">{{ extended_info['currency'] }} {{ extended_info['totalDebt'] | format_money }}</span></li>{% endif %}
+                        {% if 'ebitda' in extended_info %}<li><span class="info-label">EBITDA</span><span class="info-value">{{ extended_info['currency'] }} {{ extended_info['ebitda'] | format_money }}</span></li>{% endif %}
+                        <li><span class="info-label">Dividend Yield</span><span class="info-value">{{ extended_info.get('dividendYield', '-') }}</span></li>
+                        <li><span class="info-label">Dividend Rate</span><span class="info-value">{{ extended_info.get('dividendRate', '-') }}</span></li>
+                        <li><span class="info-label">Payout Ratio</span><span class="info-value">{{ extended_info.get('payoutRatio', '-') }}</span></li>
+                        <li><span class="info-label">Trailing EPS</span><span class="info-value">{{ extended_info.get('trailingEps', '-') }}</span></li>
+                        <li><span class="info-label">Forward EPS</span><span class="info-value">{{ extended_info.get('forwardEps', '-') }}</span></li>
+                        <li><span class="info-label">PEG Ratio</span><span class="info-value">{{ extended_info.get('pegRatio', '-') }}</span></li>
+                        <li><span class="info-label">Return on Equity</span><span class="info-value">{{ extended_info.get('returnOnEquity', '-') }}</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Company Info -->
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-building"></i> Company</div>
+                <div class="card-body">
+                    {% if extended_info.get('website') %}
+                    <div class="external-links mb-3">
+                        <a href="{{ extended_info['website'] }}" target="_blank"><i class="bi bi-globe"></i> Website</a>
+                    </div>
+                    {% endif %}
+                    <ul class="info-list mb-3">
+                        <li><span class="info-label">Industry</span><span class="info-value">{{ extended_info.get('industry', '-') }}</span></li>
+                        <li><span class="info-label">Sector</span><span class="info-value">{{ extended_info.get('sector', '-') }}</span></li>
+                    </ul>
+                    {% if extended_info.get('longBusinessSummary') %}
+                    <div class="business-summary">{{ extended_info['longBusinessSummary'] }}</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Price Chart -->
+    {% if graph_html %}
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-graph-up"></i> Price History</div>
+        <div class="card-body">
+            {{ graph_html|safe }}
+        </div>
+    </div>
     {% endif %}
 
-    <div class="row">
+    <!-- Buys & Sells -->
+    <div class="row g-3 mb-4">
         <div class="col-md-6">
-            <div class="p-3 m-3 border">
-                <h2>Buys</h2>
-                <p>Buys Total: {{ info['currency'] }} {{ info['buys_value_sum'] }}</p>
-                <div class="container-fluid">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="bi bi-cart-plus"></i> Buys</span>
+                    <span class="badge bg-success">{{ info['currency'] }} {{ info['buys_value_sum'] }}</span>
+                </div>
+                <div class="card-body p-0">
                     {{ table.render(buys) }}
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="p-3 m-3 border">
-                <h2>Sells</h2>
-                <p>Sells Total: {{ info['currency'] }} {{ info['sells_value_sum'] }}</p>
-                <div class="container-fluid">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="bi bi-cart-dash"></i> Sells</span>
+                    <span class="badge bg-danger">{{ info['currency'] }} {{ info['sells_value_sum'] }}</span>
+                </div>
+                <div class="card-body p-0">
                     {{ table.render(sells) }}
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
+    <!-- Wages, Taxes, Rent -->
+    <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="p-3 m-3 border">
-                <h2>Wages</h2>
-                <div class="container-fluid">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-cash-coin"></i> Wages</div>
+                <div class="card-body p-0">
                     {{ table.render(wages) }}
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 m-3 border">
-                <h2>Taxes</h2>
-                <div class="container-fluid">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-receipt"></i> Taxes</div>
+                <div class="card-body p-0">
                     {{ table.render(taxes) }}
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="p-3 m-3 border">
-                <h2>Rent</h2>
-                <div class="container-fluid">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-arrow-left-right"></i> Rent</div>
+                <div class="card-body p-0">
                     {{ table.render(rent) }}
-                </div>            
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Raw Data -->
     {% if not negotiation.empty %}
-    <h2>Negotiation (All)</h2>
-    <div class="container-fluid">
-        {{ table.render(negotiation) }}
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-list-ul"></i> Negotiation (All)</div>
+        <div class="card-body p-0">
+            {{ table.render(negotiation) }}
+        </div>
     </div>
     {% endif %}
     
     {% if not movimentation.empty %}
-    <h2>Movimentation (All)</h2>
-    <div class="container-fluid">
-        {{ table.render(movimentation) }}
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-list-ul"></i> Movimentation (All)</div>
+        <div class="card-body p-0">
+            {{ table.render(movimentation) }}
+        </div>
     </div>
     {% endif %}
 {% endblock %}

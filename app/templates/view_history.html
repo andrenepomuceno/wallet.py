@@ -1,15 +1,22 @@
 {% extends "base.html" %}
 {% import 'table.html' as table %}
 {% block content %}
-    <h1>History for {{ title }}</h1>
+    <div class="page-header">
+        <h1><i class="bi bi-clock-history"></i> History for {{ title }}</h1>
+    </div>
 
     {% for plot in plots %}
-        <div class="container-fluid">
-            <div>{{ plot | safe }}</div>
+    <div class="card mb-4">
+        <div class="card-body">
+            {{ plot | safe }}
         </div>
+    </div>
     {% endfor %}
 
-    <div class='container-fluid'>
-        {{ table.render(df, True, True) }}
+    <div class="card">
+        <div class="card-header"><i class="bi bi-table"></i> Data</div>
+        <div class="card-body p-0">
+            {{ table.render(df, True, True) }}
+        </div>
     </div>
 {% endblock %}

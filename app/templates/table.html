@@ -1,6 +1,7 @@
 {% macro render(df=None, enable_index=False, enable_controls=False) -%}
-<div class="table table-sm table-striped mt-3">
+<div class="table-container">
     <table
+    class="table table-sm table-striped table-hover mb-0"
     data-toggle="table"
     pagination="true"
     data-sticky-header="true"
@@ -14,14 +15,10 @@
         <thead>
             <tr>
                 {% if enable_index %}
-                <th data-sortable="true">
-                    Index
-                </th>
+                <th data-sortable="true">Index</th>
                 {% endif %}
                 {% for column in df.columns %}
-                <th data-sortable="true">
-                    {{ column|safe }}
-                </th>
+                <th data-sortable="true">{{ column|safe }}</th>
                 {% endfor %}
             </tr>
         </thead>
@@ -29,9 +26,7 @@
             {% for row in df.itertuples(index=enable_index) %}
             <tr>
                 {% for item in row %}
-                <td>
-                    {{ item|safe }}
-                </td>
+                <td>{{ item|safe }}</td>
                 {% endfor %}
             </tr>
             {% endfor %}

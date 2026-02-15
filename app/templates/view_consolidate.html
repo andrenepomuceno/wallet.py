@@ -1,15 +1,67 @@
 {% extends "base.html" %}
 {% import 'table.html' as table %}
 {% block content %}
-    <h1>Consolidate Data</h1>
-    <p>USD/BRL: {{ info['usd_brl'] }}</p>
-    
-    <h2>By Group</h2>
-    {{ table.render(by_group) }}
+    <div class="page-header d-flex align-items-center justify-content-between">
+        <h1><i class="bi bi-pie-chart"></i> Portfolio Consolidation</h1>
+        <span class="badge bg-secondary fs-6">USD/BRL: {{ info['usd_brl'] }}</span>
+    </div>
+
+    <!-- Summary KPI cards -->
+    {% if info['consolidate_by_group'] is defined %}
+    {% set totals = info['consolidate_by_group'].iloc[0] %}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card">
+                <div class="kpi-value">{{ "%.2f"|format(totals['position']) }}</div>
+                <div class="kpi-label">Total Position (BRL)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card">
+                <div class="kpi-value">{{ "%.2f"|format(totals['liquid_cost']) }}</div>
+                <div class="kpi-label">Liquid Cost</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card">
+                <div class="kpi-value {% if totals['capital_gain'] >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                    {{ "%.2f"|format(totals['capital_gain']) }}
+                </div>
+                <div class="kpi-label">Capital Gain</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card">
+                <div class="kpi-value {% if totals['rentability'] >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                    {{ "%.2f"|format(totals['rentability']) }}%
+                </div>
+                <div class="kpi-label">Rentability</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-bar-chart"></i> By Group</div>
+        <div class="card-body p-0">
+            {{ table.render(by_group) }}
+        </div>
+    </div>
 
     {% for group in group_df %}
-        <h2>{{ group['name'] }}</h2>
-        {{ table.render(group['df']) }}
+    <div class="group-header">
+        <h2><i class="bi bi-folder2-open"></i> {{ group['name'] }}</h2>
+        {% if group['consolidate'] is defined %}
+            <span class="badge bg-secondary">
+                Position: {{ "%.2f"|format(group['consolidate']['position']) }}
+            </span>
+        {% endif %}
+    </div>
+    <div class="card mb-3">
+        <div class="card-body p-0">
+            {{ table.render(group['df']) }}
+        </div>
+    </div>
     {% endfor %}
 
 {% endblock %}

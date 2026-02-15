@@ -1,43 +1,51 @@
 {% extends "base.html" %}
 {% import 'table.html' as table %}
 {% block content %}
-    <h1>Generic Extract Data</h1>
-    <button type="button" class="btn btn-info" onclick="toggleDisplay('add_form')">Add Entry</button>
-    <div class="container" id="add_form" style="display: none;">
-        <h2>Add Entry</h2>
-        <form method="POST" class="form-inline">
+    <div class="page-header d-flex align-items-center gap-3">
+        <h1><i class="bi bi-file-earmark-spreadsheet"></i> Generic Extract</h1>
+        <button type="button" class="btn btn-outline-success btn-sm" onclick="toggleDisplay('add_form')">
+            <i class="bi bi-plus-circle"></i> Add Entry
+        </button>
+    </div>
+
+    <div id="add_form" style="display: none;" class="form-section mb-3">
+        <form method="POST">
             {{ add_form.hidden_tag() }}
-            <div class="form-group">
-                {{ add_form.date.label(class="form-control-label") }}
-                {{ add_form.date(class="form-control") }}
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">{{ add_form.date.label.text }}</label>
+                    {{ add_form.date(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ add_form.asset.label.text }}</label>
+                    {{ add_form.asset(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ add_form.movimentation.label.text }}</label>
+                    {{ add_form.movimentation(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ add_form.quantity.label.text }}</label>
+                    {{ add_form.quantity(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ add_form.price.label.text }}</label>
+                    {{ add_form.price(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ add_form.total.label.text }}</label>
+                    {{ add_form.total(class="form-control form-control-sm") }}
+                </div>
             </div>
-            <div class="form-group">
-                {{ add_form.asset.label(class="form-control-label") }}
-                {{ add_form.asset(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ add_form.movimentation.label(class="form-control-label") }}
-                {{ add_form.movimentation(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ add_form.quantity.label(class="form-control-label") }}
-                {{ add_form.quantity(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ add_form.price.label(class="form-control-label") }}
-                {{ add_form.price(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ add_form.total.label(class="form-control-label") }}
-                {{ add_form.total(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ add_form.submit(class="btn btn-primary") }}
+            <div class="mt-3">
+                {{ add_form.submit(class="btn btn-primary btn-sm") }}
             </div>
         </form>
     </div>
 
-    <div class='container-fluid'>
-        {{ table.render(df, True) }}
+    <div class="card">
+        <div class="card-body p-0">
+            {{ table.render(df, True) }}
+        </div>
     </div>
 {% endblock %}

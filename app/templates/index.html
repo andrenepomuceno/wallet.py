@@ -1,21 +1,94 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-    <h1>File Upload</h1>
-    <form id="uploadForm" method="post" enctype="multipart/form-data">
-        <div class="form-group">
-            <input type="file" name="file" accept=".csv, .xlsx">
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-cloud-arrow-up"></i> Import Financial Data
+            </div>
+            <div class="card-body p-4">
+                <form id="uploadForm" method="post" enctype="multipart/form-data">
+                    <!-- File Drop Area -->
+                    <div class="upload-area mb-3" id="dropArea" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon"><i class="bi bi-file-earmark-arrow-up"></i></div>
+                        <div class="upload-label">Click or drag a file here</div>
+                        <div class="small opacity-50 mt-1">CSV or XLSX files supported</div>
+                        <input type="file" name="file" id="fileInput" accept=".csv, .xlsx">
+                        <div class="upload-filename" id="fileName"></div>
+                    </div>
+
+                    <!-- File Type -->
+                    <div class="mb-3">
+                        <label for="filetype" class="form-label">Data Source</label>
+                        <select class="form-select" id="filetype" name="filetype">
+                            <option value="B3 Negotiation">B3 Negotiation</option>
+                            <option value="B3 Movimentation">B3 Movimentation</option>
+                            <option value="Avenue Extract">Avenue Extract</option>
+                            <option value="Generic Extract">Generic Extract</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" id="uploadBtn" disabled>
+                        <i class="bi bi-upload"></i> Upload
+                    </button>
+                </form>
+            </div>
         </div>
-        <div class="form-group">
-            <label for="filetype">File Type</label>
-            <select class="form-control" id="filetype" name="filetype">
-            <option>B3 Negotiation</option>
-            <option>B3 Movimentation</option>
-            <option>Avenue Extract</option>
-            <option>Generic Extract</option>
-            </select>
+
+        <!-- Quick links -->
+        <div class="text-center mt-3 opacity-50">
+            <small>
+                After uploading, go to
+                <a href="/consolidate" class="text-decoration-none">Consolidate</a>
+                to see your portfolio.
+            </small>
         </div>
-        <button type="submit" class="btn btn-primary">Upload</button>
-    </form>
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var dropArea = document.getElementById('dropArea');
+    var fileInput = document.getElementById('fileInput');
+    var fileName = document.getElementById('fileName');
+    var uploadBtn = document.getElementById('uploadBtn');
+    var uploadForm = document.getElementById('uploadForm');
+
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            fileName.textContent = this.files[0].name;
+            uploadBtn.disabled = false;
+        }
+    });
+
+    ['dragenter', 'dragover'].forEach(function(evt) {
+        dropArea.addEventListener(evt, function(e) {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(function(evt) {
+        dropArea.addEventListener(evt, function(e) {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+        });
+    });
+
+    dropArea.addEventListener('drop', function(e) {
+        fileInput.files = e.dataTransfer.files;
+        if (fileInput.files.length > 0) {
+            fileName.textContent = fileInput.files[0].name;
+            uploadBtn.disabled = false;
+        }
+    });
+
+    // Loading state on submit
+    uploadForm.addEventListener('submit', function() {
+        uploadBtn.disabled = true;
+        uploadBtn.classList.add('btn-loading');
+        uploadBtn.innerHTML = '<span class="spinner-border" role="status"></span> Uploading...';
+    });
+});
+</script>
 {% endblock %}

@@ -1,45 +1,59 @@
 {% extends "base.html" %}
 {% import 'table.html' as table %}
 {% block content %}
-    <h1>B3 Movimentation Data</h1>
+    <div class="page-header d-flex align-items-center gap-3">
+        <h1><i class="bi bi-arrow-left-right"></i> B3 Movimentation</h1>
+        <button type="button" class="btn btn-outline-info btn-sm" onclick="toggleDisplay('filter_form')">
+            <i class="bi bi-funnel"></i> Filter
+        </button>
+    </div>
 
-    <!-- Botão para Mostrar/Ocultar o Formulário de Filtro -->
-    <button type="button" class="btn btn-info" onclick="toggleDisplay('filter_form')">Filter</button>
-    <div class="container" id="filter_form" style="display: none;">
-        <h2>Filter</h2>
-        <form method="POST" class="form-inline">
+    <div id="filter_form" style="display: none;" class="form-section mb-3">
+        <form method="POST">
             {{ filter_form.hidden_tag() }}
-            <div class="form-group">
-                {{ filter_form.entrada_saida.label(class="form-control-label") }} {{ filter_form.entrada_saida(class="form-control") }}
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.entrada_saida.label.text }}</label>
+                    {{ filter_form.entrada_saida(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.data.label.text }}</label>
+                    {{ filter_form.data(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.movimentacao.label.text }}</label>
+                    {{ filter_form.movimentacao(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.produto.label.text }}</label>
+                    {{ filter_form.produto(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.instituicao.label.text }}</label>
+                    {{ filter_form.instituicao(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.quantidade.label.text }}</label>
+                    {{ filter_form.quantidade(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.preco_unitario.label.text }}</label>
+                    {{ filter_form.preco_unitario(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ filter_form.valor_operacao.label.text }}</label>
+                    {{ filter_form.valor_operacao(class="form-control form-control-sm") }}
+                </div>
             </div>
-            <div class="form-group">
-                {{ filter_form.data.label(class="form-control-label") }} {{ filter_form.data(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.movimentacao.label(class="form-control-label") }} {{ filter_form.movimentacao(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.produto.label(class="form-control-label") }} {{ filter_form.produto(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.instituicao.label(class="form-control-label") }} {{ filter_form.instituicao(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.quantidade.label(class="form-control-label") }} {{ filter_form.quantidade(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.preco_unitario.label(class="form-control-label") }} {{ filter_form.preco_unitario(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.valor_operacao.label(class="form-control-label") }} {{ filter_form.valor_operacao(class="form-control") }}
-            </div>
-            <div class="form-group">
-                {{ filter_form.submit(class="btn btn-primary") }}
+            <div class="mt-3">
+                {{ filter_form.submit(class="btn btn-primary btn-sm") }}
             </div>
         </form>
     </div>
-    
-    <div class='container-fluid'>
-        {{ table.render(df, True) }}
+
+    <div class="card">
+        <div class="card-body p-0">
+            {{ table.render(df, True) }}
+        </div>
     </div>
 {% endblock %}
