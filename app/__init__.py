@@ -11,8 +11,7 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-SECRET_KEY = os.urandom(32)
-app.config['SECRET_KEY'] = SECRET_KEY
+app.config['SECRET_KEY'] = 'dev-secret-key'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///demo.db'

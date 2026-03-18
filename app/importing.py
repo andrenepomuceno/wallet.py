@@ -117,7 +117,7 @@ def import_b3_negotiation(df, filepath):
 
 def extract_fill(df):
     def parse_entrada_saida(x):
-        if re.match(r'Câmbio Instantâneo|Câmbio Padrão|Compra|Dividendos|Estorno', x):
+        if re.match(r'Câmbio|Compra|Dividendos|Estorno', x):
             return 'Credito'
         return 'Debito'
     df['Entrada/Saída'] = df['Descrição'].apply(parse_entrada_saida)
@@ -142,6 +142,9 @@ def extract_fill(df):
         # Check for "Imposto sobre dividendo" first (new format)
         if re.search(r'Imposto sobre dividendo', x):
             return 'Impostos'
+        # New format: "Cobrança de taxa de corretagem" (lowercase)
+        if re.search(r'corretagem', x, re.IGNORECASE):
+            return 'Corretagem'
         match = re.search(r'Câmbio|Compra|Venda|Impostos|Dividendos|Corretagem|Desdobramento', x)
         if match:
             return match.group(0)
@@ -161,9 +164,9 @@ def extract_fill(df):
 
     def parse_preco_unitario(x):
         # Handle both period and comma as decimal separator
-        # New format: "a $ 178,24 cada"
+        # New format: "a $\xa0209,00 cada" (non-breaking space)
         # Old format: "a $ 3154.35"
-        match = re.search(r'\$ ?([0-9.,]+)', x)
+        match = re.search(r'\$[\s\xa0]?([0-9.,]+)', x)
         if match:
             # Replace comma with period for decimal separator
             price_str = match.group(1).replace(',', '.')

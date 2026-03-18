@@ -211,8 +211,11 @@ def get_online_info(ticker, asset_info = None):
 
     return asset_info
 
-def consolidate_asset_info(dataframes, asset_info, until_date=datetime.now(), date_close_price = None):
+def consolidate_asset_info(dataframes, asset_info, until_date=None, date_close_price = None):
     ticker = asset_info['ticker']
+
+    if until_date is None:
+        until_date = datetime.now()
 
     buys = dataframes['buys']
     buys = buys.loc[buys['Date'] <= pd.to_datetime(until_date)]
