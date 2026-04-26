@@ -11,7 +11,7 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = 'dev-secret-key'
+app.config['SECRET_KEY'] = os.environ.get('WALLET_SECRET_KEY', 'dev-secret-key')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'WALLET_DATABASE_URI', 'sqlite:///wallet.db'

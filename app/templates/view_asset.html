@@ -145,23 +145,15 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-newspaper"></i> News</span>
             <div class="d-flex gap-2">
-                {% if news_requested %}
-                <a href="{{ url_for('view_asset', source=info.source, asset=info.name) }}"
-                   class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-x-lg"></i> Ocultar
-                </a>
-                {% else %}
-                <a href="{{ url_for('view_asset', source=info.source, asset=info.name, news=1, news_sort=news_sort) }}"
-                   class="btn btn-sm btn-primary">
+                <button id="newsFetchBtn" class="btn btn-sm btn-primary" type="button">
                     <i class="bi bi-search"></i> Buscar noticias (Serper)
-                </a>
-                {% endif %}
-                {% if news_requested %}
-                <a href="{{ url_for('view_asset', source=info.source, asset=info.name, news=1, sentiment=1, news_sort=news_sort) }}"
-                   class="btn btn-sm btn-warning">
+                </button>
+                <button id="newsAnalyzeBtn" class="btn btn-sm btn-warning" type="button" disabled>
                     <i class="bi bi-stars"></i> Analisar sentimento (Gemini)
-                </a>
-                {% endif %}
+                </button>
+                <button id="newsHideBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>
+                    <i class="bi bi-x-lg"></i> Ocultar
+                </button>
                 <button class="btn btn-sm btn-outline-info"
                         type="button"
                         data-bs-toggle="collapse"
@@ -173,112 +165,213 @@
             </div>
         </div>
         <div class="collapse show" id="newsBody">
-            {% if news_requested %}
-                {% if news %}
-                <div class="card-body border-bottom">
-                    <form method="get" class="row g-2 align-items-end">
-                        <input type="hidden" name="news" value="1">
-                        {% if sentiment_requested %}<input type="hidden" name="sentiment" value="1">{% endif %}
-                        <div class="col-12 col-md-4">
-                            <label class="form-label form-label-sm mb-1">Ordenar noticias</label>
-                            <select name="news_sort" class="form-select form-select-sm">
-                                <option value="date_desc" {% if news_sort == 'date_desc' %}selected{% endif %}>Mais recentes primeiro</option>
-                                <option value="date_asc" {% if news_sort == 'date_asc' %}selected{% endif %}>Mais antigas primeiro</option>
-                                <option value="source_asc" {% if news_sort == 'source_asc' %}selected{% endif %}>Fonte (A-Z)</option>
-                                <option value="title_asc" {% if news_sort == 'title_asc' %}selected{% endif %}>Titulo (A-Z)</option>
-                            </select>
-                        </div>
-                        <div class="col-12 col-md-auto">
-                            <button type="submit" class="btn btn-sm btn-outline-light">
-                                <i class="bi bi-sort-down"></i> Aplicar ordenacao
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                {% if sentiment_requested %}
-                {% if news_sentiment %}
-                <div class="card-body border-bottom">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <strong>Sentimento (Gemini):</strong>
-                        {% if news_sentiment.overall == 'positive' %}
-                        <span class="badge bg-success">Positivo</span>
-                        {% elif news_sentiment.overall == 'negative' %}
-                        <span class="badge bg-danger">Negativo</span>
-                        {% else %}
-                        <span class="badge bg-secondary">Neutro</span>
-                        {% endif %}
-                        {% if news_sentiment.model %}
-                        <small class="opacity-75">Modelo: {{ news_sentiment.model }}</small>
-                        {% endif %}
+            <div class="card-body border-bottom">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label form-label-sm mb-1" for="newsSortSelect">Ordenar noticias</label>
+                        <select id="newsSortSelect" class="form-select form-select-sm">
+                            <option value="date_desc" {% if news_sort == 'date_desc' %}selected{% endif %}>Mais recentes primeiro</option>
+                            <option value="date_asc" {% if news_sort == 'date_asc' %}selected{% endif %}>Mais antigas primeiro</option>
+                            <option value="source_asc" {% if news_sort == 'source_asc' %}selected{% endif %}>Fonte (A-Z)</option>
+                            <option value="title_asc" {% if news_sort == 'title_asc' %}selected{% endif %}>Titulo (A-Z)</option>
+                        </select>
                     </div>
-                    {% if news_sentiment.summary %}
-                    <p class="mb-0 small text-muted">{{ news_sentiment.summary }}</p>
-                    {% endif %}
-                    <details class="mt-2">
-                        <summary class="small">Ver prompt e resposta do Gemini</summary>
-                        <div class="mt-2">
-                            <div class="small fw-bold">Prompt</div>
-                            <pre class="small mb-2" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">{{ news_sentiment.prompt }}</pre>
-                            <div class="small fw-bold">Resposta</div>
-                            <pre class="small mb-0" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">{{ news_sentiment.raw_response }}</pre>
-                        </div>
-                    </details>
+                    <div class="col-12 col-md-auto">
+                        <button id="newsSortBtn" type="button" class="btn btn-sm btn-outline-light" disabled>
+                            <i class="bi bi-sort-down"></i> Aplicar ordenacao
+                        </button>
+                    </div>
                 </div>
-                {% else %}
-                <div class="card-body border-bottom text-muted small">
-                    Nao foi possivel gerar analise de sentimento com Gemini.
-                    Verifique se a chave Gemini esta configurada em
-                    <a href="{{ url_for('view_api_config') }}">API Config</a>.
-                </div>
-                {% endif %}
-                {% else %}
-                <div class="card-body border-bottom text-muted small">
-                    A analise de sentimento nao e automatica. Clique em
-                    <strong>Analisar sentimento (Gemini)</strong> para executar.
-                </div>
-                {% endif %}
-                <div class="list-group list-group-flush">
-                    {% for item in news %}
-                    <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer"
-                       class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ item.title }}</h6>
-                            <small class="opacity-75">{{ item.date }}</small>
-                        </div>
-                        {% if sentiment_requested and item.sentiment %}
-                        <div class="mb-1">
-                            {% if item.sentiment == 'positive' %}
-                            <span class="badge bg-success">Positivo</span>
-                            {% elif item.sentiment == 'negative' %}
-                            <span class="badge bg-danger">Negativo</span>
-                            {% else %}
-                            <span class="badge bg-secondary">Neutro</span>
-                            {% endif %}
-                            {% if item.sentiment_confidence is defined %}
-                            <small class="opacity-75">Conf.: {{ (item.sentiment_confidence * 100) | round(0) }}%</small>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        {% if item.snippet %}<p class="mb-1 small">{{ item.snippet }}</p>{% endif %}
-                        {% if item.sentiment_reason %}<p class="mb-1 small text-muted">{{ item.sentiment_reason }}</p>{% endif %}
-                        {% if item.source %}<small class="opacity-75">{{ item.source }}</small>{% endif %}
-                    </a>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="card-body text-muted small">
-                    Nenhuma noticia encontrada. Verifique se a chave Serper esta configurada em
-                    <a href="{{ url_for('view_api_config') }}">API Config</a>.
-                </div>
-                {% endif %}
-            {% else %}
-            <div class="card-body text-muted small">
+            </div>
+            <div id="newsContent" class="card-body text-muted small">
                 Clique em "Buscar noticias" para consultar o Serper sob demanda.
             </div>
-            {% endif %}
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const source = {{ info.source | tojson }};
+            const asset = {{ info.name | tojson }};
+            const apiUrl = `/api/view/${encodeURIComponent(source)}/${encodeURIComponent(asset)}/news`;
+
+            const newsFetchBtn = document.getElementById('newsFetchBtn');
+            const newsAnalyzeBtn = document.getElementById('newsAnalyzeBtn');
+            const newsHideBtn = document.getElementById('newsHideBtn');
+            const newsSortBtn = document.getElementById('newsSortBtn');
+            const newsSortSelect = document.getElementById('newsSortSelect');
+            const newsContent = document.getElementById('newsContent');
+
+            const state = {
+                loaded: false,
+                sentimentRequested: false,
+                sort: newsSortSelect.value || 'date_desc',
+            };
+
+            function escapeHtml(str) {
+                if (str === null || str === undefined) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function sentimentBadge(sentiment) {
+                if (sentiment === 'positive') {
+                    return '<span class="badge bg-success">Positivo</span>';
+                }
+                if (sentiment === 'negative') {
+                    return '<span class="badge bg-danger">Negativo</span>';
+                }
+                return '<span class="badge bg-secondary">Neutro</span>';
+            }
+
+            function renderNews(payload) {
+                const news = payload.news || [];
+                const sentiment = payload.news_sentiment;
+                const sentimentRequested = !!payload.sentiment_requested;
+
+                if (!news.length) {
+                    newsContent.innerHTML = `
+                        <div class="text-muted small">
+                            Nenhuma noticia encontrada. Verifique se a chave Serper esta configurada em
+                            <a href="{{ url_for('view_api_config') }}">API Config</a>.
+                        </div>`;
+                    return;
+                }
+
+                let html = '';
+                if (sentimentRequested) {
+                    if (sentiment) {
+                        html += `
+                            <div class="card-body border-bottom">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <strong>Sentimento (Gemini):</strong>
+                                    ${sentimentBadge(sentiment.overall)}
+                                    ${sentiment.model ? `<small class="opacity-75">Modelo: ${escapeHtml(sentiment.model)}</small>` : ''}
+                                </div>
+                                ${sentiment.summary ? `<p class="mb-0 small text-muted">${escapeHtml(sentiment.summary)}</p>` : ''}
+                                <details class="mt-2">
+                                    <summary class="small">Ver prompt e resposta do Gemini</summary>
+                                    <div class="mt-2">
+                                        <div class="small fw-bold">Prompt</div>
+                                        <pre class="small mb-2" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(sentiment.prompt || '')}</pre>
+                                        <div class="small fw-bold">Resposta</div>
+                                        <pre class="small mb-0" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(sentiment.raw_response || '')}</pre>
+                                    </div>
+                                </details>
+                            </div>`;
+                    } else {
+                        html += `
+                            <div class="card-body border-bottom text-muted small">
+                                Nao foi possivel gerar analise de sentimento com Gemini.
+                                Verifique se a chave Gemini esta configurada em
+                                <a href="{{ url_for('view_api_config') }}">API Config</a>.
+                            </div>`;
+                    }
+                } else {
+                    html += `
+                        <div class="card-body border-bottom text-muted small">
+                            A analise de sentimento nao e automatica. Clique em
+                            <strong>Analisar sentimento (Gemini)</strong> para executar.
+                        </div>`;
+                }
+
+                html += '<div class="list-group list-group-flush">';
+                news.forEach(function(item) {
+                    html += `
+                        <a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer"
+                           class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${escapeHtml(item.title)}</h6>
+                                <small class="opacity-75">${escapeHtml(item.date)}</small>
+                            </div>
+                            ${sentimentRequested && item.sentiment ?
+                                `<div class="mb-1">
+                                    ${sentimentBadge(item.sentiment)}
+                                    ${item.sentiment_confidence !== undefined ?
+                                        `<small class="opacity-75">Conf.: ${Math.round((item.sentiment_confidence || 0) * 100)}%</small>` :
+                                        ''}
+                                </div>` :
+                                ''}
+                            ${item.snippet ? `<p class="mb-1 small">${escapeHtml(item.snippet)}</p>` : ''}
+                            ${item.sentiment_reason ? `<p class="mb-1 small text-muted">${escapeHtml(item.sentiment_reason)}</p>` : ''}
+                            ${item.source ? `<small class="opacity-75">${escapeHtml(item.source)}</small>` : ''}
+                        </a>`;
+                });
+                html += '</div>';
+                newsContent.innerHTML = html;
+            }
+
+            function setLoading(loading) {
+                newsFetchBtn.disabled = loading;
+                newsAnalyzeBtn.disabled = loading || !state.loaded;
+                newsHideBtn.disabled = loading || !state.loaded;
+                newsSortBtn.disabled = loading || !state.loaded;
+                if (loading) {
+                    newsContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Carregando...</div>';
+                }
+            }
+
+            async function fetchNews(analyzeSentiment) {
+                setLoading(true);
+                const params = new URLSearchParams({
+                    news: '1',
+                    news_sort: newsSortSelect.value,
+                });
+                if (analyzeSentiment) {
+                    params.set('sentiment', '1');
+                }
+
+                try {
+                    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+                        headers: {'Accept': 'application/json'},
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const payload = await response.json();
+                    state.loaded = true;
+                    state.sentimentRequested = !!payload.sentiment_requested;
+                    state.sort = payload.news_sort || newsSortSelect.value;
+                    newsSortSelect.value = state.sort;
+                    renderNews(payload);
+                } catch (error) {
+                    newsContent.innerHTML = '<div class="text-danger small">Falha ao carregar noticias. Tente novamente.</div>';
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            newsFetchBtn.addEventListener('click', function() {
+                fetchNews(false);
+            });
+
+            newsAnalyzeBtn.addEventListener('click', function() {
+                fetchNews(true);
+            });
+
+            newsSortBtn.addEventListener('click', function() {
+                if (!state.loaded) return;
+                fetchNews(state.sentimentRequested);
+            });
+
+            newsHideBtn.addEventListener('click', function() {
+                state.loaded = false;
+                state.sentimentRequested = false;
+                newsAnalyzeBtn.disabled = true;
+                newsHideBtn.disabled = true;
+                newsSortBtn.disabled = true;
+                newsContent.innerHTML = 'Clique em "Buscar noticias" para consultar o Serper sob demanda.';
+            });
+
+            if ({{ 'true' if news_requested else 'false' }}) {
+                fetchNews({{ 'true' if sentiment_requested else 'false' }});
+            }
+        });
+    </script>
 
     <!-- Buys & Sells -->
     <div class="row g-3 mb-4">
