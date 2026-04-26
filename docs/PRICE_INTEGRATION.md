@@ -13,7 +13,7 @@ For each asset, the system works through this cascade:
 2. B3 REITs (XXXX11)?               → ticker + .SA → yfinance
 3. Crypto (BTC, ETH …)?            → ticker + -USD → yfinance → × USD/BRL rate
 4. In scrape_dict?                  → XPath scraping
-5. Gemini AI available?             → ask gemini-2.0-flash for best Yahoo Finance ticker
+5. Gemini AI available?             → ask compatible Gemini model for best Yahoo Finance ticker
 6. Final fallback                   → yfinance with raw ticker string
 ```
 
@@ -37,10 +37,10 @@ def get_yfinance_data(ticker):
 
 ## 🤖 Gemini AI Ticker Resolution
 
-When a ticker doesn’t match any B3/crypto pattern and isn’t in `scrape_dict`, `guess_yfinance_ticker_with_gemini(asset_name)` (in `processing.py`) is called.
+When a ticker doesn’t match any B3/crypto pattern and isn’t in `scrape_dict`, `guess_yfinance_ticker_with_gemini(asset_name)` (in `app/processing/prices.py`) is called.
 
 - Requires a **Gemini API key** stored in `ApiConfig` (provider = `gemini`). Set via `/config/api`.
-- Calls `gemini-2.0-flash` with a prompt asking for the best Yahoo Finance ticker, with `.SA` suffix for Brazilian assets.
+- Calls Gemini with model fallback candidates (`gemini-2.5-flash`, `gemini-1.5-flash`, `gemini-2.0-flash`) asking for the best Yahoo Finance ticker, with `.SA` suffix for Brazilian assets.
 - Returns the suggested ticker string, or `None` if no key is configured or the model is not confident.
 
 ---
@@ -63,7 +63,7 @@ def is_valid_b3_ticker(ticker): ...
 
 ## 🏷️ Custom XPath Scraping
 
-Defined in `scrape_dict` at the top of `app/processing.py`.
+Defined in `scrape_dict` at the top of `app/processing/prices.py`.
 Example (pre-configured):
 
 ```python
@@ -112,7 +112,7 @@ To clear the HTTP cache immediately, use the **Clear Cache** button at `/config/
 ### Price not found
 
 1. Verify the ticker exists on Yahoo Finance: `yfinance.Ticker('ITUB3.SA').info`
-2. For custom assets, check `scrape_dict` in `processing.py`
+2. For custom assets, check `scrape_dict` in `app/processing/prices.py`
 3. Configure a Gemini API key at `/config/api` to enable AI-assisted ticker resolution
 
 ### Price different from expected
@@ -130,7 +130,7 @@ To clear the HTTP cache immediately, use the **Clear Cache** button at `/config/
 
 ## 🔄 get_online_info() Flow
 
-Function in `app/processing.py`:
+Function in `app/processing/prices.py`:
 
 ```python
 def get_online_info(asset):
@@ -384,7 +384,7 @@ For assets not found on yfinance:
 
 ### Configuration
 
-In `app/processing.py`, at the beginning of the file:
+In `app/processing/prices.py`, at the beginning of the file:
 
 ```python
 scrape_dict = {

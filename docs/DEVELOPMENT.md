@@ -150,7 +150,7 @@ Follow the 4 steps in the [Architecture diagram](ARCHITECTURE.md#1-adding-a-new-
 
 ### Example: Add "XP Investimentos"
 
-#### Step 1: Model (app/models.py)
+#### Step 1: Model (app/models/transactions.py + app/models/converters.py)
 
 ```python
 class XPExtract(db.Model):
@@ -250,7 +250,7 @@ def parse_xp_extract(filepath):
     db.session.commit()
 ```
 
-#### Step 3: Processing (app/processing.py)
+#### Step 3: Processing (app/processing/assets.py and related modules)
 
 ```python
 def process_xp_asset_request(asset):
@@ -292,7 +292,7 @@ def process_xp_asset_request(asset):
     return asset_info
 ```
 
-#### Step 4: Route (app/routes.py)
+#### Step 4: Route (app/routes/*.py)
 
 ```python
 @app.route('/import_xp', methods=['POST'])

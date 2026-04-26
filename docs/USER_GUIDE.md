@@ -27,6 +27,8 @@ When you access **http://localhost:5000**, you will see:
    - **Generic Extract** (Generic Format)
 4. Click **"Upload"**
 
+The upload form works without full page reload. After import, you get inline feedback and a button to open the corresponding result page.
+
 ### Get Data from Sources
 
 #### B3 (Brazilian Exchange)
@@ -122,7 +124,14 @@ Click on any asset in the consolidation table to access the **detailed view**:
 
 ### News
 
-If a **Serper API key** is configured (see § API Configuration below), recent news articles related to the asset are shown below the charts.
+If a **Serper API key** is configured (see § API Configuration below), the asset page has a News panel with interactive controls:
+
+- **Buscar noticias (Serper)** — fetch news on demand
+- **Ordenar noticias** — sort by date/source/title
+- **Analisar sentimento (Gemini)** — manual trigger (not automatic)
+- **Expandir/Comprimir** — collapse panel content without navigation
+
+When sentiment is executed, the page also shows the Gemini prompt and raw response for transparency/debug.
 
 ---
 
@@ -138,7 +147,7 @@ Direct URL: `/history/<source>/<asset>` (e.g. `/history/b3/ITUB3`)
 
 You can add transactions manually without uploading a file:
 
-1. In the sidebar of any asset, look for **"Add Transaction"** (if available)
+1. Open one of the extract pages (`/b3_negotiation`, `/avenue`, `/generic`)
 2. Fill in:
    - Date
    - Asset
@@ -146,6 +155,8 @@ You can add transactions manually without uploading a file:
    - Quantity
    - Price
 3. Click **"Add"**
+
+Manual entry forms now submit asynchronously and refresh the table inline (no full page reload).
 
 **Deduplication system** prevents duplicates even in manual entry.
 
@@ -157,7 +168,7 @@ Go to **http://localhost:5000/config/api** to configure optional services:
 
 ### Gemini API Key (Google AI Studio)
 
-Enables AI-assisted ticker resolution: when an asset ticker cannot be identified automatically, the system queries `gemini-2.0-flash` to find the best Yahoo Finance symbol.
+Enables AI-assisted ticker resolution: when an asset ticker cannot be identified automatically, the system queries a compatible Gemini model (with fallback candidates) to find the best Yahoo Finance symbol.
 
 1. Get a free key at [Google AI Studio](https://aistudio.google.com/)
 2. Paste it in the **Gemini API Key** field and save
@@ -165,6 +176,8 @@ Enables AI-assisted ticker resolution: when an asset ticker cannot be identified
 ### Serper API Key (serper.dev)
 
 Enables a **News** section on every asset detail page, showing recent articles via Google Search.
+
+When both Serper and Gemini keys are configured, sentiment analysis can be executed on demand in the asset News panel.
 
 1. Get a key at [serper.dev](https://serper.dev/)
 2. Paste it in the **Serper API Key** field and save
@@ -206,8 +219,8 @@ Click **Clear Cache** to force an immediate refresh of all cached data.
 ### Custom
 
 For assets not found on yfinance, the system:
-1. Checks `scrape_dict` in `processing.py` for XPath-based price scraping
-2. If a Gemini API key is configured, queries `gemini-2.0-flash` for the best Yahoo Finance ticker
+1. Checks `scrape_dict` in `app/processing/prices.py` for XPath-based price scraping
+2. If a Gemini API key is configured, queries a compatible Gemini model for the best Yahoo Finance ticker
 3. Falls back to a direct yfinance lookup with the raw ticker string
 
 ---

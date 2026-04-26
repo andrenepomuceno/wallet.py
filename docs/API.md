@@ -24,31 +24,50 @@ Upload a CSV/XLSX file for import.
   - `Avenue Extract`
   - `Generic Extract`
 
-**Response:** Redirect to the corresponding view page on success, redirect to `/` on error. Flash messages indicate result.
+**Response (regular form):** Redirect to the corresponding view page on success, render `/` on validation/import errors (flash messages).
+
+**Response (AJAX):** JSON
+
+```json
+{
+    "success": true,
+    "messages": ["Successfully imported foo.csv!"],
+    "errors": [],
+    "redirect_url": "/b3_negotiation"
+}
+```
 
 ---
 
 ### Source Views (read-only tables)
 
-#### GET /b3_movimentation
+#### GET|POST /b3_movimentation
 B3 movement extract table with optional filter form.
 
-**Response:** HTML (`view_movimentation.html`)
+**Response (GET/regular POST):** HTML (`view_movimentation.html`)
+
+**Response (AJAX POST):** JSON with updated `table_html`.
 
 #### GET|POST /b3_negotiation
 B3 negotiation extract table. POST adds a manual entry.
 
-**Response:** HTML (`view_negotiation.html`)
+**Response (GET/regular POST):** HTML (`view_negotiation.html`)
+
+**Response (AJAX POST):** JSON with `success`, `messages`, `errors`, `table_html`.
 
 #### GET|POST /avenue
 Avenue extract table. POST adds a manual entry.
 
-**Response:** HTML (`view_extract.html`)
+**Response (GET/regular POST):** HTML (`view_extract.html`)
+
+**Response (AJAX POST):** JSON with `success`, `messages`, `errors`, `table_html`.
 
 #### GET|POST /generic
 Generic extract table. POST adds a manual entry.
 
-**Response:** HTML (`view_generic.html`)
+**Response (GET/regular POST):** HTML (`view_generic.html`)
+
+**Response (AJAX POST):** JSON with `success`, `messages`, `errors`, `table_html`.
 
 ---
 
@@ -82,6 +101,11 @@ Detailed view of a single asset.
 
 **Response:** HTML (`view_asset.html`)
 
+**Query params (optional):**
+- `news=1` — fetch Serper news
+- `sentiment=1` — run Gemini sentiment analysis (manual trigger)
+- `news_sort` — one of `date_desc`, `date_asc`, `source_asc`, `title_asc`
+
 **Context variables:**
 - `info` — Full asset info dict from `process_*_asset_request()`
 - `buys`, `sells`, `wages`, `taxes` — Filtered DataFrames
@@ -90,6 +114,33 @@ Detailed view of a single asset.
 - `news` — List of recent news articles from Serper.dev (empty if no key configured)
 
 **Returns 404** if source is invalid or asset not found.
+
+#### GET /api/view/\<source\>/\<asset\>/news
+Asset news endpoint used by the async UI in asset details.
+
+**Query params:**
+- `news=1` (default for UI usage)
+- `sentiment=1` (optional; disabled by default)
+- `news_sort` (`date_desc`, `date_asc`, `source_asc`, `title_asc`)
+
+**Response:** JSON
+
+```json
+{
+    "news": [{"title": "...", "link": "..."}],
+    "news_sentiment": {
+        "overall": "neutral",
+        "summary": "...",
+        "items": [{"index": 0, "sentiment": "positive", "confidence": 0.81, "reason": "..."}],
+        "prompt": "...",
+        "raw_response": "...",
+        "model": "gemini-2.5-flash"
+    },
+    "news_requested": true,
+    "sentiment_requested": false,
+    "news_sort": "date_desc"
+}
+```
 
 ---
 
@@ -201,12 +252,12 @@ def consolidate_all() -> dict:
 
 ## 📤 Funções de Import (importing.py)
 
-### parse_b3_movimentation(filepath)
+### import_b3_movimentation(df, filepath)
 
 ```python
-def parse_b3_movimentation(filepath: str) -> None:
+def import_b3_movimentation(df: pd.DataFrame, filepath: str) -> None:
     """
-    Lê XLSX/CSV da B3 Movimentação, normaliza e importa.
+    Recebe DataFrame já carregado da B3 Movimentação, normaliza e importa.
     
     Raises:
         - FileNotFoundError
@@ -217,33 +268,33 @@ def parse_b3_movimentation(filepath: str) -> None:
 
 ---
 
-### parse_b3_negotiation(filepath)
+### import_b3_negotiation(df, filepath)
 
 ```python
-def parse_b3_negotiation(filepath: str) -> None:
-    """Lê XLSX/CSV da B3 Negociação"""
+def import_b3_negotiation(df: pd.DataFrame, filepath: str) -> None:
+    """Importa DataFrame da B3 Negociação"""
 ```
 
 ---
 
-### parse_avenue_extract(filepath)
+### import_avenue_extract(df, filepath)
 
 ```python
-def parse_avenue_extract(filepath: str) -> None:
+def import_avenue_extract(df: pd.DataFrame, filepath: str) -> None:
     """
-    Lê CSV da Avenue (detecta formato antigo/novo)
-    Auto-detecta e normaliza
+    Importa DataFrame da Avenue (formato antigo/novo)
+    com normalização automática.
     """
 ```
 
 ---
 
-### parse_generic_extract(filepath)
+### import_generic_extract(df, filepath)
 
 ```python
-def parse_generic_extract(filepath: str) -> None:
+def import_generic_extract(df: pd.DataFrame, filepath: str) -> None:
     """
-    Lê CSV genérico com colunas:
+    Importa DataFrame genérico com colunas:
     Date, Asset, Movimentation, Quantity, Price, Total
     """
 ```

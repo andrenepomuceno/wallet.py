@@ -6,7 +6,7 @@ Documentation of SQLite schema and access patterns.
 
 ## 📊 Schema
 
-Wallet.py uses SQLite with 4 main tables (SQLAlchemy models in `app/models.py`):
+Wallet.py uses SQLite with the tables below (SQLAlchemy models in `app/models/`):
 
 ### 1. b3_movimentation
 
@@ -446,8 +446,8 @@ sqlite3 instance/wallet.db "ANALYZE;"
 
 ## 🔗 References
 
-- [SQLAlchemy Models](../app/models.py)
-- [Queries in processing.py](../app/processing.py)
+- [SQLAlchemy Models](../app/models/)
+- [Processing Modules](../app/processing/)
 - [Imports in importing.py](../app/importing.py)
 
 ---

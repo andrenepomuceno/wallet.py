@@ -8,7 +8,7 @@ from flask import flash
 from app import app
 from app.models import get_api_key
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
-from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data
+from app.utils.scraping import cached_json_post, scrape_data, usd_exchange_rate, get_yfinance_data
 
 
 scrape_dict = {
@@ -36,11 +36,8 @@ def _post_gemini_generate_content(api_key, payload):
             f'{model}:generateContent?key={api_key}'
         )
         try:
-            response = requests.post(endpoint, json=payload, timeout=12)
-            if response.status_code == 404:
-                continue
-            response.raise_for_status()
-            return response.json()
+            response_data = cached_json_post(endpoint, json_payload=payload, timeout=12)
+            return response_data
         except requests.HTTPError as e:
             status_code = getattr(getattr(e, 'response', None), 'status_code', None)
             if status_code == 404:

@@ -12,11 +12,13 @@ _CACHE_FIELD_TO_CATEGORY = {
     'cache_yfinance_ttl': 'yfinance',
     'cache_exchange_ttl': 'exchange_rate',
     'cache_scraping_ttl': 'scraping',
+    'cache_serper_ttl': 'serper',
+    'cache_gemini_ttl': 'gemini',
     'cache_asset_ttl': 'asset',
     'cache_consolidate_ttl': 'consolidate',
 }
 
-_HTTP_CACHE_CATEGORIES = {'default', 'yfinance', 'exchange_rate', 'scraping'}
+_HTTP_CACHE_CATEGORIES = {'default', 'yfinance', 'exchange_rate', 'scraping', 'serper', 'gemini'}
 
 
 @app.route('/config/api', methods=['GET', 'POST'])

@@ -10,6 +10,7 @@ from app import app
 request_cache = requests_cache.CachedSession(
     'request_cache',
     expire_after=60 * 60,
+    allowable_methods=('GET', 'POST'),
 )
 
 
@@ -25,6 +26,7 @@ def build_request_cache(default_ttl=3600, urls_expire_after=None):
         'request_cache',
         expire_after=default_ttl,
         urls_expire_after=urls_expire_after or {},
+        allowable_methods=('GET', 'POST'),
     )
 
 
@@ -112,3 +114,15 @@ def get_yfinance_data(ticker):
         'close_5d': round(close_5d, 2),
         'last_close_variation': round(last_close_variation, 2),
     }
+
+
+def cached_json_post(url, headers=None, json_payload=None, timeout=12):
+    """POST JSON through the shared cached session and return parsed JSON."""
+    response = _get_session().post(
+        url,
+        headers=headers,
+        json=json_payload,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return response.json()

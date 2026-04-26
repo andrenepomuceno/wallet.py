@@ -5,6 +5,7 @@ import re
 import requests
 from app import app
 from app.models import get_api_key
+from app.utils.scraping import cached_json_post
 
 
 SERPER_NEWS_ENDPOINT = 'https://google.serper.dev/news'
@@ -18,11 +19,8 @@ def _post_gemini_generate_content(api_key, payload):
             f'{model}:generateContent?key={api_key}'
         )
         try:
-            response = requests.post(endpoint, json=payload, timeout=25)
-            if response.status_code == 404:
-                continue
-            response.raise_for_status()
-            return {'data': response.json(), 'model': model}
+            response_data = cached_json_post(endpoint, json_payload=payload, timeout=25)
+            return {'data': response_data, 'model': model}
         except requests.HTTPError as e:
             status_code = getattr(getattr(e, 'response', None), 'status_code', None)
             if status_code == 404:
@@ -66,14 +64,12 @@ def search_news(query, num=10):
         return []
 
     try:
-        response = requests.post(
+        data = cached_json_post(
             SERPER_NEWS_ENDPOINT,
             headers={'X-API-KEY': api_key, 'Content-Type': 'application/json'},
-            json={'q': query, 'num': num},
+            json_payload={'q': query, 'num': num},
             timeout=10,
         )
-        response.raise_for_status()
-        data = response.json()
     except Exception as e:
         app.logger.warning('serper.search_news failed for %r: %s', query, e)
         return []

@@ -41,6 +41,8 @@ DEFAULT_CACHE_CONFIG = [
     {'category': 'yfinance',      'ttl_seconds': 900,  'url_pattern': '*yahoo.com*'},
     {'category': 'exchange_rate', 'ttl_seconds': 3600, 'url_pattern': '*exchangerate-api.com*'},
     {'category': 'scraping',      'ttl_seconds': 3600, 'url_pattern': '*taxas-tesouro.com*'},
+    {'category': 'serper',        'ttl_seconds': 900,  'url_pattern': '*google.serper.dev*'},
+    {'category': 'gemini',        'ttl_seconds': 900,  'url_pattern': '*generativelanguage.googleapis.com*'},
     {'category': 'asset',         'ttl_seconds': 600,  'url_pattern': None},
     {'category': 'consolidate',   'ttl_seconds': 600,  'url_pattern': None},
 ]
