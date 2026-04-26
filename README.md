@@ -27,30 +27,63 @@ Flask-based investment portfolio analyzer that imports financial data from multi
 ## Architecture
 
 ```
-wallet.py (entrypoint)
+wallet.py                      # Entrypoint — creates DB, runs migration, starts server
 ├── app/
-│   ├── __init__.py          # Flask app, SQLAlchemy, logging config
-│   ├── models.py            # 4 ORM models + *_sql_to_df() converters
-│   ├── importing.py         # CSV/XLSX parsing, normalization, dedup
-│   ├── processing.py        # Core logic: consolidation, price fetching, charts
-│   ├── routes.py            # Flask views + Jinja2 rendering
-│   ├── forms.py             # FlaskForm definitions
+│   ├── __init__.py            # Flask app, SQLAlchemy, logging config
+│   ├── importing.py           # CSV/XLSX parsing, normalization, bulk dedup insert
+│   ├── import_translators.py  # Per-source CSV row → Transaction kwargs translators
+│   ├── migrate_to_transaction.py  # One-shot idempotent migration from legacy tables
+│   ├── forms.py               # FlaskForm definitions
+│   ├── models/
+│   │   ├── transactions.py    # Unified Transaction ORM model + legacy models
+│   │   ├── category_mapping.py # Canonical category enum + classify() function
+│   │   ├── converters.py      # ORM rows → pandas DataFrames
+│   │   └── config.py          # ApiConfig, CacheConfig, seed helpers
+│   ├── processing/
+│   │   ├── assets.py          # Per-asset KPI calculation (B3, Avenue, Generic)
+│   │   ├── consolidate.py     # Portfolio-wide consolidation + load_products()
+│   │   └── extracts.py        # DB queries → DataFrames, merge helpers
+│   ├── routes/
+│   │   ├── asset.py           # Asset detail view + analysis API endpoints
+│   │   ├── consolidate.py     # Portfolio consolidation view + analysis API
+│   │   ├── transactions.py    # Movimentation / negotiation / extract list views
+│   │   ├── upload.py          # File upload handler
+│   │   ├── admin.py           # API config / cache settings
+│   │   └── _helpers.py        # Shared form-handling and manual-entry helpers
 │   ├── utils/
-│   │   ├── parsing.py       # B3 ticker regex (XXXX3/4, XXXX11)
-│   │   └── scraping.py      # yfinance wrapper, XPath scraping, USD/BRL rate
-│   ├── static/css/wallet.css
-│   └── templates/           # Jinja2 templates (Bootstrap 5 dark theme)
-├── instance/wallet.db       # SQLite database (auto-created)
-├── uploads/                 # Uploaded CSV/XLSX files
-└── tests/                   # (empty — no test suite yet)
+│   │   ├── parsing.py         # B3 ticker regex (XXXX3/4, XXXX11)
+│   │   ├── scraping.py        # yfinance wrapper, XPath scraping, cached HTTP session
+│   │   ├── serper.py          # Serper.dev news + Gemini AI analysis
+│   │   └── memocache.py       # TTL memoize decorator + cache invalidation
+│   ├── static/                # CSS / JS / images
+│   └── templates/             # Jinja2 templates (Bootstrap 5 dark theme)
+├── instance/wallet.db         # SQLite database (auto-created)
+├── uploads/                   # Uploaded CSV/XLSX files
+├── docs/                      # Extended documentation (see below)
+└── tests/                     # pytest suite
 ```
 
 ### Data Flow
 
-1. **Upload** → `routes.py home()` saves file to `uploads/`, reads with pandas
-2. **Import** → `importing.py` normalizes columns, deduplicates via `origin_id = filepath:sha256:row_index`, stores in SQLite
-3. **Processing** → `processing.py` queries DB → `*_sql_to_df()` converters → classifies buys/sells/wages/taxes → `consolidate_asset_info()` calculates metrics
-4. **Rendering** → `routes.py` passes data to Jinja2 templates with embedded Plotly charts
+1. **Upload** → `routes/upload.py` saves file to `uploads/`, reads with pandas
+2. **Import** → `importing.py` normalizes columns → `import_translators.py` maps each row to `Transaction(**kwargs)` with a canonical `category` — deduplicates via `origin_id = filepath:sha256:row_index:<suffix>` — stores in the unified `transaction` table
+3. **Processing** → `processing/` queries `Transaction` filtered by `source`/`record_type`/`category` → `transactions_sql_to_df()` builds the standard DataFrame → `consolidate_asset_info()` calculates KPIs
+4. **Rendering** → `routes/` passes data to Jinja2 templates with embedded Plotly charts
+
+## Documentation
+
+Extended docs live in the [`docs/`](docs/) folder:
+
+| Document | Description |
+|----------|-------------|
+| [docs/INDEX.md](docs/INDEX.md) | Documentation index and table of contents |
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Detailed setup and environment configuration |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | How to import data and analyse your portfolio |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Code structure, patterns, and design decisions |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev environment setup and how to add new features |
+| [docs/API.md](docs/API.md) | Available HTTP endpoints and response schemas |
+| [docs/DATABASE.md](docs/DATABASE.md) | Schema, ORM models, and query patterns |
+| [docs/PRICE_INTEGRATION.md](docs/PRICE_INTEGRATION.md) | Price lookups via yfinance, custom scraping, and AI analysis |
 
 ## Setup
 
