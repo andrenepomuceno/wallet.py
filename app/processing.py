@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import re
 import pandas as pd
 # import yfinance_cache as yf
@@ -10,9 +11,11 @@ from app import app, db
 from app.models import B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
 from app.models import b3_movimentation_sql_to_df, b3_negotiation_sql_to_df
 from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
+from app.models import get_api_key
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
 from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data
 import numpy as np
+import requests
 
 scrape_dict = {
     "Tesouro Selic 2029": {
@@ -22,6 +25,73 @@ scrape_dict = {
         'currency': 'BRL',
     }
 }
+
+
+def _extract_json_object(raw_text):
+    if raw_text is None:
+        return None
+
+    text = raw_text.strip()
+    fence_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, flags=re.DOTALL)
+    if fence_match:
+        return fence_match.group(1)
+
+    object_match = re.search(r'(\{.*\})', text, flags=re.DOTALL)
+    if object_match:
+        return object_match.group(1)
+
+    return None
+
+
+def guess_yfinance_ticker_with_gemini(asset_name):
+    api_key = get_api_key('gemini')
+    if not api_key:
+        return None
+
+    endpoint = (
+        'https://generativelanguage.googleapis.com/v1beta/models/'
+        f'gemini-2.0-flash:generateContent?key={api_key}'
+    )
+    prompt = (
+        'You are a finance assistant. Given an asset name or ticker, return only a JSON object '
+        'with key "ticker" containing the best Yahoo Finance ticker symbol. '
+        'Use .SA suffix for Brazilian equities/FIIs when applicable. '
+        'If you are not confident, return {"ticker": ""}. '
+        f'Input: {asset_name}'
+    )
+
+    payload = {
+        'contents': [{'parts': [{'text': prompt}]}],
+        'generationConfig': {'temperature': 0, 'responseMimeType': 'application/json'},
+    }
+
+    try:
+        response = requests.post(endpoint, json=payload, timeout=12)
+        response.raise_for_status()
+        response_data = response.json()
+        candidates = response_data.get('candidates', [])
+        if len(candidates) == 0:
+            return None
+
+        parts = candidates[0].get('content', {}).get('parts', [])
+        if len(parts) == 0:
+            return None
+
+        raw_text = parts[0].get('text', '')
+        json_text = _extract_json_object(raw_text)
+        if json_text is None:
+            return None
+
+        parsed = json.loads(json_text)
+        suggested_ticker = str(parsed.get('ticker', '')).strip().upper()
+
+        if not re.match(r'^[A-Z0-9\.\-=]{1,20}$', suggested_ticker):
+            return None
+
+        return suggested_ticker or None
+    except Exception as e:
+        app.logger.warning('Gemini ticker suggestion failed for %s: %s', asset_name, e)
+        return None
 
 def process_b3_movimentation_request(request):
     app.logger.info('process_b3_movimentation_request')
@@ -200,10 +270,21 @@ def get_online_info(ticker, asset_info = None):
             asset_info['currency'] = scrap_info['currency']
 
         else:
-            online_data = get_yfinance_data(ticker)
-            asset_info.update(online_data)
-            asset_info['asset_class'] = asset_info['asset_class'].capitalize()
-            asset_info['yfinance_ticker'] = ticker
+            try:
+                online_data = get_yfinance_data(ticker)
+                asset_info.update(online_data)
+                asset_info['asset_class'] = asset_info['asset_class'].capitalize()
+                asset_info['yfinance_ticker'] = ticker
+            except Exception:
+                suggested_ticker = guess_yfinance_ticker_with_gemini(ticker)
+                if suggested_ticker:
+                    app.logger.info('Trying Gemini suggested ticker %s for %s', suggested_ticker, ticker)
+                    online_data = get_yfinance_data(suggested_ticker)
+                    asset_info.update(online_data)
+                    asset_info['asset_class'] = asset_info['asset_class'].capitalize()
+                    asset_info['yfinance_ticker'] = suggested_ticker
+                else:
+                    raise
 
     except Exception as e:
         flash(f'Failed to get online data for {ticker}.')

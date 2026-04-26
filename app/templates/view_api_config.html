@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-7">
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="bi bi-key"></i> Configuracao de API
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Cadastre sua chave da Gemini API para habilitar fallback inteligente
+                    na resolucao de tickers quando o Yahoo Finance nao reconhecer um ativo.
+                </p>
+
+                <div class="alert {% if has_gemini_key %}alert-success{% else %}alert-warning{% endif %}">
+                    {% if has_gemini_key %}
+                    Chave Gemini configurada.
+                    {% else %}
+                    Nenhuma chave Gemini configurada.
+                    {% endif %}
+                </div>
+
+                <form method="post">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.gemini_api_key.label(class='form-label') }}
+                        {{ form.gemini_api_key(class='form-control', placeholder='Cole aqui sua Gemini API Key') }}
+                        <div class="form-text">A chave nao e exibida por seguranca. Preencha somente para criar/atualizar.</div>
+                    </div>
+
+                    {{ form.submit(class='btn btn-primary') }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

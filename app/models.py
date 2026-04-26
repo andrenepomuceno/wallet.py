@@ -2,6 +2,22 @@ import pandas as pd
 from app import db
 from app.utils.parsing import parse_b3_ticker
 
+
+class ApiConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(50), unique=True, nullable=False)
+    api_key = db.Column(db.String(255), nullable=False)
+
+    def __repr__(self):
+        return f'<ApiConfig {self.provider}>'
+
+
+def get_api_key(provider: str):
+    config = ApiConfig.query.filter_by(provider=provider).first()
+    if config is None:
+        return None
+    return config.api_key
+
 class B3Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     origin_id = db.Column(db.String)

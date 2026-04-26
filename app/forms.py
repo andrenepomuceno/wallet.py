@@ -1,7 +1,7 @@
 import pandas as pd
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, SubmitField
-from wtforms.validators import DataRequired
+from wtforms import StringField, FloatField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Optional
 
 class GenericExtractAddForm(FlaskForm):
     date = StringField('Date', validators=[DataRequired()], default=pd.to_datetime("today").date)
@@ -48,3 +48,7 @@ class B3NegotiationAddForm(FlaskForm):
     price = FloatField('Price', default=0)
     total = FloatField('Total', default=0)
     submit = SubmitField('Submit')
+
+class ApiConfigForm(FlaskForm):
+    gemini_api_key = PasswordField('Gemini API Key', validators=[Optional()])
+    submit = SubmitField('Salvar Configuracoes')

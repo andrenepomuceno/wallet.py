@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from flask import render_template, request, redirect, url_for, flash, abort
 from app import app, db, UPLOADS_FOLDER
-from app.models import B3Negotiation, GenericExtract, AvenueExtract
+from app.models import B3Negotiation, GenericExtract, AvenueExtract, ApiConfig, get_api_key
 from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract
 from app.importing import import_generic_extract
 from app.processing import plot_price_history, process_generic_asset_request
@@ -11,7 +11,7 @@ from app.processing import process_avenue_extract_request, process_avenue_asset_
 from app.processing import process_b3_movimentation_request, process_generic_extract_request
 from app.processing import process_consolidate_request
 from app.processing import process_history
-from app.forms import B3MovimentationFilterForm, B3NegotiationAddForm, GenericExtractAddForm, AvenueExtractAddForm
+from app.forms import B3MovimentationFilterForm, B3NegotiationAddForm, GenericExtractAddForm, AvenueExtractAddForm, ApiConfigForm
 
 def format_money(value):
     if value >= 1e12:
@@ -241,6 +241,30 @@ def view_generic_extract():
     return render_template('view_generic.html', html_title='Generic Extract',
                            df=df, add_form=add_form)
 
+@app.route('/config/api', methods=['GET', 'POST'])
+def view_api_config():
+    form = ApiConfigForm()
+
+    if form.validate_on_submit():
+        new_key = (form.gemini_api_key.data or '').strip()
+        gemini_config = ApiConfig.query.filter_by(provider='gemini').first()
+
+        if new_key:
+            if gemini_config is None:
+                gemini_config = ApiConfig(provider='gemini', api_key=new_key)
+                db.session.add(gemini_config)
+            else:
+                gemini_config.api_key = new_key
+            db.session.commit()
+            flash('Chave Gemini salva com sucesso!')
+            return redirect(url_for('view_api_config'))
+
+        flash('Nenhuma chave informada. A configuracao atual foi mantida.')
+
+    has_gemini_key = bool(get_api_key('gemini'))
+    return render_template('view_api_config.html', html_title='API Config',
+                           form=form, has_gemini_key=has_gemini_key)
+
 def view_asset_helper(asset_info):
     dataframes = asset_info['dataframes']
     extended_info=asset_info['info']
@@ -289,6 +313,8 @@ def view_asset_helper(asset_info):
 
 @app.route('/view/<source>/<asset>', methods=['GET', 'POST'])
 def view_asset(source=None, asset=None):
+    asset_info = {'valid': False}
+
     if source == 'b3':
         asset_info = process_b3_asset_request(asset)
     elif source == 'avenue':

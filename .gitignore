@@ -3,3 +3,4 @@ instance
 venv
 __pycache__
 request_cache.sqlite
+.github/*instructions*
