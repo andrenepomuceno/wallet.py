@@ -9,7 +9,8 @@
     </div>
 
     <div id="add_form" style="display: none;" class="form-section mb-3">
-        <form method="POST">
+        <div id="manualEntryFeedback"></div>
+        <form method="POST" id="manualEntryForm">
             {{ add_form.hidden_tag() }}
             <div class="row g-2">
                 <div class="col-md-4">
@@ -43,9 +44,23 @@
         </form>
     </div>
 
-    <div class="card">
-        <div class="card-body p-0">
-            {{ table.render(df, True) }}
+    <div id="extractTableContainer">
+        <div class="card">
+            <div class="card-body p-0">
+                {{ table.render(df, True) }}
+            </div>
         </div>
     </div>
+
+    <script src="{{ url_for('static', filename='js/async-manual-entry.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            setupAsyncManualEntry({
+                formId: 'manualEntryForm',
+                tableContainerId: 'extractTableContainer',
+                messageContainerId: 'manualEntryFeedback',
+                endpoint: '{{ url_for('view_generic_extract') }}',
+            });
+        });
+    </script>
 {% endblock %}

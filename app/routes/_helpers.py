@@ -26,17 +26,30 @@ def flash_form_errors(form):
             flash(f"Error validating field {getattr(form, field).label.text}: {error}")
 
 
-def handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_id=True):
-    """Validate `form`, dedup against `model` by field values, insert if new.
+def collect_form_errors(form):
+    errors = []
+    for field, field_errors in form.errors.items():
+        label = getattr(form, field).label.text
+        for error in field_errors:
+            errors.append(f"Error validating field {label}: {error}")
+    return errors
 
-    `field_map` maps form attribute names to model column names.
-    Returns a redirect Response on success, otherwise None (caller must render).
-    """
+
+def process_manual_entry(model, form, field_map, with_origin_id=True):
+    """Validate/dedup/insert a manual entry and return a structured result."""
     if not form.validate_on_submit():
         if form.errors:
             app.logger.debug('Not submit. Errors: %s', form.errors)
-            flash_form_errors(form)
-        return None
+            return {
+                'success': False,
+                'errors': collect_form_errors(form),
+                'inserted': False,
+            }
+        return {
+            'success': False,
+            'errors': [],
+            'inserted': False,
+        }
 
     values = {col: getattr(form, attr).data for attr, col in field_map.items()}
     filter_kwargs = dict(values)
@@ -45,8 +58,11 @@ def handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_i
 
     if model.query.filter_by(**filter_kwargs).first():
         app.logger.info('New entry already exists in the database!')
-        flash('Entry already exists in the database.')
-        return None
+        return {
+            'success': False,
+            'errors': ['Entry already exists in the database.'],
+            'inserted': False,
+        }
 
     insert_kwargs = dict(values)
     if with_origin_id:
@@ -55,5 +71,34 @@ def handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_i
     db.session.commit()
     invalidate_processing_cache()
     app.logger.info('Added new entry to database!')
-    flash('Entry added successfully!')
-    return redirect(url_for(redirect_endpoint))
+
+    return {
+        'success': True,
+        'errors': [],
+        'messages': ['Entry added successfully!'],
+        'inserted': True,
+    }
+
+
+def handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_id=True):
+    """Validate `form`, dedup against `model` by field values, insert if new.
+
+    `field_map` maps form attribute names to model column names.
+    Returns a redirect Response on success, otherwise None (caller must render).
+    """
+    result = process_manual_entry(
+        model,
+        form,
+        field_map,
+        with_origin_id=with_origin_id,
+    )
+
+    if result.get('success'):
+        for msg in result.get('messages', ['Entry added successfully!']):
+            flash(msg)
+        return redirect(url_for(redirect_endpoint))
+
+    for error in result.get('errors', []):
+        flash(error)
+
+    return None
