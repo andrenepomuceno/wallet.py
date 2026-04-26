@@ -1,4 +1,14 @@
 {% macro render(df=None, enable_index=False, enable_controls=False) -%}
+{% set render_df = df %}
+{% if df is not none %}
+    {% if 'Date' in df.columns %}
+        {% set render_df = df.sort_values(by='Date', ascending=False) %}
+    {% elif 'date' in df.columns %}
+        {% set render_df = df.sort_values(by='date', ascending=False) %}
+    {% elif 'Data' in df.columns %}
+        {% set render_df = df.sort_values(by='Data', ascending=False) %}
+    {% endif %}
+{% endif %}
 <div class="table-container">
     <table
     class="table table-sm table-striped table-hover mb-0"
@@ -17,13 +27,13 @@
                 {% if enable_index %}
                 <th data-sortable="true">Index</th>
                 {% endif %}
-                {% for column in df.columns %}
+                {% for column in render_df.columns %}
                 <th data-sortable="true">{{ column|safe }}</th>
                 {% endfor %}
             </tr>
         </thead>
         <tbody>
-            {% for row in df.itertuples(index=enable_index) %}
+            {% for row in render_df.itertuples(index=enable_index) %}
             <tr>
                 {% for item in row %}
                 <td>{{ item|safe }}</td>

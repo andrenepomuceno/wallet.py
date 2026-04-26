@@ -13,14 +13,14 @@ This document describes the technical structure, data flow, and patterns used in
                     │
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│          Flask Routes (app/routes.py)                       │
-│  - home() → upload, consolidate, view_asset, etc.         │
+│        Flask Routes Package (app/routes/)                   │
+│  - upload, transactions, asset, consolidate, admin         │
 └───────────────┬───────────────────────────────────────────┘
                 │
     ┌───────────┴─────────────┬──────────────────┐
     ▼                         ▼                  ▼
 [Importing]            [Processing]        [Models/ORM]
-app/importing.py      app/processing.py    app/models.py
+app/importing.py      app/processing/      app/models/
     │                     │                    │
     ├─ Parse CSV/XLSX     ├─ Query DB         ├─ B3Movimentation
     ├─ Normalize cols     ├─ Consolidate     ├─ B3Negotiation
@@ -50,13 +50,27 @@ app/importing.py      app/processing.py    app/models.py
 
 ```
 app/
-├── __init__.py              # Flask app factory, SQLAlchemy init, logging
-├── models.py                # ORM models + *_sql_to_df() converters
-│                            # ApiConfig, CacheConfig, ProcessingCache
-│                            # B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
+├── __init__.py              # Flask app setup, SQLAlchemy init, logging
+├── models/                  # ORM + converters + config/cache models
+│   ├── __init__.py
+│   ├── config.py
+│   ├── transactions.py
+│   └── converters.py
 ├── importing.py             # CSV/XLSX parsing, normalization, dedup
-├── processing.py            # Core: consolidation, prices, charts
-├── routes.py                # Flask routes, views, Jinja2
+├── processing/              # Core processing split by concern
+│   ├── __init__.py
+│   ├── prices.py
+│   ├── extracts.py
+│   ├── assets.py
+│   ├── consolidate.py
+│   └── history.py
+├── routes/                  # Flask route modules
+│   ├── __init__.py
+│   ├── upload.py
+│   ├── transactions.py
+│   ├── asset.py
+│   ├── consolidate.py
+│   └── admin.py
 ├── forms.py                 # Flask-WTF forms
 ├── utils/
 │   ├── parsing.py          # Ticker detection (XXXX3/4, XXXX11)
@@ -94,7 +108,7 @@ uploads/
 
 ## 🗂️ Data Models
 
-### SQLAlchemy Models (models.py)
+### SQLAlchemy Models (models/)
 
 #### Transaction Models
 
@@ -126,7 +140,7 @@ Each model has a companion `*_sql_to_df(result)` function that converts ORM obje
 ```
 CSV/XLSX File (User)
     ↓
-routes.py: home() → saves to uploads/
+routes/upload.py: home() → saves to uploads/
     ↓
 importing.py: parse_<source>()
     ├─ Reads with pandas
@@ -152,9 +166,9 @@ Prevents re-importing the same file multiple times.
 ```
 User clicks "Consolidate"
     ↓
-routes.py: consolidate() → calls processing.consolidate_all()
+routes/consolidate.py: view_consolidate() → calls processing.process_consolidate_request()
     ↓
-processing.py:
+processing package:
     ├─ Iterates each asset type found in DB
     ├─ For each asset:
     │   ├─ Query: get_all_transactions(asset_code)
@@ -181,7 +195,7 @@ HTML + Plotly DIVs rendered in browser
 ```
 User clicks on an asset
     ↓
-routes.py: view_asset(asset_code)
+routes/asset.py: view_asset(source, asset)
     ├─ Calls processing.process_<source>_asset_request(asset_code)
     ├─ Returns dataframes: {buys, sells, wages, taxes}
     ├─ Fetches online price
@@ -221,7 +235,7 @@ ETH → ETH-USD → yfinance → × usd_exchange_rate('BRL')
 ```
 
 #### Custom (XPath)
-Defined in `scrape_dict` at the beginning of `processing.py`:
+Defined in `scrape_dict` at the beginning of `app/processing/prices.py`:
 ```python
 scrape_dict = {
     'Tesouro Selic 2029': {
@@ -235,7 +249,14 @@ scrape_dict = {
 ```
 
 #### Gemini AI Fallback
-When standard ticker detection fails, `guess_yfinance_ticker_with_gemini(asset_name)` is called (requires a Gemini API key stored in `ApiConfig`). It queries `gemini-2.0-flash` to resolve the best Yahoo Finance ticker symbol.
+When standard ticker detection fails, `guess_yfinance_ticker_with_gemini(asset_name)` is called (requires a Gemini API key stored in `ApiConfig`). The system tries a compatible Gemini model (fallback candidates) to resolve the best Yahoo Finance ticker symbol.
+
+#### News Sentiment via Gemini
+On the asset detail page, news can be fetched from Serper and analyzed on demand via Gemini. The sentiment flow is intentionally manual (button-triggered) and returns:
+
+- Overall sentiment (`positive|neutral|negative`)
+- Per-item sentiment + confidence + reason
+- Prompt and raw model response (for transparency/debug)
 
 #### Final Fallback
 Tries yfinance directly with the raw ticker.
@@ -246,7 +267,7 @@ Tries yfinance directly with the raw ticker.
 
 ### 1. Adding a New Data Source
 
-**Step 1: Model (models.py)**
+**Step 1: Model (app/models/transactions.py + app/models/converters.py)**
 ```python
 class NewSource(db.Model):
     __tablename__ = 'new_source'
@@ -316,7 +337,7 @@ def parse_new_source(filepath):
     db.session.commit()
 ```
 
-**Step 3: Processing (processing.py)**
+**Step 3: Processing (app/processing/assets.py and related modules)**
 ```python
 def process_new_source_asset_request(asset):
     """Process consolidation for an asset from new source"""
@@ -334,7 +355,7 @@ def process_new_source_asset_request(asset):
     return asset_info
 ```
 
-**Step 4: Route (routes.py)**
+**Step 4: Route (app/routes/*.py)**
 ```python
 @app.route('/view_new_source/<asset>')
 def view_new_source(asset):
@@ -405,7 +426,7 @@ All templates use **Bootstrap 5 Dark Theme** + **Plotly** for charts.
 
 ### Charts (Embedded DIVs)
 ```python
-# In processing.py
+# In app/processing/history.py
 fig = go.Figure(...)
 chart_div = pyo.plot(fig, output_type='div')
 
@@ -467,13 +488,13 @@ def consolidate_asset_info(dataframes, asset):
 ## 🔗 Module Relationships
 
 ```
-routes.py (Controller)
+routes package (Controller)
     ├─ app/forms.py (Forms)
-    ├─ app/models.py (ORM)
+    ├─ app/models/ (ORM)
     ├─ app/importing.py (Import)
     │   └─ app/utils/parsing.py (Ticker detection)
-    └─ app/processing.py (Logic)
-        ├─ app/models.py (Queries)
+    └─ app/processing/ (Logic)
+        ├─ app/models/ (Queries)
         ├─ app/utils/scraping.py (Prices)
         └─ Plotly (Charts)
 ```

@@ -126,6 +126,17 @@ document.addEventListener('DOMContentLoaded', function() {
             var payload = await response.json();
             renderFeedback(payload.messages, payload.errors);
 
+            (payload.messages || []).forEach(function(message) {
+                if (window.asyncUI && window.asyncUI.showToast) {
+                    window.asyncUI.showToast(message, 'success');
+                }
+            });
+            (payload.errors || []).forEach(function(error) {
+                if (window.asyncUI && window.asyncUI.showToast) {
+                    window.asyncUI.showToast(error, 'warning');
+                }
+            });
+
             if (payload.success && payload.redirect_url) {
                 uploadNextStep.innerHTML =
                     '<a href="' + payload.redirect_url + '" class="btn btn-outline-light btn-sm">' +
@@ -133,6 +144,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             renderFeedback([], ['Falha ao enviar arquivo. Tente novamente.']);
+            if (window.asyncUI && window.asyncUI.showToast) {
+                window.asyncUI.showToast('Falha ao enviar arquivo. Tente novamente.', 'danger');
+            }
         } finally {
             uploadBtn.disabled = fileInput.files.length === 0;
             uploadBtn.classList.remove('btn-loading');

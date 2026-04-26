@@ -57,9 +57,15 @@
         if (payload.table_html) {
           tableContainer.innerHTML = payload.table_html;
           refreshBootstrapTable();
+          if (window.asyncUI && window.asyncUI.showToast) {
+            window.asyncUI.showToast('Filtro aplicado.', 'info');
+          }
         }
       } catch (error) {
         renderError('Falha ao aplicar filtro. Tente novamente.');
+        if (window.asyncUI && window.asyncUI.showToast) {
+          window.asyncUI.showToast('Falha ao aplicar filtro. Tente novamente.', 'danger');
+        }
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -98,9 +104,15 @@
             if (payload.table_html) {
               tableContainer.innerHTML = payload.table_html;
               refreshBootstrapTable();
+              if (window.asyncUI && window.asyncUI.showToast) {
+                window.asyncUI.showToast('Filtro limpo.', 'info');
+              }
             }
           } catch (error) {
             renderError('Falha ao limpar filtro.');
+            if (window.asyncUI && window.asyncUI.showToast) {
+              window.asyncUI.showToast('Falha ao limpar filtro.', 'danger');
+            }
           } finally {
             if (submitBtn) {
               submitBtn.disabled = false;

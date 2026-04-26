@@ -79,6 +79,17 @@
 
         renderMessages(messageContainer, payload);
 
+        (payload.messages || []).forEach(function (message) {
+          if (window.asyncUI && window.asyncUI.showToast) {
+            window.asyncUI.showToast(message, 'success');
+          }
+        });
+        (payload.errors || []).forEach(function (errorMessage) {
+          if (window.asyncUI && window.asyncUI.showToast) {
+            window.asyncUI.showToast(errorMessage, 'warning');
+          }
+        });
+
         if (payload.success && payload.table_html) {
           tableContainer.innerHTML = payload.table_html;
           refreshBootstrapTable(tableContainer);
@@ -88,6 +99,9 @@
         renderMessages(messageContainer, {
           errors: ['Falha ao salvar entrada. Tente novamente.'],
         });
+        if (window.asyncUI && window.asyncUI.showToast) {
+          window.asyncUI.showToast('Falha ao salvar entrada. Tente novamente.', 'danger');
+        }
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
