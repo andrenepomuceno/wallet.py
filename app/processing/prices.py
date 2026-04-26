@@ -26,6 +26,34 @@ scrape_dict = {
     }
 }
 
+GEMINI_MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash']
+
+
+def _post_gemini_generate_content(api_key, payload):
+    for model in GEMINI_MODEL_CANDIDATES:
+        endpoint = (
+            'https://generativelanguage.googleapis.com/v1beta/models/'
+            f'{model}:generateContent?key={api_key}'
+        )
+        try:
+            response = requests.post(endpoint, json=payload, timeout=12)
+            if response.status_code == 404:
+                continue
+            response.raise_for_status()
+            return response.json()
+        except requests.HTTPError as e:
+            status_code = getattr(getattr(e, 'response', None), 'status_code', None)
+            if status_code == 404:
+                continue
+            app.logger.warning('Gemini request failed (status=%s)', status_code)
+            return None
+        except Exception as e:
+            app.logger.warning('Gemini request failed (%s)', type(e).__name__)
+            return None
+
+    app.logger.warning('No compatible Gemini model available')
+    return None
+
 
 def _extract_json_object(raw_text):
     if raw_text is None:
@@ -48,10 +76,6 @@ def guess_yfinance_ticker_with_gemini(asset_name):
     if not api_key:
         return None
 
-    endpoint = (
-        'https://generativelanguage.googleapis.com/v1beta/models/'
-        f'gemini-2.0-flash:generateContent?key={api_key}'
-    )
     prompt = (
         'You are a finance assistant. Given an asset name or ticker, return only a JSON object '
         'with key "ticker" containing the best Yahoo Finance ticker symbol. '
@@ -66,9 +90,9 @@ def guess_yfinance_ticker_with_gemini(asset_name):
     }
 
     try:
-        response = requests.post(endpoint, json=payload, timeout=12)
-        response.raise_for_status()
-        response_data = response.json()
+        response_data = _post_gemini_generate_content(api_key, payload)
+        if not response_data:
+            return None
         candidates = response_data.get('candidates', [])
         if len(candidates) == 0:
             return None
@@ -90,7 +114,7 @@ def guess_yfinance_ticker_with_gemini(asset_name):
 
         return suggested_ticker or None
     except Exception as e:
-        app.logger.warning('Gemini ticker suggestion failed for %s: %s', asset_name, e)
+        app.logger.warning('Gemini ticker suggestion failed for %s (%s)', asset_name, type(e).__name__)
         return None
 
 

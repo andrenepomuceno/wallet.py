@@ -1,6 +1,6 @@
 """Asset detail view + price history view."""
 import pandas as pd
-from flask import abort, render_template
+from flask import abort, render_template, request
 
 from app import app
 from app.processing import (
@@ -10,10 +10,34 @@ from app.processing import (
     process_generic_asset_request,
     process_history,
 )
-from app.utils.serper import search_news
+from app.utils.serper import search_news, analyze_news_sentiment_with_gemini
 
 
-def _view_asset_helper(asset_info):
+def _sort_news(news, news_sort):
+    if not news:
+        return news
+
+    if news_sort == 'source_asc':
+        return sorted(news, key=lambda item: str(item.get('source', '')).lower())
+
+    if news_sort == 'title_asc':
+        return sorted(news, key=lambda item: str(item.get('title', '')).lower())
+
+    if news_sort == 'date_asc':
+        return sorted(
+            news,
+            key=lambda item: pd.to_datetime(item.get('date'), errors='coerce'),
+        )
+
+    # default: newest first
+    return sorted(
+        news,
+        key=lambda item: pd.to_datetime(item.get('date'), errors='coerce'),
+        reverse=True,
+    )
+
+
+def _view_asset_helper(asset_info, fetch_news=False, analyze_sentiment=False, news_sort='date_desc'):
     dataframes = asset_info['dataframes']
     extended_info = asset_info['info']
 
@@ -43,8 +67,30 @@ def _view_asset_helper(asset_info):
         rent = rent[['Date', 'Total', 'Movimentation']]
 
     asset = asset_info['name']
-    news_query = asset_info.get('long_name') or asset_info.get('ticker') or asset
-    news = search_news(f'{news_query} stock', num=8)
+    news = []
+    news_sentiment = None
+    if fetch_news:
+        news_query = asset_info.get('long_name') or asset_info.get('ticker') or asset
+        news = search_news(f'{news_query} stock', num=8)
+        news = _sort_news(news, news_sort)
+
+        if analyze_sentiment:
+            news_sentiment = analyze_news_sentiment_with_gemini(asset, news)
+
+        # Map sentiment output back to each news item for rendering.
+        if news_sentiment and news_sentiment.get('items'):
+            sentiment_by_index = {
+                item.get('index'): item
+                for item in news_sentiment['items']
+                if isinstance(item, dict)
+            }
+            for idx, item in enumerate(news):
+                meta = sentiment_by_index.get(idx)
+                if meta:
+                    item['sentiment'] = meta.get('sentiment', 'neutral')
+                    item['sentiment_confidence'] = meta.get('confidence', 0.0)
+                    item['sentiment_reason'] = meta.get('reason', '')
+
     return render_template(
         'view_asset.html', html_title=f'{asset}',
         info=asset_info,
@@ -58,6 +104,10 @@ def _view_asset_helper(asset_info):
         rent=rent,
         negotiation=negotiation,
         news=news,
+        news_sentiment=news_sentiment,
+        news_requested=fetch_news,
+        sentiment_requested=analyze_sentiment,
+        news_sort=news_sort,
     )
 
 
@@ -77,7 +127,18 @@ def view_asset(source=None, asset=None):
     if not asset_info['valid']:
         abort(404)
 
-    return _view_asset_helper(asset_info)
+    fetch_news = request.args.get('news') == '1'
+    analyze_sentiment = request.args.get('sentiment') == '1'
+    news_sort = request.args.get('news_sort', 'date_desc')
+    if news_sort not in {'date_desc', 'date_asc', 'source_asc', 'title_asc'}:
+        news_sort = 'date_desc'
+
+    return _view_asset_helper(
+        asset_info,
+        fetch_news=fetch_news,
+        analyze_sentiment=analyze_sentiment,
+        news_sort=news_sort,
+    )
 
 
 @app.route('/history/<source>/<asset>', methods=['GET', 'POST'])
