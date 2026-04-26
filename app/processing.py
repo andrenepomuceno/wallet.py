@@ -180,7 +180,10 @@ def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentat
             df2[col] = None
     df2 = df2[columns]
 
-    df_merged = pd.concat([df1, df2], ignore_index=True)
+    frames = [d for d in (df1, df2) if not d.empty]
+    if not frames:
+        return pd.DataFrame(columns=columns)
+    df_merged = pd.concat(frames, ignore_index=True)
     df_merged.sort_values(by='Date', inplace=True)
 
     return df_merged
@@ -370,6 +373,7 @@ def consolidate_asset_info(dataframes, asset_info, until_date=None, date_close_p
     realized_gain = sells['Realized Gain'].sum()
 
     asset_info['last_close_price'] = 0
+    asset_info.setdefault('last_close_variation', 0)
     asset_info['info'] = {}
     if first_buy is not None:
         asset_info['first_buy'] = first_buy.strftime("%Y-%m-%d")

@@ -81,36 +81,34 @@ def usd_exchange_rate(currency = 'BRL'):
         app.logger.error("usd_exchange_rate Exception: %s", e)
 
 def get_yfinance_data(ticker):
-    """Scrape yfinance online data for the specified asset"""
-    try:
-        stock = yf.Ticker(ticker, session=_get_session())
-    except TypeError:
-        # Some yfinance versions may not accept session= kwarg.
-        stock = yf.Ticker(ticker)
-    info = stock.info
+    """Scrape yfinance online data for the specified asset.
 
-    asset_info = {}
-
-    # last_close_price = info['previousClose']
-    currency = info['currency']
-    asset_class = info['quoteType']
-    long_name = info['longName']
+    Note: yfinance now requires curl_cffi internally and is incompatible with
+    custom requests/requests_cache sessions, so we let yfinance manage its own
+    transport.
+    """
+    stock = yf.Ticker(ticker)
+    info = stock.info or {}
 
     data = stock.history(period='5d', auto_adjust=False)
-    last_close_price = data['Close'].iloc[-1]
-    previous_close = data['Close'].iloc[-2]
-    close_5d = data['Close'].mean()
-    last_close_variation = 100 * (last_close_price/previous_close - 1)
+    if data is None or data.empty or 'Close' not in data.columns:
+        raise RuntimeError(f'yfinance returned no history for {ticker}')
 
-    asset_info['last_close_price'] = round(last_close_price, 2)
-    asset_info['currency'] = currency
-    asset_info['long_name'] = long_name
-    asset_info['asset_class'] = asset_class
-    asset_info['info'] = stock.info
-    asset_info['previous_close'] = round(previous_close, 2)
-    asset_info['close_5d'] = round(close_5d, 2)
-    asset_info['last_close_variation'] = round(last_close_variation, 2)
+    close = data['Close']
+    last_close_price = float(close.iloc[-1])
+    previous_close = float(close.iloc[-2]) if len(close) >= 2 else last_close_price
+    close_5d = float(close.mean())
+    last_close_variation = (
+        100 * (last_close_price / previous_close - 1) if previous_close else 0.0
+    )
 
-    # print(json.dumps(stock.info, indent = 4))
-
-    return asset_info
+    return {
+        'last_close_price': round(last_close_price, 2),
+        'currency': info.get('currency', ''),
+        'long_name': info.get('longName', ''),
+        'asset_class': info.get('quoteType', ''),
+        'info': info,
+        'previous_close': round(previous_close, 2),
+        'close_5d': round(close_5d, 2),
+        'last_close_variation': round(last_close_variation, 2),
+    }

@@ -9,4 +9,4 @@ if __name__ == '__main__':
         db.create_all()
         seed_default_cache_config()
         rebuild_request_cache()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5100)
