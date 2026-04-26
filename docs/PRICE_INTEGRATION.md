@@ -6,15 +6,125 @@ How Wallet.py resolves prices for assets from multiple sources.
 
 ## 🎯 General Strategy
 
-The system tries multiple methods in cascade:
+For each asset, the system works through this cascade:
 
 ```
-1. B3 Stocks (XXXX3/XXXX4)?       → yfinance + .SA
-2. B3 REITs (XXXX11)?              → yfinance + .SA
-3. Crypto (BTC, ETH)?             → yfinance + -USD + exchange rate
-4. Custom XPath Scraping?         → specific website
-5. Fallback → yfinance direct
+1. B3 Stocks (XXXX3/XXXX4)?        → ticker + .SA → yfinance
+2. B3 REITs (XXXX11)?               → ticker + .SA → yfinance
+3. Crypto (BTC, ETH …)?            → ticker + -USD → yfinance → × USD/BRL rate
+4. In scrape_dict?                  → XPath scraping
+5. Gemini AI available?             → ask gemini-2.0-flash for best Yahoo Finance ticker
+6. Final fallback                   → yfinance with raw ticker string
 ```
+
+---
+
+## 🔄 Price Fetching (`get_yfinance_data`)
+
+In `app/utils/scraping.py`. yfinance manages its own transport (incompatible with `requests_cache`).
+
+```python
+def get_yfinance_data(ticker):
+    stock = yf.Ticker(ticker)
+    data = stock.history(period='5d', auto_adjust=False)
+    last_close_price  = float(data['Close'].iloc[-1])
+    previous_close    = float(data['Close'].iloc[-2])
+    close_5d          = float(data['Close'].mean())
+    return last_close_price, previous_close, close_5d, info
+```
+
+---
+
+## 🤖 Gemini AI Ticker Resolution
+
+When a ticker doesn’t match any B3/crypto pattern and isn’t in `scrape_dict`, `guess_yfinance_ticker_with_gemini(asset_name)` (in `processing.py`) is called.
+
+- Requires a **Gemini API key** stored in `ApiConfig` (provider = `gemini`). Set via `/config/api`.
+- Calls `gemini-2.0-flash` with a prompt asking for the best Yahoo Finance ticker, with `.SA` suffix for Brazilian assets.
+- Returns the suggested ticker string, or `None` if no key is configured or the model is not confident.
+
+---
+
+## 🏆 Asset Type Detection (`app/utils/parsing.py`)
+
+### B3 Stocks
+Pattern: `[A-Z0-9]{4}(3|4)$` — e.g. `ITUB3`, `VALE3`, `WEGE4`
+
+### B3 REITs
+Pattern: `[A-Z0-9]{4}11$` — e.g. `HGLG11`, `CSHG11`
+
+```python
+def is_b3_stock_ticker(ticker): ...
+def is_b3_fii_ticker(ticker): ...
+def is_valid_b3_ticker(ticker): ...
+```
+
+---
+
+## 🏷️ Custom XPath Scraping
+
+Defined in `scrape_dict` at the top of `app/processing.py`.
+Example (pre-configured):
+
+```python
+scrape_dict = {
+    "Tesouro Selic 2029": {
+        'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
+        'xpath': '/html/body/.../span',
+        'class': 'Renda Fixa',
+        'currency': 'BRL',
+    },
+    ...
+}
+```
+
+Scraping is performed by `scrape_data(url, xpath)` in `app/utils/scraping.py`, using a `requests_cache.CachedSession` with TTL from `CacheConfig` (`category='scraping'`).
+
+---
+
+## 💱 USD/BRL Exchange Rate
+
+Fetched from `https://api.exchangerate-api.com/v4/latest/USD` by `usd_exchange_rate(currency='BRL')` in `app/utils/scraping.py`.
+Cached per `CacheConfig` category `exchange_rate` (default 3600 s).
+
+---
+
+## ⏰ Caching
+
+All HTTP caches are managed by a single `requests_cache.CachedSession` in `app/utils/scraping.py`.
+TTLs are stored in the `cache_config` table and are editable at runtime via `/config/api`.
+
+| Category | Default TTL | URL pattern |
+|----------|-------------|-------------|
+| `default` | 3600 s | (global fallback) |
+| `yfinance` | 900 s | `*yahoo.com*` |
+| `exchange_rate` | 3600 s | `*exchangerate-api.com*` |
+| `scraping` | 3600 s | `*taxas-tesouro.com*` |
+
+Processing results (`consolidate`, `asset`) are memoized separately via `ProcessingCache` (see [Database](DATABASE.md)).
+
+To clear the HTTP cache immediately, use the **Clear Cache** button at `/config/api` (POST `/config/cache/clear`).
+
+---
+
+## ❌ Troubleshooting
+
+### Price not found
+
+1. Verify the ticker exists on Yahoo Finance: `yfinance.Ticker('ITUB3.SA').info`
+2. For custom assets, check `scrape_dict` in `processing.py`
+3. Configure a Gemini API key at `/config/api` to enable AI-assisted ticker resolution
+
+### Price different from expected
+
+- B3 assets need `.SA`: `ITUB3.SA` ✅
+- Crypto prices are automatically converted from USD to BRL via `usd_exchange_rate()`
+
+### Stale prices
+
+- Reduce yfinance TTL at `/config/api`
+- Click **Clear Cache** at `/config/api` to force an immediate refresh
+
 
 ---
 

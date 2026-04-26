@@ -77,16 +77,15 @@ After importing data, click **"Consolidate"** to see the complete summary:
 
 ### Information Displayed
 
-**For each asset:**
-- Current position quantity
-- Current price (real-time via yfinance)
-- Total position value
-- Profitability (P&L in R$ and %)
-- Allocation (% of total portfolio)
+**Summary table by asset class:**
+- Class, Currency, Position value, Cost, Wages, Rent Wages, Taxes, Liquid Cost, Realized/Unrealized Gain, Capital Gain, Rentability, Relative position
 
-**Charts:**
-- Allocation by asset type (pie chart)
-- Profitability evolution over time
+**Per-asset table:**
+- Name, Close Price, 1D Variation, Shares, Position value, Avg Buy Price, individual gain/loss metrics
+
+### Sold Positions
+
+Assets that have been fully sold appear on a separate **"Sold"** page (link available in the navigation or at `/sold`). They are excluded from the main consolidation view.
 
 ---
 
@@ -119,23 +118,23 @@ Click on any asset in the consolidation table to access the **detailed view**:
 ### Charts
 
 **Candlestick Chart:**
-- Asset price history
-- Shows open, high, low, close
+- Asset price history fetched from Yahoo Finance (yfinance)
 
-**Profitability Over Time:**
-- Evolution of your P&L with this asset
+### News
 
-### Fundamentals
-
-If available via Yahoo Finance, shows:
-- P/E Ratio
-- Dividend Yield
-- 52-week Range
-- Market Cap
+If a **Serper API key** is configured (see § API Configuration below), recent news articles related to the asset are shown below the charts.
 
 ---
 
-## ➕ 4. Manual Transaction Entry
+## 📈 4. Asset History
+
+On the asset detail page, a **"History"** link is available that shows the historical evolution of your position (quantity, cost, value over time) as Plotly charts.
+
+Direct URL: `/history/<source>/<asset>` (e.g. `/history/b3/ITUB3`)
+
+---
+
+## ➕ 5. Manual Transaction Entry
 
 You can add transactions manually without uploading a file:
 
@@ -149,6 +148,39 @@ You can add transactions manually without uploading a file:
 3. Click **"Add"**
 
 **Deduplication system** prevents duplicates even in manual entry.
+
+---
+
+## � 6. API Configuration
+
+Go to **http://localhost:5000/config/api** to configure optional services:
+
+### Gemini API Key (Google AI Studio)
+
+Enables AI-assisted ticker resolution: when an asset ticker cannot be identified automatically, the system queries `gemini-2.0-flash` to find the best Yahoo Finance symbol.
+
+1. Get a free key at [Google AI Studio](https://aistudio.google.com/)
+2. Paste it in the **Gemini API Key** field and save
+
+### Serper API Key (serper.dev)
+
+Enables a **News** section on every asset detail page, showing recent articles via Google Search.
+
+1. Get a key at [serper.dev](https://serper.dev/)
+2. Paste it in the **Serper API Key** field and save
+
+### Cache TTLs
+
+You can adjust how long prices and scraping results are cached:
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| Default TTL | 3600 s | Global HTTP cache fallback |
+| yfinance TTL | 900 s | Yahoo Finance price data |
+| Exchange Rate TTL | 3600 s | USD/BRL rate |
+| Scraping TTL | 3600 s | Custom XPath scraping |
+
+Click **Clear Cache** to force an immediate refresh of all cached data.
 
 ---
 
@@ -173,28 +205,12 @@ You can add transactions manually without uploading a file:
 
 ### Custom
 
-For assets not found on yfinance, the system tries:
-- XPath scraping (defined in `processing.py`)
-- External configurable sources
+For assets not found on yfinance, the system:
+1. Checks `scrape_dict` in `processing.py` for XPath-based price scraping
+2. If a Gemini API key is configured, queries `gemini-2.0-flash` for the best Yahoo Finance ticker
+3. Falls back to a direct yfinance lookup with the raw ticker string
 
 ---
-
-## 🔧 Advanced Configuration
-
-### Enable/Disable Price Sources
-
-Edit `app/processing.py` and the `get_online_info()` function to customize how prices are fetched.
-
-### Price Cache
-
-Prices are cached for 60 minutes by default. To clear cache:
-
-```bash
-# Remove yfinance cache files
-rm -rf ~/.cache/yfinance
-```
-
-### Multiple Uploads
 
 You can upload from:
 - Different brokers (B3 + Avenue)

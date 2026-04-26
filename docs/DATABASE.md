@@ -10,78 +10,125 @@ Wallet.py uses SQLite with 4 main tables (SQLAlchemy models in `app/models.py`):
 
 ### 1. b3_movimentation
 
-B3 transactions (Movement — dividends, credits, debits)
+B3 movement extract (dividends, credits, debits, buys, sells). Column names mirror the original B3 CSV export.
 
 ```sql
 CREATE TABLE b3_movimentation (
     id INTEGER PRIMARY KEY,
-    origin_id VARCHAR UNIQUE NOT NULL,
-    date VARCHAR NOT NULL,                    -- 'YYYY-MM-DD'
-    asset VARCHAR NOT NULL,                   -- Asset code (ITUB3, HGLG11, etc)
-    movimentation VARCHAR NOT NULL,           -- 'Compra', 'Venda', 'Dividendo', 'Credito', 'Debito'
-    quantity FLOAT NOT NULL,                  -- Precision 8 decimals (crypto)
-    price FLOAT NOT NULL,                     -- Unit price
-    total FLOAT NOT NULL                      -- Quantity × Price
+    origin_id VARCHAR,                        -- dedup key
+    entrada_saida VARCHAR,                    -- 'Credito' or 'Debito'
+    data VARCHAR,                             -- 'YYYY-MM-DD'
+    movimentacao VARCHAR,                     -- e.g. 'Compra', 'Venda', 'Dividendo'
+    produto VARCHAR,                          -- Full product name (used to derive asset ticker)
+    instituicao VARCHAR,                      -- Broker name
+    quantidade FLOAT,                         -- Quantity
+    preco_unitario FLOAT,                     -- Unit price
+    valor_operacao FLOAT                      -- Total value
 );
-
-CREATE UNIQUE INDEX idx_b3_movimentation_origin_id ON b3_movimentation(origin_id);
 ```
+
+`b3_movimentation_sql_to_df()` maps these columns to the standard DataFrame format (`Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`).
 
 ### 2. b3_negotiation
 
-B3 transactions (Negotiation — buys and sells)
+B3 negotiation extract (buys and sells). Column names mirror the original B3 CSV export.
 
 ```sql
 CREATE TABLE b3_negotiation (
     id INTEGER PRIMARY KEY,
-    origin_id VARCHAR UNIQUE NOT NULL,
-    date VARCHAR NOT NULL,
-    asset VARCHAR NOT NULL,
-    movimentation VARCHAR NOT NULL,           -- 'Compra' or 'Venda'
-    quantity FLOAT NOT NULL,
-    price FLOAT NOT NULL,
-    total FLOAT NOT NULL
+    origin_id VARCHAR,
+    data VARCHAR,                             -- 'YYYY-MM-DD'
+    tipo VARCHAR,                             -- 'Compra' or 'Venda'
+    mercado VARCHAR,                          -- Market type
+    prazo VARCHAR,                            -- Settlement period
+    instituicao VARCHAR,                      -- Broker name
+    codigo VARCHAR,                           -- Asset code (ITUB3, etc.)
+    quantidade FLOAT,
+    preco FLOAT,
+    valor FLOAT
 );
-
-CREATE UNIQUE INDEX idx_b3_negotiation_origin_id ON b3_negotiation(origin_id);
 ```
 
 ### 3. avenue_extract
 
-Avenue transactions (US Broker)
+Avenue (US broker) statement export. Column names mirror the original CSV.
 
 ```sql
 CREATE TABLE avenue_extract (
     id INTEGER PRIMARY KEY,
-    origin_id VARCHAR UNIQUE NOT NULL,
-    date VARCHAR NOT NULL,
-    asset VARCHAR NOT NULL,                   -- US ticker (AAPL, GOOGL) or crypto
-    movimentation VARCHAR NOT NULL,           -- 'Compra', 'Venda', 'Dividendos', 'Impostos'
-    quantity FLOAT NOT NULL,
-    price FLOAT NOT NULL,                     -- Price in USD
-    total FLOAT NOT NULL                      -- Total in USD
+    origin_id VARCHAR,
+    data VARCHAR,                             -- 'YYYY-MM-DD'
+    hora VARCHAR,                             -- Time of transaction
+    liquidacao VARCHAR,                       -- Settlement date 'YYYY-MM-DD'
+    descricao VARCHAR,                        -- Transaction description
+    valor FLOAT,                              -- Amount in USD
+    saldo FLOAT,                              -- Account balance in USD
+    entrada_saida VARCHAR,                    -- 'Credito' or 'Debito'
+    produto VARCHAR,                          -- Asset name / ticker
+    movimentacao VARCHAR,                     -- 'Compra', 'Venda', 'Dividendos', 'Impostos'
+    quantidade FLOAT,
+    preco_unitario FLOAT                      -- Unit price in USD
 );
-
-CREATE UNIQUE INDEX idx_avenue_extract_origin_id ON avenue_extract(origin_id);
 ```
 
 ### 4. generic_extract
 
-Generic transactions (custom format)
+Generic custom format (English column names).
 
 ```sql
 CREATE TABLE generic_extract (
     id INTEGER PRIMARY KEY,
-    origin_id VARCHAR UNIQUE NOT NULL,
-    date VARCHAR NOT NULL,
-    asset VARCHAR NOT NULL,
-    movimentation VARCHAR NOT NULL,           -- 'Buy', 'Sell', 'Wages', 'Taxes'
-    quantity FLOAT NOT NULL,
-    price FLOAT NOT NULL,
-    total FLOAT NOT NULL
+    origin_id VARCHAR,
+    date VARCHAR,                             -- 'YYYY-MM-DD'
+    asset VARCHAR,
+    movimentation VARCHAR,                    -- 'Buy', 'Sell', 'Wages', 'Taxes'
+    quantity FLOAT,
+    price FLOAT,
+    total FLOAT
 );
+```
 
-CREATE UNIQUE INDEX idx_generic_extract_origin_id ON generic_extract(origin_id);
+### 5. api_config
+
+Stores API keys for external services.
+
+```sql
+CREATE TABLE api_config (
+    id INTEGER PRIMARY KEY,
+    provider VARCHAR(50) UNIQUE NOT NULL,     -- 'gemini' or 'serper'
+    api_key VARCHAR(255) NOT NULL
+);
+```
+
+### 6. cache_config
+
+Configurable TTLs for both HTTP and processing caches.
+
+```sql
+CREATE TABLE cache_config (
+    id INTEGER PRIMARY KEY,
+    category VARCHAR(50) UNIQUE NOT NULL,     -- 'default', 'yfinance', 'exchange_rate', etc.
+    ttl_seconds INTEGER NOT NULL DEFAULT 3600,
+    url_pattern VARCHAR(255),                 -- URL glob for HTTP cache rules (NULL = processing cache)
+    updated_at DATETIME
+);
+```
+
+Default categories: `default` (3600 s), `yfinance` (900 s, `*yahoo.com*`), `exchange_rate` (3600 s), `scraping` (3600 s), `asset` (600 s), `consolidate` (600 s).
+
+### 7. processing_cache
+
+Persistent memoization table. Stores pickled return values from expensive processing functions, keyed by `(category, key)`.
+
+```sql
+CREATE TABLE processing_cache (
+    id INTEGER PRIMARY KEY,
+    category VARCHAR(50) NOT NULL,
+    key VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL,
+    payload BLOB NOT NULL,
+    UNIQUE (category, key)
+);
 ```
 
 ---
@@ -155,36 +202,48 @@ movimentation_map = {
 
 ## 🔍 Common Queries
 
-### Get all transactions for an asset
+### Get all B3 movimentation rows containing a ticker
 
 ```python
-# ORM
+# Use `.produto` (the raw product name column) with .like()
 results = db.session.query(B3Movimentation).filter(
-    B3Movimentation.asset.like(f'%ITUB%')
+    B3Movimentation.produto.like('%ITUB%')
 ).all()
-
-# Result
-[
-    B3Movimentation(date='2024-01-10', asset='ITUB3', movimentation='Compra', quantity=100, ...),
-    B3Movimentation(date='2024-02-15', asset='ITUB3', movimentation='Dividendo', quantity=0, ...)
-]
 ```
 
-### Get by date
+The `b3_movimentation_sql_to_df()` helper then extracts the ticker with `parse_b3_ticker()`.
+
+### Get all B3 negotiation rows for an asset
 
 ```python
-# Between dates
+results = db.session.query(B3Negotiation).filter(
+    B3Negotiation.codigo.like('%ITUB%')
+).all()
+```
+
+### Get by date range (all sources)
+
+```python
+# B3Movimentation uses column `data`
 results = db.session.query(B3Movimentation).filter(
-    db.and_(
-        B3Movimentation.date >= '2024-01-01',
-        B3Movimentation.date <= '2024-12-31'
-    )
+    B3Movimentation.data >= '2024-01-01',
+    B3Movimentation.data <= '2024-12-31'
 ).all()
 
-# After date
-results = db.session.query(B3Movimentation).filter(
-    B3Movimentation.date >= '2024-01-01'
+# GenericExtract uses column `date`
+results = db.session.query(GenericExtract).filter(
+    GenericExtract.date >= '2024-01-01',
+    GenericExtract.date <= '2024-12-31'
 ).all()
+```
+
+### Get API key
+
+```python
+from app.models import get_api_key
+
+api_key = get_api_key('gemini')   # Returns None if not configured
+api_key = get_api_key('serper')
 ```
 
 ### Count transactions by type
@@ -193,9 +252,9 @@ results = db.session.query(B3Movimentation).filter(
 from sqlalchemy import func
 
 result = db.session.query(
-    B3Movimentation.movimentation,
+    B3Movimentation.movimentacao,
     func.count(B3Movimentation.id).label('count')
-).group_by(B3Movimentation.movimentation).all()
+).group_by(B3Movimentation.movimentacao).all()
 
 # Result
 [('Compra', 50), ('Venda', 20), ('Dividendo', 15)]

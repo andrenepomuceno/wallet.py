@@ -30,15 +30,16 @@ The application will automatically reload when you edit files.
 
 ### 3. Environment Variables (optional)
 
-Create a `.env` file in the root:
+The application reads `FLASK_ENV`, `FLASK_DEBUG`, and `PORT` from the environment.
+There is no `.env` file loader — export variables directly or set them in your shell profile.
 
-```env
-FLASK_ENV=development
-FLASK_DEBUG=1
-DATABASE_URL=sqlite:///instance/wallet.db
-PORT=5000
-LOG_LEVEL=DEBUG
+```bash
+export FLASK_ENV=development
+export FLASK_DEBUG=1
+export PORT=5000
 ```
+
+API keys (Gemini, Serper) and cache TTLs are stored in the SQLite DB and configured at runtime via **http://localhost:5000/config/api**.
 
 ---
 
@@ -70,9 +71,39 @@ LOG_LEVEL=DEBUG
   ```
 
 #### Movimentation Labels
-- **B3/Avenue:** Portuguese — `'Compra'`, `'Venda'`, `'Dividendo'`, `'Credito'`, `'Debito'`, `'Impostos'`
+- **B3:** Portuguese — `'Compra'`, `'Venda'`, `'Dividendo'`, `'Credito'`, `'Debito'`
+- **Avenue:** Portuguese — `'Compra'`, `'Venda'`, `'Dividendos'`, `'Impostos'`
 - **Generic:** English — `'Buy'`, `'Sell'`, `'Wages'`, `'Taxes'`
-- **On conversion:** Normalize to Portuguese internally
+
+#### Processing Cache (`utils/memocache.py`)
+
+Expensive processing functions are wrapped with `@ttl_memoize(category='...')`. Results are stored pickled in the `ProcessingCache` table. TTL per category is read from `CacheConfig`. Invalidate with `invalidate_processing_cache(category)`.
+
+```python
+from app.utils.memocache import ttl_memoize
+
+@ttl_memoize(category='asset')
+def consolidate_asset_info(dataframes, asset_info):
+    ...
+```
+
+#### News Search (`utils/serper.py`)
+
+```python
+from app.utils.serper import search_news
+
+news = search_news('ITUB3 stock', num=8)
+# Returns list of {title, link, snippet, source, date, imageUrl} or [] if no key
+```
+
+#### API Keys
+
+```python
+from app.models import get_api_key
+
+gemini_key = get_api_key('gemini')   # None if not configured
+serper_key = get_api_key('serper')
+```
 
 #### Precision
 - **Quantities:** `round(qty, 8)` to avoid float errors

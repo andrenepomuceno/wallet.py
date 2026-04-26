@@ -51,14 +51,18 @@ app/importing.py      app/processing.py    app/models.py
 ```
 app/
 ├── __init__.py              # Flask app factory, SQLAlchemy init, logging
-├── models.py                # 4 ORM models + *_sql_to_df() converters
+├── models.py                # ORM models + *_sql_to_df() converters
+│                            # ApiConfig, CacheConfig, ProcessingCache
+│                            # B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract
 ├── importing.py             # CSV/XLSX parsing, normalization, dedup
-├── processing.py            # Core: consolidation, prices, charts (925 lines!)
+├── processing.py            # Core: consolidation, prices, charts
 ├── routes.py                # Flask routes, views, Jinja2
 ├── forms.py                 # Flask-WTF forms
 ├── utils/
-│   ├── parsing.py          # Ticker detection (XXXX3/4, XXXX11, crypto)
-│   └── scraping.py         # yfinance wrapper, cache, custom scraping
+│   ├── parsing.py          # Ticker detection (XXXX3/4, XXXX11)
+│   ├── scraping.py         # requests_cache session, yfinance wrapper, XPath scraping
+│   ├── memocache.py        # Persistent TTL memoization via ProcessingCache table
+│   └── serper.py           # Serper.dev API integration for news search
 ├── static/
 │   ├── css/wallet.css      # Styles (Bootstrap 5 dark theme)
 │   └── js/                 # Optional JavaScript
@@ -92,61 +96,26 @@ uploads/
 
 ### SQLAlchemy Models (models.py)
 
-#### B3Movimentation
-B3 transactions (Movement)
+#### Transaction Models
 
-```python
-- id (PK)
-- origin_id      # filepath:sha256:row_index (dedup)
-- date           # 'YYYY-MM-DD'
-- asset          # Asset code (XXXX3, XXXX11, etc)
-- movimentation  # 'Compra', 'Venda', 'Dividendo', 'Credito', 'Debito'
-- quantity       # float, precision 8 decimals
-- price          # float
-- total          # float
-```
+Each transaction model stores the raw columns from the respective broker CSV export and has an `origin_id` column for deduplication.
 
-#### B3Negotiation
-B3 transactions (Negotiation)
+| Model | Table | Source |
+|-------|-------|--------|
+| `B3Movimentation` | `b3_movimentation` | B3 movement extract |
+| `B3Negotiation` | `b3_negotiation` | B3 negotiation extract |
+| `AvenueExtract` | `avenue_extract` | Avenue (US) statement |
+| `GenericExtract` | `generic_extract` | Custom generic format |
 
-```python
-- id (PK)
-- origin_id      # filepath:sha256:row_index
-- date           # 'YYYY-MM-DD'
-- asset          # Asset code
-- movimentation  # 'Compra' or 'Venda'
-- quantity       # float
-- price          # float
-- total          # float
-```
+Column details: see [Database](DATABASE.md).
 
-#### AvenueExtract
-Avenue transactions
+Each model has a companion `*_sql_to_df(result)` function that converts ORM objects to a pandas DataFrame with standardized columns: `Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`.
 
-```python
-- id (PK)
-- origin_id      # filepath:sha256:row_index
-- date           # 'YYYY-MM-DD'
-- asset          # US ticker (AAPL, GOOGL, etc) or crypto
-- movimentation  # 'Compra', 'Venda', 'Dividendos', 'Impostos'
-- quantity       # float
-- price          # float
-- total          # float
-```
+#### Configuration & Cache Models
 
-#### GenericExtract
-Generic transactions
-
-```python
-- id (PK)
-- origin_id      # filepath:sha256:row_index
-- date           # 'YYYY-MM-DD'
-- asset          # Asset code (free format)
-- movimentation  # 'Buy', 'Sell', 'Wages', 'Taxes'
-- quantity       # float
-- price          # float
-- total          # float
-```
+- **`ApiConfig`** — Stores API keys for external services (`gemini`, `serper`).
+- **`CacheConfig`** — Configurable TTLs for HTTP caches (yfinance, exchange rate, scraping) and processing caches (`asset`, `consolidate`).
+- **`ProcessingCache`** — Persistent pickled memoization for expensive processing functions (`consolidate_asset_info`, etc.). TTL per category is read from `CacheConfig`.
 
 ---
 
@@ -255,16 +224,21 @@ ETH → ETH-USD → yfinance → × usd_exchange_rate('BRL')
 Defined in `scrape_dict` at the beginning of `processing.py`:
 ```python
 scrape_dict = {
-    'CUSTOM_TICKER': {
-        'url': 'https://example.com/price',
-        'xpath': '//span[@id="preco"]/text()',
-        'currency': 'BRL'
-    }
+    'Tesouro Selic 2029': {
+        'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2029/',
+        'xpath': '...',
+        'class': 'Renda Fixa',
+        'currency': 'BRL',
+    },
+    ...
 }
 ```
 
-#### Fallback
-If none of the above work, tries yfinance directly with the ticker.
+#### Gemini AI Fallback
+When standard ticker detection fails, `guess_yfinance_ticker_with_gemini(asset_name)` is called (requires a Gemini API key stored in `ApiConfig`). It queries `gemini-2.0-flash` to resolve the best Yahoo Finance ticker symbol.
+
+#### Final Fallback
+Tries yfinance directly with the raw ticker.
 
 ---
 

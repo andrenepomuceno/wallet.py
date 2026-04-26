@@ -45,8 +45,12 @@ Access at **http://localhost:5000**
 
 ✅ **Multi-source** — Integrates B3, Avenue, and generic formats  
 ✅ **Automatic deduplication** — Prevents re-importing the same data  
-✅ **Real-time prices** — yfinance + custom scraping  
-✅ **Smart consolidation** — Groups positions, calculates profitability  
+✅ **Real-time prices** — yfinance + XPath scraping + Gemini AI ticker resolution  
+✅ **Smart consolidation** — Groups positions by asset class, calculates profitability and realized/unrealized gains  
+✅ **Sold positions** — Separate view for fully-exited positions  
+✅ **Asset history** — Historical position evolution charts  
+✅ **News** — Recent articles via Serper.dev (optional API key)  
+✅ **Configurable cache** — Per-category TTLs editable at runtime  
 ✅ **Visualizations** — Interactive Plotly charts  
 ✅ **Detailed analysis** — Per-asset view with history and fundamentals  
 ✅ **Dark UI** — Bootstrap 5 dark theme, responsive design  

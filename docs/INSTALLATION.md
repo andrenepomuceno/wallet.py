@@ -73,11 +73,22 @@ No database migrations are needed — the database is initialized automatically.
 | pandas | - | CSV/XLSX data handling |
 | openpyxl | - | Excel file reading |
 | yfinance | - | Asset price fetching |
-| yfinance_cache | - | yfinance caching |
 | Plotly | - | Interactive charts |
-| lxml | - | HTML parsing (scraping) |
+| lxml | - | HTML parsing (XPath scraping) |
 | requests | - | HTTP requests |
-| requests_cache | - | Request caching |
+| requests_cache | - | HTTP request caching |
+
+---
+
+## Optional API Keys
+
+These are not required to run the application but unlock additional features.
+Configure them at **http://localhost:5000/config/api** after starting the app.
+
+| Key | Provider | Feature |
+|-----|----------|---------|
+| Gemini API key | Google AI Studio | AI-assisted ticker resolution for unknown assets |
+| Serper API key | serper.dev | News articles on the asset detail page |
 
 ---
 

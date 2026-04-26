@@ -1,302 +1,149 @@
-# Referência de APIs
+# API Reference
 
-Endpoints e modelos de dados do Wallet.py.
+HTTP endpoints exposed by Wallet.py.
 
 ---
 
-## 🌐 Endpoints HTTP
+## 🌐 HTTP Endpoints
 
 ### Home & Upload
 
 #### GET /
-```
-Página inicial com upload de arquivo
-```
+Home page with file upload form.
 
-**Response:** HTML (template: `index.html`)
+**Response:** HTML (`index.html`)
 
-#### POST /upload
-```
-Upload de arquivo (CSV/XLSX) para importação
-```
+#### POST /
+Upload a CSV/XLSX file for import.
 
-**Parameters:**
-- `file` (multipart) — Arquivo CSV ou XLSX
-- `source` (form) — Tipo de fonte:
-  - `b3_movimentation`
-  - `b3_negotiation`
-  - `avenue`
-  - `generic`
+**Form fields:**
+- `file` (multipart) — CSV or XLSX file
+- `filetype` (form) — Source type string:
+  - `B3 Movimentation`
+  - `B3 Negotiation`
+  - `Avenue Extract`
+  - `Generic Extract`
 
-**Response:**
-- Sucesso: Redirect para `/` com flash `"Arquivo importado com sucesso"`
-- Erro: Redirect para `/` com flash de erro
-
-**Status Codes:**
-- 302 — Sucesso (redirect)
-- 400 — Arquivo inválido
-- 413 — Arquivo muito grande
+**Response:** Redirect to the corresponding view page on success, redirect to `/` on error. Flash messages indicate result.
 
 ---
 
-### Consolidação
+### Source Views (read-only tables)
+
+#### GET /b3_movimentation
+B3 movement extract table with optional filter form.
+
+**Response:** HTML (`view_movimentation.html`)
+
+#### GET|POST /b3_negotiation
+B3 negotiation extract table. POST adds a manual entry.
+
+**Response:** HTML (`view_negotiation.html`)
+
+#### GET|POST /avenue
+Avenue extract table. POST adds a manual entry.
+
+**Response:** HTML (`view_extract.html`)
+
+#### GET|POST /generic
+Generic extract table. POST adds a manual entry.
+
+**Response:** HTML (`view_generic.html`)
+
+---
+
+### Consolidation
 
 #### GET /consolidate
-```
-Visualizar portfólio consolidado
-```
+Consolidated portfolio view: active positions grouped by asset class.
 
-**Response:** HTML (template: `view_consolidate.html`)
+**Response:** HTML (`view_consolidate.html`)
 
-**Dados retornados:**
-```python
-{
-    'portfolio': [
-        {
-            'asset': 'ITUB3',
-            'quantity': 1000,
-            'price': 26.50,
-            'total_value': 26500.00,
-            'cost_basis': 25000.00,
-            'profit': 1500.00,
-            'profit_pct': 6.0,
-            'allocation_pct': 15.5
-        },
-        ...
-    ],
-    'total_value': 170000.00,
-    'total_profit': 15000.00,
-    'total_profit_pct': 9.8,
-    'allocation_chart': '<div>...</div>',  # Plotly div
-    'evolution_chart': '<div>...</div>'
-}
-```
+**Context variables:**
+- `by_group` — DataFrame with one row per asset class (Class, Currency, Position, Cost, Wages, Rent Wages, Taxes, Liquid Cost, Realized Gain, Not Realized Gain, Capital Gain, Rentability, Rel. Position)
+- `group_df` — List of dicts, one per asset group, each with `name`, `df` (per-asset DataFrame with Name, Links, Close Price, 1D Variation, Shares, Position, Avg Price, …)
+- `info` — Raw dict from `process_consolidate_request()`
+
+#### GET /sold
+Consolidated view showing only fully-sold positions.
+
+**Response:** HTML (`view_consolidate.html`) filtered to sold groups.
 
 ---
 
-### Detalhes de Ativo
+### Asset Details
 
-#### GET /view_asset/<asset>
-```
-Visualizar detalhes de um ativo específico
-```
+#### GET /view/\<source\>/\<asset\>
+Detailed view of a single asset.
 
-**Parameters:**
-- `asset` (path) — Código do ativo (ex: ITUB3, BTC, AAPL)
+**Path parameters:**
+- `source` — `b3`, `avenue`, or `generic`
+- `asset` — Asset ticker (e.g. `ITUB3`, `BTC`, `AAPL`)
 
-**Response:** HTML (template: `view_asset.html`)
+**Response:** HTML (`view_asset.html`)
 
-**Dados retornados:**
-```python
-{
-    'asset': 'ITUB3',
-    'quantity': 500,
-    'price': 26.50,
-    'total_value': 13250.00,
-    'cost_basis': 12500.00,
-    'profit': 750.00,
-    'profit_pct': 6.0,
-    'average_buy_price': 25.00,
-    'highest_price': 27.50,
-    'lowest_price': 24.00,
-    'buys': [
-        {
-            'date': '2024-01-15',
-            'quantity': 300,
-            'price': 24.50,
-            'total': 7350.00
-        },
-        {
-            'date': '2024-02-20',
-            'quantity': 200,
-            'price': 26.00,
-            'total': 5200.00
-        }
-    ],
-    'sells': [
-        {
-            'date': '2024-03-10',
-            'quantity': 100,
-            'price': 26.50,
-            'total': 2650.00
-        }
-    ],
-    'wages': [
-        {
-            'date': '2024-03-15',
-            'description': 'Dividendo',
-            'total': 50.00
-        }
-    ],
-    'taxes': [
-        {
-            'date': '2024-04-01',
-            'description': 'Imposto',
-            'total': 10.00
-        }
-    ],
-    'price_chart': '<div>...</div>',  # Plotly candlestick
-    'fundamentals': {
-        'pe': 12.5,
-        'dividend_yield': 0.025,
-        'market_cap': 500000000,
-        '52_week_high': 28.00,
-        '52_week_low': 22.00
-    }
-}
-```
+**Context variables:**
+- `info` — Full asset info dict from `process_*_asset_request()`
+- `buys`, `sells`, `wages`, `taxes` — Filtered DataFrames
+- `movimentation`, `negotiation`, `rent` — Optional extra DataFrames
+- `graph_html` — Plotly candlestick chart HTML div
+- `news` — List of recent news articles from Serper.dev (empty if no key configured)
+
+**Returns 404** if source is invalid or asset not found.
 
 ---
 
-### Tabelas de Visualização
+### History
 
-#### GET /view_table/<source>/<type>
-```
-Tabela raw de transações por fonte e tipo
-```
+#### GET /history/\<source\>/\<asset\>
+Historical position evolution chart for an asset.
 
-**Parameters:**
-- `source` — `b3_movimentation`, `b3_negotiation`, `avenue`, `generic`
-- `type` — `buys`, `sells`, `wages`, `taxes`
+**Path parameters:**
+- `source` — `b3`, `avenue`, or `generic`
+- `asset` — Asset ticker
 
-**Response:** HTML (template: `view_table.html`)
-
-**Dados:**
-```python
-{
-    'transactions': [
-        {
-            'id': 1,
-            'date': '2024-01-15',
-            'asset': 'ITUB3',
-            'movimentation': 'Compra',
-            'quantity': 100,
-            'price': 25.00,
-            'total': 2500.00,
-            'origin_id': 'file.csv:abc123:0'
-        },
-        ...
-    ],
-    'count': 42
-}
-```
+**Response:** HTML (`view_history.html`)
 
 ---
 
-### Configuração de API (Experimental)
+### Configuration
 
-#### GET /view_api_config
-```
-Visualizar e gerenciar configurações de APIs externas
-```
+#### GET|POST /config/api
+View and update API keys (Gemini, Serper) and cache TTLs.
 
-**Response:** HTML (template: `view_api_config.html`)
+**Form fields (POST):**
+- `gemini_api_key` — Gemini API key (for AI ticker resolution)
+- `serper_api_key` — Serper.dev API key (for news search)
+- `cache_default_ttl` — Default HTTP cache TTL (seconds)
+- `cache_yfinance_ttl` — yfinance cache TTL (seconds)
+- `cache_exchange_ttl` — Exchange rate cache TTL (seconds)
+- `cache_scraping_ttl` — XPath scraping cache TTL (seconds)
 
----
+**Response:** HTML (`view_api_config.html`)
 
-## 📦 Modelos de Dados (ORM)
+#### POST /config/cache/clear
+Clears all cached HTTP responses (does not change TTL configuration).
 
-### B3Movimentation
-
-```python
-class B3Movimentation(db.Model):
-    __tablename__ = 'b3_movimentation'
-    
-    id: int                    # PK auto-increment
-    origin_id: str            # Chave dedup única
-    date: str                 # 'YYYY-MM-DD'
-    asset: str                # Código do ativo
-    movimentation: str        # Tipo operação
-    quantity: float           # Precisão 8 decimais
-    price: float              # Preço unitário
-    total: float              # Quantidade × Preço
-```
-
-**Valores de movimentation:**
-- `'Compra'` — Buy
-- `'Venda'` — Sell
-- `'Dividendo'` — Dividend
-- `'Credito'` — Credit
-- `'Debito'` — Debit
+**Response:** Redirect to `/config/api` with flash message.
 
 ---
 
-### B3Negotiation
+## 📦 ORM Models
 
-```python
-class B3Negotiation(db.Model):
-    __tablename__ = 'b3_negotiation'
-    
-    id: int
-    origin_id: str            # Chave dedup única
-    date: str                 # 'YYYY-MM-DD'
-    asset: str                # Código do ativo
-    movimentation: str        # 'Compra' ou 'Venda'
-    quantity: float
-    price: float
-    total: float
-```
+See [Database](DATABASE.md) for full schema. Summary:
 
----
+| Model | Table | Key columns |
+|-------|-------|-------------|
+| `B3Movimentation` | `b3_movimentation` | `produto`, `movimentacao`, `quantidade`, `preco_unitario`, `valor_operacao` |
+| `B3Negotiation` | `b3_negotiation` | `codigo`, `tipo`, `quantidade`, `preco`, `valor` |
+| `AvenueExtract` | `avenue_extract` | `produto`, `movimentacao`, `quantidade`, `preco_unitario`, `valor` |
+| `GenericExtract` | `generic_extract` | `asset`, `movimentation`, `quantity`, `price`, `total` |
+| `ApiConfig` | `api_config` | `provider`, `api_key` |
+| `CacheConfig` | `cache_config` | `category`, `ttl_seconds`, `url_pattern` |
+| `ProcessingCache` | `processing_cache` | `category`, `key`, `payload` |
 
-### AvenueExtract
+All transaction models expose a `*_sql_to_df(result)` function that normalises columns to `Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`.
 
-```python
-class AvenueExtract(db.Model):
-    __tablename__ = 'avenue_extract'
-    
-    id: int
-    origin_id: str            # Chave dedup única
-    date: str                 # 'YYYY-MM-DD'
-    asset: str                # Ticker US ou crypto
-    movimentation: str        # 'Compra', 'Venda', 'Dividendos', 'Impostos'
-    quantity: float
-    price: float              # Em USD
-    total: float              # Em USD
-```
-
----
-
-### GenericExtract
-
-```python
-class GenericExtract(db.Model):
-    __tablename__ = 'generic_extract'
-    
-    id: int
-    origin_id: str            # Chave dedup única
-    date: str                 # 'YYYY-MM-DD'
-    asset: str                # Código do ativo
-    movimentation: str        # 'Buy', 'Sell', 'Wages', 'Taxes'
-    quantity: float
-    price: float
-    total: float
-```
-
----
-
-## 🔧 Funções Principais (processing.py)
-
-### get_online_info(asset)
-
-Fetch preço, chart e fundamentals de um ativo.
-
-```python
-def get_online_info(asset: str) -> dict:
-    """
-    Args:
-        asset: Código do ativo (ex: 'ITUB3', 'BTC', 'AAPL')
-    
-    Returns:
-    {
-        'price': float,              # Preço em BRL
-        'currency': str,             # 'BRL' ou 'USD'
-        'chart': str,                # HTML Plotly candlestick
-        'fundamentals': dict,        # PE, dividend_yield, etc
-        'timestamp': str             # ISO 8601
-    }
-    """
-```
 
 ---
 
