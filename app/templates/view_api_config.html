@@ -31,12 +31,26 @@
                 <form method="post">
                     {{ form.hidden_tag() }}
                     <div class="mb-3">
-                        {{ form.gemini_api_key.label(class='form-label') }}
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            {{ form.gemini_api_key.label(class='form-label mb-0') }}
+                            {% if has_gemini_key %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Instalada</span>
+                            {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Nao instalada</span>
+                            {% endif %}
+                        </div>
                         {{ form.gemini_api_key(class='form-control', placeholder='Cole aqui sua Gemini API Key') }}
                         <div class="form-text">A chave nao e exibida por seguranca. Preencha somente para criar/atualizar.</div>
                     </div>
                     <div class="mb-3">
-                        {{ form.serper_api_key.label(class='form-label') }}
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            {{ form.serper_api_key.label(class='form-label mb-0') }}
+                            {% if has_serper_key %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Instalada</span>
+                            {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Nao instalada</span>
+                            {% endif %}
+                        </div>
                         {{ form.serper_api_key(class='form-control', placeholder='Cole aqui sua Serper API Key') }}
                         <div class="form-text">Habilita busca de noticias do ativo via serper.dev.</div>
                     </div>
