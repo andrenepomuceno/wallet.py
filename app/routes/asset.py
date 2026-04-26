@@ -10,7 +10,11 @@ from app.processing import (
     process_generic_asset_request,
     process_history,
 )
-from app.utils.serper import search_news, analyze_news_sentiment_with_gemini
+from app.utils.serper import (
+    analyze_asset_performance_with_gemini,
+    analyze_news_sentiment_with_gemini,
+    search_news,
+)
 
 
 _ALLOWED_NEWS_SORTS = {'date_desc', 'date_asc', 'source_asc', 'title_asc'}
@@ -186,6 +190,13 @@ def api_asset_news(source=None, asset=None):
     )
 
     return jsonify(payload)
+
+
+@app.route('/api/view/<source>/<asset>/analysis', methods=['GET'])
+def api_asset_analysis(source=None, asset=None):
+    asset_info = _load_asset_info_or_404(source, asset)
+    analysis = analyze_asset_performance_with_gemini(asset_info)
+    return jsonify({'analysis': analysis, 'analysis_requested': True})
 
 
 @app.route('/history/<source>/<asset>', methods=['GET', 'POST'])

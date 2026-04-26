@@ -69,6 +69,57 @@ def test_view_asset_no_data(client, db_session):
     assert client.get('/view/avenue/UNKNOWN').status_code == 404
 
 
+@patch('app.routes.asset.analyze_asset_performance_with_gemini')
+@patch('app.routes.asset._load_asset_info_or_404')
+def test_api_asset_analysis_success(mock_loader, mock_analysis, client):
+    mock_loader.return_value = {
+        'name': 'PETR4',
+        'source': 'b3',
+        'valid': True,
+        'dataframes': {},
+        'info': {},
+    }
+    mock_analysis.return_value = {
+        'overall': 'good',
+        'score': 74,
+        'performance_summary': 'Asset com desempenho consistente.',
+        'strengths': ['Rentabilidade positiva'],
+        'risks': ['Alta volatilidade'],
+        'next_steps': ['Revisar exposicao trimestralmente'],
+        'time_horizon': 'medium',
+        'confidence': 0.82,
+        'prompt': 'x',
+        'raw_response': 'y',
+        'model': 'gemini-2.5-flash',
+    }
+
+    resp = client.get('/api/view/b3/PETR4/analysis')
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload['analysis_requested'] is True
+    assert payload['analysis']['overall'] == 'good'
+    assert payload['analysis']['score'] == 74
+
+
+@patch('app.routes.asset.analyze_asset_performance_with_gemini')
+@patch('app.routes.asset._load_asset_info_or_404')
+def test_api_asset_analysis_without_key(mock_loader, mock_analysis, client):
+    mock_loader.return_value = {
+        'name': 'PETR4',
+        'source': 'b3',
+        'valid': True,
+        'dataframes': {},
+        'info': {},
+    }
+    mock_analysis.return_value = None
+
+    resp = client.get('/api/view/b3/PETR4/analysis')
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload['analysis_requested'] is True
+    assert payload['analysis'] is None
+
+
 @patch('app.routes.asset.process_history')
 def test_view_history(mock_history, client):
     mock_history.return_value = {

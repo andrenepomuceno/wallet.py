@@ -192,3 +192,152 @@ def analyze_news_sentiment_with_gemini(asset_name, news):
             type(e).__name__,
         )
         return None
+
+
+def analyze_asset_performance_with_gemini(asset_info):
+    """Generate a qualitative performance analysis for a consolidated asset."""
+    api_key = get_api_key('gemini')
+    if not api_key:
+        app.logger.debug('serper: no gemini API key configured for asset analysis')
+        return None
+
+    consolidated = {
+        'name': asset_info.get('name'),
+        'source': asset_info.get('source'),
+        'ticker': asset_info.get('ticker'),
+        'long_name': asset_info.get('long_name'),
+        'currency': asset_info.get('currency'),
+        'position': asset_info.get('position'),
+        'position_total': asset_info.get('position_total'),
+        'last_close_price': asset_info.get('last_close_price'),
+        'cost': asset_info.get('cost'),
+        'liquid_cost': asset_info.get('liquid_cost'),
+        'avg_price': asset_info.get('avg_price'),
+        'capital_gain': asset_info.get('capital_gain'),
+        'realized_gain': asset_info.get('realized_gain'),
+        'not_realized_gain': asset_info.get('not_realized_gain'),
+        'rentability': asset_info.get('rentability'),
+        'anualized_rentability': asset_info.get('anualized_rentability'),
+        'price_gain': asset_info.get('price_gain'),
+        'age_years': asset_info.get('age_years'),
+        'wages_sum': asset_info.get('wages_sum'),
+        'rent_wages_sum': asset_info.get('rent_wages_sum'),
+        'taxes_sum': asset_info.get('taxes_sum'),
+    }
+
+    fundamentals = asset_info.get('info', {}) or {}
+    compact_fundamentals = {
+        'symbol': fundamentals.get('symbol'),
+        'quoteType': fundamentals.get('quoteType'),
+        'sector': fundamentals.get('sector'),
+        'industry': fundamentals.get('industry'),
+        'marketCap': fundamentals.get('marketCap'),
+        'dividendYield': fundamentals.get('dividendYield'),
+        'payoutRatio': fundamentals.get('payoutRatio'),
+        'trailingEps': fundamentals.get('trailingEps'),
+        'forwardEps': fundamentals.get('forwardEps'),
+        'pegRatio': fundamentals.get('pegRatio'),
+        'returnOnEquity': fundamentals.get('returnOnEquity'),
+    }
+
+    prompt = (
+        'You are a buy-side portfolio analyst. Analyze a single asset based only on '
+        'the consolidated portfolio metrics and fundamentals provided. '
+        'Return ONLY valid JSON with this schema: '
+        '{"overall":"great|good|mixed|weak",'
+        '"score":0,'
+        '"performance_summary":"max 320 chars",'
+        '"strengths":["..."],'
+        '"risks":["..."],'
+        '"next_steps":["..."],'
+        '"time_horizon":"short|medium|long",'
+        '"confidence":0.0}. '
+        'Use concise language in pt-BR. Score must be an integer from 0 to 100. '
+        'Do not include markdown. '
+        f'Consolidated metrics: {json.dumps(consolidated, ensure_ascii=True)}. '
+        f'Fundamentals: {json.dumps(compact_fundamentals, ensure_ascii=True)}.'
+    )
+
+    payload = {
+        'contents': [{'parts': [{'text': prompt}]}],
+        'generationConfig': {'temperature': 0.2, 'responseMimeType': 'application/json'},
+    }
+
+    try:
+        gemini_result = _post_gemini_generate_content(api_key, payload)
+        if not gemini_result:
+            return None
+
+        response_data = gemini_result['data']
+        model_used = gemini_result.get('model')
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            return None
+
+        parts = candidates[0].get('content', {}).get('parts', [])
+        if not parts:
+            return None
+
+        raw_text = parts[0].get('text', '')
+        json_text = _extract_json_object(raw_text)
+        if json_text is None:
+            return None
+
+        parsed = json.loads(json_text)
+
+        overall = str(parsed.get('overall', 'mixed')).strip().lower()
+        if overall not in {'great', 'good', 'mixed', 'weak'}:
+            overall = 'mixed'
+
+        try:
+            score = int(parsed.get('score', 0))
+        except Exception:
+            score = 0
+        score = max(0, min(100, score))
+
+        summary = str(parsed.get('performance_summary', '')).strip()
+
+        def _as_str_list(value, max_items=5):
+            if not isinstance(value, list):
+                return []
+            out = []
+            for item in value[:max_items]:
+                text = str(item).strip()
+                if text:
+                    out.append(text)
+            return out
+
+        strengths = _as_str_list(parsed.get('strengths'))
+        risks = _as_str_list(parsed.get('risks'))
+        next_steps = _as_str_list(parsed.get('next_steps'))
+
+        time_horizon = str(parsed.get('time_horizon', 'medium')).strip().lower()
+        if time_horizon not in {'short', 'medium', 'long'}:
+            time_horizon = 'medium'
+
+        try:
+            confidence = float(parsed.get('confidence', 0.0))
+        except Exception:
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+
+        return {
+            'overall': overall,
+            'score': score,
+            'performance_summary': summary,
+            'strengths': strengths,
+            'risks': risks,
+            'next_steps': next_steps,
+            'time_horizon': time_horizon,
+            'confidence': confidence,
+            'prompt': prompt,
+            'raw_response': raw_text,
+            'model': model_used,
+        }
+    except Exception as e:
+        app.logger.warning(
+            'serper.analyze_asset_performance_with_gemini failed for %r (%s)',
+            asset_info.get('name'),
+            type(e).__name__,
+        )
+        return None
