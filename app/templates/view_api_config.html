@@ -9,8 +9,8 @@
             </div>
             <div class="card-body">
                 <p class="text-muted mb-3">
-                    Cadastre sua chave da Gemini API para habilitar fallback inteligente
-                    na resolucao de tickers quando o Yahoo Finance nao reconhecer um ativo.
+                    Cadastre suas chaves de API. Gemini habilita fallback inteligente
+                    na resolucao de tickers; Serper busca noticias recentes do ativo.
                 </p>
 
                 <div class="alert {% if has_gemini_key %}alert-success{% else %}alert-warning{% endif %}">
@@ -20,6 +20,13 @@
                     Nenhuma chave Gemini configurada.
                     {% endif %}
                 </div>
+                <div class="alert {% if has_serper_key %}alert-success{% else %}alert-warning{% endif %}">
+                    {% if has_serper_key %}
+                    Chave Serper configurada.
+                    {% else %}
+                    Nenhuma chave Serper configurada.
+                    {% endif %}
+                </div>
 
                 <form method="post">
                     {{ form.hidden_tag() }}
@@ -27,6 +34,11 @@
                         {{ form.gemini_api_key.label(class='form-label') }}
                         {{ form.gemini_api_key(class='form-control', placeholder='Cole aqui sua Gemini API Key') }}
                         <div class="form-text">A chave nao e exibida por seguranca. Preencha somente para criar/atualizar.</div>
+                    </div>
+                    <div class="mb-3">
+                        {{ form.serper_api_key.label(class='form-label') }}
+                        {{ form.serper_api_key(class='form-control', placeholder='Cole aqui sua Serper API Key') }}
+                        <div class="form-text">Habilita busca de noticias do ativo via serper.dev.</div>
                     </div>
 
                     <hr>

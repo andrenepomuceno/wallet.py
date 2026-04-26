@@ -213,4 +213,23 @@
         </div>
     </div>
     {% endif %}
+
+    {% if news %}
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-newspaper"></i> News</div>
+        <div class="list-group list-group-flush">
+            {% for item in news %}
+            <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer"
+               class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ item.title }}</h6>
+                    <small class="opacity-75">{{ item.date }}</small>
+                </div>
+                {% if item.snippet %}<p class="mb-1 small">{{ item.snippet }}</p>{% endif %}
+                {% if item.source %}<small class="opacity-75">{{ item.source }}</small>{% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 {% endblock %}

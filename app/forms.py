@@ -51,6 +51,7 @@ class B3NegotiationAddForm(FlaskForm):
 
 class ApiConfigForm(FlaskForm):
     gemini_api_key = PasswordField('Gemini API Key', validators=[Optional()])
+    serper_api_key = PasswordField('Serper API Key', validators=[Optional()])
     cache_default_ttl = IntegerField(
         'TTL padrão (s)', validators=[Optional(), NumberRange(min=0)])
     cache_yfinance_ttl = IntegerField(
