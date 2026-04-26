@@ -341,3 +341,154 @@ def analyze_asset_performance_with_gemini(asset_info):
             type(e).__name__,
         )
         return None
+
+
+def _safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def analyze_consolidate_performance_with_gemini(consolidate_info):
+    """Generate a high-level portfolio performance analysis from consolidate data."""
+    api_key = get_api_key('gemini')
+    if not api_key:
+        app.logger.debug('serper: no gemini API key configured for consolidate analysis')
+        return None
+
+    by_group_df = consolidate_info.get('consolidate_by_group')
+    if by_group_df is None or len(by_group_df) == 0:
+        return None
+
+    try:
+        total_row = by_group_df.iloc[0]
+        for idx in range(len(by_group_df)):
+            row = by_group_df.iloc[idx]
+            if str(row.get('asset_class', '')).strip().lower() == 'total':
+                total_row = row
+                break
+
+        total_metrics = {
+            'position': round(_safe_float(total_row.get('position')), 2),
+            'liquid_cost': round(_safe_float(total_row.get('liquid_cost')), 2),
+            'capital_gain': round(_safe_float(total_row.get('capital_gain')), 2),
+            'realized_gain': round(_safe_float(total_row.get('realized_gain')), 2),
+            'not_realized_gain': round(_safe_float(total_row.get('not_realized_gain')), 2),
+            'rentability': round(_safe_float(total_row.get('rentability')), 2),
+            'wages': round(_safe_float(total_row.get('wages')), 2),
+            'rents': round(_safe_float(total_row.get('rents')), 2),
+            'taxes': round(_safe_float(total_row.get('taxes')), 2),
+            'currency': str(total_row.get('currency', 'BRL')),
+        }
+
+        allocation = []
+        for idx in range(len(by_group_df)):
+            row = by_group_df.iloc[idx]
+            asset_class = str(row.get('asset_class', '')).strip()
+            if not asset_class or asset_class.lower() == 'total':
+                continue
+            allocation.append({
+                'asset_class': asset_class,
+                'position': round(_safe_float(row.get('position')), 2),
+                'relative_position': round(_safe_float(row.get('relative_position')), 2),
+                'rentability': round(_safe_float(row.get('rentability')), 2),
+                'capital_gain': round(_safe_float(row.get('capital_gain')), 2),
+            })
+
+        allocation = sorted(allocation, key=lambda item: item['position'], reverse=True)[:12]
+
+        prompt = (
+            'You are a portfolio strategist. Analyze the portfolio consolidated performance and diversification. '
+            'Return ONLY valid JSON with this schema: '
+            '{"overall":"great|good|mixed|weak",'
+            '"score":0,'
+            '"performance_summary":"max 320 chars",'
+            '"allocation_summary":"max 220 chars",'
+            '"strengths":["..."],'
+            '"risks":["..."],'
+            '"next_steps":["..."],'
+            '"confidence":0.0}. '
+            'Use concise language in pt-BR. Score must be integer 0..100. Do not include markdown. '
+            f'Total metrics: {json.dumps(total_metrics, ensure_ascii=True)}. '
+            f'Allocation by class: {json.dumps(allocation, ensure_ascii=True)}.'
+        )
+
+        payload = {
+            'contents': [{'parts': [{'text': prompt}]}],
+            'generationConfig': {'temperature': 0.2, 'responseMimeType': 'application/json'},
+        }
+
+        gemini_result = _post_gemini_generate_content(api_key, payload)
+        if not gemini_result:
+            return None
+
+        response_data = gemini_result['data']
+        model_used = gemini_result.get('model')
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            return None
+
+        parts = candidates[0].get('content', {}).get('parts', [])
+        if not parts:
+            return None
+
+        raw_text = parts[0].get('text', '')
+        json_text = _extract_json_object(raw_text)
+        if json_text is None:
+            return None
+
+        parsed = json.loads(json_text)
+
+        overall = str(parsed.get('overall', 'mixed')).strip().lower()
+        if overall not in {'great', 'good', 'mixed', 'weak'}:
+            overall = 'mixed'
+
+        try:
+            score = int(parsed.get('score', 0))
+        except Exception:
+            score = 0
+        score = max(0, min(100, score))
+
+        summary = str(parsed.get('performance_summary', '')).strip()
+        allocation_summary = str(parsed.get('allocation_summary', '')).strip()
+
+        def _as_str_list(value, max_items=6):
+            if not isinstance(value, list):
+                return []
+            out = []
+            for item in value[:max_items]:
+                text = str(item).strip()
+                if text:
+                    out.append(text)
+            return out
+
+        strengths = _as_str_list(parsed.get('strengths'))
+        risks = _as_str_list(parsed.get('risks'))
+        next_steps = _as_str_list(parsed.get('next_steps'))
+
+        try:
+            confidence = float(parsed.get('confidence', 0.0))
+        except Exception:
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+
+        return {
+            'overall': overall,
+            'score': score,
+            'performance_summary': summary,
+            'allocation_summary': allocation_summary,
+            'strengths': strengths,
+            'risks': risks,
+            'next_steps': next_steps,
+            'confidence': confidence,
+            'prompt': prompt,
+            'raw_response': raw_text,
+            'model': model_used,
+        }
+    except Exception as e:
+        app.logger.warning(
+            'serper.analyze_consolidate_performance_with_gemini failed (%s)',
+            type(e).__name__,
+        )
+        return None

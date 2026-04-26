@@ -1,8 +1,9 @@
 """Portfolio consolidate + sold-positions views."""
-from flask import flash, redirect, render_template, url_for
+from flask import flash, jsonify, redirect, render_template, url_for
 
 from app import app
 from app.processing import process_consolidate_request
+from app.utils.serper import analyze_consolidate_performance_with_gemini
 
 _BY_GROUP_COLUMNS = ['asset_class', 'currency', 'position', 'rentability',
                      'cost', 'liquid_cost', 'wages', 'rents',
@@ -123,3 +124,14 @@ def view_sold():
     return render_template('view_consolidate.html', html_title='Sold Positions', info=info,
                            by_group=by_group,
                            group_df=group_df)
+
+
+@app.route('/api/consolidate/analysis', methods=['GET'])
+def api_consolidate_analysis():
+    info = process_consolidate_request()
+
+    if not info['valid']:
+        return jsonify({'analysis_requested': True, 'analysis': None}), 404
+
+    analysis = analyze_consolidate_performance_with_gemini(info)
+    return jsonify({'analysis_requested': True, 'analysis': analysis})

@@ -42,6 +42,18 @@
     {% endif %}
 
     <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-robot"></i> Analise de Performance (Gemini)</span>
+            <button id="consolidateAnalyzeBtn" class="btn btn-sm btn-warning" type="button">
+                <i class="bi bi-stars"></i> Analisar consolidate
+            </button>
+        </div>
+        <div id="consolidateAnalysisContent" class="card-body text-muted small">
+            Clique em "Analisar consolidate" para gerar um parecer de performance e diversificacao.
+        </div>
+    </div>
+
+    <div class="card mb-4">
         <div class="card-header"><i class="bi bi-bar-chart"></i> By Group</div>
         <div class="card-body p-0">
             {{ table.render(by_group) }}
@@ -63,5 +75,105 @@
         </div>
     </div>
     {% endfor %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const analyzeBtn = document.getElementById('consolidateAnalyzeBtn');
+            const content = document.getElementById('consolidateAnalysisContent');
+            const apiUrl = '/api/consolidate/analysis';
+
+            function escapeHtml(str) {
+                if (str === null || str === undefined) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function analysisBadge(overall) {
+                if (overall === 'great') return '<span class="badge bg-success">Excelente</span>';
+                if (overall === 'good') return '<span class="badge bg-info text-dark">Boa</span>';
+                if (overall === 'weak') return '<span class="badge bg-danger">Fraca</span>';
+                return '<span class="badge bg-secondary">Mista</span>';
+            }
+
+            function renderTextList(items) {
+                if (!items || !items.length) {
+                    return '<li class="text-muted">Sem itens.</li>';
+                }
+                return items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+            }
+
+            function renderAnalysis(payload) {
+                const analysis = payload.analysis;
+                if (!analysis) {
+                    content.innerHTML = `
+                        <div class="text-muted small">
+                            Nao foi possivel gerar a analise do consolidate. Verifique se a chave Gemini esta configurada em
+                            <a href="{{ url_for('view_api_config') }}">API Config</a>.
+                        </div>`;
+                    return;
+                }
+
+                const confidencePct = Math.round((analysis.confidence || 0) * 100);
+                content.innerHTML = `
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <strong>Parecer:</strong>
+                        ${analysisBadge(analysis.overall)}
+                        <span class="badge bg-dark">Score: ${escapeHtml(analysis.score)}</span>
+                        <span class="badge bg-light text-dark">Confianca: ${confidencePct}%</span>
+                        ${analysis.model ? `<small class="opacity-75">Modelo: ${escapeHtml(analysis.model)}</small>` : ''}
+                    </div>
+                    ${analysis.performance_summary ? `<p class="mb-2">${escapeHtml(analysis.performance_summary)}</p>` : ''}
+                    ${analysis.allocation_summary ? `<p class="mb-3 small text-muted">${escapeHtml(analysis.allocation_summary)}</p>` : ''}
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-4">
+                            <div class="small fw-bold mb-1">Pontos fortes</div>
+                            <ul class="small mb-0 ps-3">${renderTextList(analysis.strengths)}</ul>
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <div class="small fw-bold mb-1">Riscos</div>
+                            <ul class="small mb-0 ps-3">${renderTextList(analysis.risks)}</ul>
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <div class="small fw-bold mb-1">Proximos passos</div>
+                            <ul class="small mb-0 ps-3">${renderTextList(analysis.next_steps)}</ul>
+                        </div>
+                    </div>
+                    <details class="mt-3">
+                        <summary class="small">Ver prompt e resposta do Gemini</summary>
+                        <div class="mt-2">
+                            <div class="small fw-bold">Prompt</div>
+                            <pre class="small mb-2" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(analysis.prompt || '')}</pre>
+                            <div class="small fw-bold">Resposta</div>
+                            <pre class="small mb-0" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(analysis.raw_response || '')}</pre>
+                        </div>
+                    </details>`;
+            }
+
+            async function runAnalysis() {
+                analyzeBtn.disabled = true;
+                content.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Analisando consolidate...</div>';
+                try {
+                    const response = await fetch(apiUrl, {headers: {'Accept': 'application/json'}});
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const payload = await response.json();
+                    renderAnalysis(payload);
+                } catch (error) {
+                    content.innerHTML = '<div class="text-danger small">Falha ao analisar consolidate. Tente novamente.</div>';
+                } finally {
+                    analyzeBtn.disabled = false;
+                }
+            }
+
+            analyzeBtn.addEventListener('click', function() {
+                runAnalysis();
+            });
+        });
+    </script>
 
 {% endblock %}

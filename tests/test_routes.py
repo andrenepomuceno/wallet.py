@@ -59,6 +59,43 @@ def test_view_consolidate_no_data_redirects(client, db_session):
     assert resp.status_code in (200, 302)
 
 
+@patch('app.routes.consolidate.analyze_consolidate_performance_with_gemini')
+@patch('app.routes.consolidate.process_consolidate_request')
+def test_api_consolidate_analysis_success(mock_process, mock_analysis, client):
+    mock_process.return_value = {'valid': True, 'consolidate_by_group': pd.DataFrame()}
+    mock_analysis.return_value = {
+        'overall': 'good',
+        'score': 71,
+        'performance_summary': 'Consolidado com boa relacao risco/retorno.',
+        'allocation_summary': 'Boa distribuicao entre classes.',
+        'strengths': ['Ganho de capital positivo'],
+        'risks': ['Concentracao em uma classe'],
+        'next_steps': ['Ajustar pesos'],
+        'confidence': 0.77,
+        'prompt': 'x',
+        'raw_response': 'y',
+        'model': 'gemini-2.5-flash',
+    }
+
+    resp = client.get('/api/consolidate/analysis')
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload['analysis_requested'] is True
+    assert payload['analysis']['overall'] == 'good'
+    assert payload['analysis']['score'] == 71
+
+
+@patch('app.routes.consolidate.process_consolidate_request')
+def test_api_consolidate_analysis_without_data(mock_process, client):
+    mock_process.return_value = {'valid': False}
+
+    resp = client.get('/api/consolidate/analysis')
+    assert resp.status_code == 404
+    payload = resp.get_json()
+    assert payload['analysis_requested'] is True
+    assert payload['analysis'] is None
+
+
 def test_view_asset_unknown_source(client):
     assert client.get('/view/bogus/AAA').status_code == 404
 
