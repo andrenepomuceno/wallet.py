@@ -92,7 +92,11 @@ def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentat
         "Valor": 'Total',
         "Código de Negociação": "Produto",
     }
-    df2.rename(columns={k: v for k, v in rename_map.items() if k in df2.columns}, inplace=True)
+    # Skip any rename whose target column already exists to avoid duplicate
+    # column names (which break pd.concat with InvalidIndexError).
+    df2.rename(columns={k: v for k, v in rename_map.items()
+                        if k in df2.columns and v not in df2.columns},
+               inplace=True)
     if 'Produto' not in df2.columns and 'Asset' in df2.columns:
         df2['Produto'] = df2['Asset']
     df2['Movimentation'] = movimentation_type
