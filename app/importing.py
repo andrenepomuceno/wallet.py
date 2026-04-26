@@ -5,115 +5,95 @@ import pandas as pd
 from app import app, db
 from app.models import AvenueExtract, B3Movimentation, B3Negotiation, GenericExtract
 
+
 def gen_hash(filepath):
+    sha256 = hashlib.sha256()
     with open(filepath, 'rb') as file:
-        sha256 = hashlib.sha256()
-        while True:
-            chunk = file.read(1024)
-            if not chunk:
-                break
+        for chunk in iter(lambda: file.read(8192), b''):
             sha256.update(chunk)
-        return sha256.hexdigest()
+    return sha256.hexdigest()
+
+
+def _coerce_numeric(df, columns):
+    for col in columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+
+
+def _coerce_date(df, column, fmt):
+    df[column] = pd.to_datetime(df[column], format=fmt).dt.strftime('%Y-%m-%d')
+
+
+def _bulk_insert_with_dedup(model, df, filepath, row_to_kwargs):
+    """Generic dedup-aware bulk insert.
+
+    Iterates `df`, builds a unique `origin_id` per row from filepath+sha256+index,
+    skips rows whose `origin_id` already exists, otherwise calls
+    `row_to_kwargs(row)` and inserts the resulting kwargs into `model`.
+    Flashes a summary and commits once at the end.
+    """
+    app.logger.info('Inserting data into %s...', model.__name__)
+    file_hash = gen_hash(filepath)
+    added = 0
+    duplicates = 0
+
+    existing = {
+        oid for (oid,) in db.session.query(model.origin_id).filter(
+            model.origin_id.like(f'{filepath}:{file_hash}:%')
+        ).all()
+    }
+
+    for index, row in df.iterrows():
+        origin_id = f'{filepath}:{file_hash}:{index}'
+        if origin_id in existing:
+            duplicates += 1
+            continue
+        kwargs = row_to_kwargs(row)
+        kwargs['origin_id'] = origin_id
+        db.session.add(model(**kwargs))
+        added += 1
+
+    db.session.commit()
+    flash(f'Rows Added: {added}')
+    flash(f'Duplicated rows discarded: {duplicates}')
+
 
 def import_b3_movimentation(df, filepath):
     app.logger.info('Processing B3 Movimentation...')
-
-    df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
-    df['Preço unitário'] = pd.to_numeric(df['Preço unitário'], errors='coerce').fillna(0.0)
-    df['Valor da Operação'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0.0)
-    df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
+    _coerce_date(df, 'Data', '%d/%m/%Y')
+    _coerce_numeric(df, ['Preço unitário', 'Valor da Operação', 'Quantidade'])
     df['Produto'] = df['Produto'].str.strip()
 
-    app.logger.info('Inserting data into database...')
-    duplicates = 0
-    added = 0
-
-    file_hash = gen_hash(filepath)
-
-    for index, row in df.iterrows():
-        origin_id = f'{filepath}:{file_hash}:{index}'
-
-        if not B3Movimentation.query.filter_by(
-            origin_id=origin_id,
-            # entrada_saida=row['Entrada/Saída'],
-            # data=row['Data'],
-            # movimentacao=row['Movimentação'],
-            # produto=row['Produto'],
-            # instituicao=row['Instituição'],
-            # quantidade=row['Quantidade']
-        ).first():
-            new_entry = B3Movimentation(
-                origin_id=origin_id,
-                entrada_saida=row['Entrada/Saída'],
-                data=row['Data'],
-                movimentacao=row['Movimentação'],
-                produto=row['Produto'],
-                instituicao=row['Instituição'],
-                quantidade=row['Quantidade'],
-                preco_unitario=row['Preço unitário'],
-                valor_operacao=row['Valor da Operação']
-            )
-            db.session.add(new_entry)
-            added += 1
-        else:
-            duplicates += 1
-    db.session.commit()
-
-    flash(f'Rows Added: {added}')
-    flash(f'Duplicated rows discarded: {duplicates}')
-
+    _bulk_insert_with_dedup(B3Movimentation, df, filepath, lambda row: dict(
+        entrada_saida=row['Entrada/Saída'],
+        data=row['Data'],
+        movimentacao=row['Movimentação'],
+        produto=row['Produto'],
+        instituicao=row['Instituição'],
+        quantidade=row['Quantidade'],
+        preco_unitario=row['Preço unitário'],
+        valor_operacao=row['Valor da Operação'],
+    ))
     return df
+
 
 def import_b3_negotiation(df, filepath):
     app.logger.info('Processing B3 Negotiation...')
+    _coerce_date(df, 'Data do Negócio', '%d/%m/%Y')
+    _coerce_numeric(df, ['Quantidade', 'Preço', 'Valor'])
 
-    df['Data do Negócio'] = pd.to_datetime(
-        df['Data do Negócio'],
-        format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
-    df['Quantidade'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0.0)
-    df['Preço'] = pd.to_numeric(df['Preço'], errors='coerce').fillna(0.0)
-    df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0.0)
-
-    app.logger.info('Inserting data into database...')
-    duplicates = 0
-    added = 0
-    file_hash = gen_hash(filepath)
-    for index, row in df.iterrows():
-        origin_id = f'{filepath}:{file_hash}:{index}'
-        if not B3Negotiation.query.filter_by(
-            origin_id=origin_id,
-            # data=row['Data do Negócio'],
-            # tipo=row['Tipo de Movimentação'],
-            # mercado=row['Mercado'],
-            # prazo=row['Prazo/Vencimento'],
-            # instituicao=row['Instituição'],
-            # codigo=row['Código de Negociação'],
-            # quantidade=row['Quantidade'],
-            # preco=row['Preço'],
-            # valor=row['Valor']
-        ).first():
-            new_entry = B3Negotiation(
-                origin_id=origin_id,
-                data=row['Data do Negócio'],
-                tipo=row['Tipo de Movimentação'],
-                mercado=row['Mercado'],
-                prazo=row['Prazo/Vencimento'],
-                instituicao=row['Instituição'],
-                codigo=row['Código de Negociação'],
-                quantidade=row['Quantidade'],
-                preco=row['Preço'],
-                valor=row['Valor']
-            )
-            db.session.add(new_entry)
-            added += 1
-        else:
-            duplicates += 1
-    db.session.commit()
-
-    flash(f'Rows Added: {added}')
-    flash(f'Duplicated rows discarded: {duplicates}')
-
+    _bulk_insert_with_dedup(B3Negotiation, df, filepath, lambda row: dict(
+        data=row['Data do Negócio'],
+        tipo=row['Tipo de Movimentação'],
+        mercado=row['Mercado'],
+        prazo=row['Prazo/Vencimento'],
+        instituicao=row['Instituição'],
+        codigo=row['Código de Negociação'],
+        quantidade=row['Quantidade'],
+        preco=row['Preço'],
+        valor=row['Valor'],
+    ))
     return df
+
 
 def _safe_str(x):
     if x is None or (isinstance(x, float) and pd.isna(x)):
@@ -147,10 +127,8 @@ def extract_fill(df):
     df['Produto'] = df['Descrição'].apply(parse_produto)
 
     def parse_movimentacao(x):
-        # Check for "Imposto sobre dividendo" first (new format)
         if re.search(r'Imposto sobre dividendo', x):
             return 'Impostos'
-        # New format: "Cobrança de taxa de corretagem" (lowercase)
         if re.search(r'corretagem', x, re.IGNORECASE):
             return 'Corretagem'
         match = re.search(r'Câmbio|Compra|Venda|Impostos|Dividendos|Corretagem|Desdobramento', x)
@@ -160,146 +138,71 @@ def extract_fill(df):
     df['Movimentação'] = df['Descrição'].apply(parse_movimentacao)
 
     def parse_quantidade(x):
-        # New format: "Compra de 5 NVDA" or "Venda de 5 NVDA"
-        # Old format: "Compra de 0.051 AMZN"
         match = re.search(r'(Compra de|Venda de) ([0-9.,]+)', x)
         if match:
-            # Replace comma with period for decimal separator
-            qty_str = match.group(2).replace(',', '.')
-            return float(qty_str)
+            return float(match.group(2).replace(',', '.'))
         return None
     df['Quantidade'] = df['Descrição'].apply(parse_quantidade)
 
     def parse_preco_unitario(x):
-        # Handle both period and comma as decimal separator
-        # New format: "a $\xa0209,00 cada" (non-breaking space)
-        # Old format: "a $ 3154.35"
         match = re.search(r'\$[\s\xa0]?([0-9.,]+)', x)
         if match:
-            # Replace comma with period for decimal separator
-            price_str = match.group(1).replace(',', '.')
-            return float(price_str)
+            return float(match.group(1).replace(',', '.'))
         return None
     df['Preço unitário'] = df['Descrição'].apply(parse_preco_unitario)
 
     return df
 
+
 def import_avenue_extract(df, filepath):
     app.logger.info('Processing Avenue Extract file...')
 
-    # Detect and normalize format (old vs new)
     if 'Data transação' in df.columns:
-        # New format: Data transação, Data liquidação, Descrição, Valor, Saldo
         app.logger.info('Detected new Avenue format')
         df = df.rename(columns={
             'Data transação': 'Data',
             'Data liquidação': 'Liquidação',
-            'Descrição': 'Descrição',
             'Valor': 'Valor (U$)',
-            'Saldo': 'Saldo da conta (U$)'
+            'Saldo': 'Saldo da conta (U$)',
         })
-        df['Hora'] = ''  # New format doesn't have time
+        df['Hora'] = ''
     else:
-        # Old format: Data, Hora, Liquidação, Descrição, Valor (U$), Saldo da conta (U$)
         app.logger.info('Detected old Avenue format')
 
-    df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
-    df['Liquidação'] = pd.to_datetime(df['Liquidação'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
-    df['Valor (U$)'] = pd.to_numeric(df['Valor (U$)'], errors='coerce').fillna(0.0)
-    df['Saldo da conta (U$)'] = pd.to_numeric(
-        df['Saldo da conta (U$)'],
-        errors='coerce'
-    ).fillna(0.0)
+    _coerce_date(df, 'Data', '%d/%m/%Y')
+    _coerce_date(df, 'Liquidação', '%d/%m/%Y')
+    _coerce_numeric(df, ['Valor (U$)', 'Saldo da conta (U$)'])
 
     df = extract_fill(df)
 
-    app.logger.info('Inserting data into database...')
-    duplicates = 0
-    added = 0
-    file_hash = gen_hash(filepath)
-    for index, row in df.iterrows():
-        origin_id = f'{filepath}:{file_hash}:{index}'
-        if not AvenueExtract.query.filter_by(
-            origin_id=origin_id,
-            # data=row['Data'],
-            # hora=row['Hora'],
-            # liquidacao=row['Liquidação'],
-            # descricao=row['Descrição'],
-            # valor=row['Valor (U$)'],
-            # saldo=row['Saldo da conta (U$)'],
-
-            # entrada_saida=row['Entrada/Saída'],
-            # produto=row['Produto'],
-            # movimentacao=row['Movimentação'],
-            # quantidade=row['Quantidade'],
-            # preco_unitario=row['Preço unitário']
-        ).first():
-            new_entry = AvenueExtract(
-                origin_id=origin_id,
-                data=row['Data'],
-                hora=row['Hora'],
-                liquidacao=row['Liquidação'],
-                descricao=row['Descrição'],
-                valor=row['Valor (U$)'],
-                saldo=row['Saldo da conta (U$)'],
-
-                entrada_saida=row['Entrada/Saída'],
-                produto=row['Produto'],
-                movimentacao=row['Movimentação'],
-                quantidade=row['Quantidade'],
-                preco_unitario=row['Preço unitário']
-            )
-            db.session.add(new_entry)
-            added += 1
-        else:
-            duplicates += 1
-    db.session.commit()
-
-    flash(f'Rows Added: {added}')
-    flash(f'Duplicated rows discarded: {duplicates}')
-
+    _bulk_insert_with_dedup(AvenueExtract, df, filepath, lambda row: dict(
+        data=row['Data'],
+        hora=row['Hora'],
+        liquidacao=row['Liquidação'],
+        descricao=row['Descrição'],
+        valor=row['Valor (U$)'],
+        saldo=row['Saldo da conta (U$)'],
+        entrada_saida=row['Entrada/Saída'],
+        produto=row['Produto'],
+        movimentacao=row['Movimentação'],
+        quantidade=row['Quantidade'],
+        preco_unitario=row['Preço unitário'],
+    ))
     return df
+
 
 def import_generic_extract(df, filepath):
     app.logger.info('Processing Generic Extract file...')
-
-    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d').dt.strftime('%Y-%m-%d')
-    df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
-    df['Price'] = pd.to_numeric(df['Price'], errors='coerce').fillna(0.0)
-    df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0.0)
+    _coerce_date(df, 'Date', '%Y-%m-%d')
+    _coerce_numeric(df, ['Quantity', 'Price', 'Total'])
     df['Movimentation'] = df['Movimentation'].fillna('')
 
-    app.logger.info('Inserting data into database...')
-    duplicates = 0
-    added = 0
-    file_hash = gen_hash(filepath)
-    for index, row in df.iterrows():
-        origin_id = f'{filepath}:{file_hash}:{index}'
-        if not GenericExtract.query.filter_by(
-            origin_id=origin_id,
-            # date=row['Date'],
-            # asset=row['Asset'],
-            # movimentation=row['Movimentation'],
-            # quantity=row['Quantity'],
-            # price=row['Price'],
-            # total=row['Total']
-        ).first():
-            new_entry = GenericExtract(
-                origin_id=origin_id,
-                date=row['Date'],
-                asset=row['Asset'],
-                movimentation=row['Movimentation'],
-                quantity=row['Quantity'],
-                price=row['Price'],
-                total=row['Total']
-            )
-            db.session.add(new_entry)
-            added += 1
-        else:
-            duplicates += 1
-    db.session.commit()
-
-    flash(f'Rows Added: {added}')
-    flash(f'Duplicated rows discarded: {duplicates}')
-
+    _bulk_insert_with_dedup(GenericExtract, df, filepath, lambda row: dict(
+        date=row['Date'],
+        asset=row['Asset'],
+        movimentation=row['Movimentation'],
+        quantity=row['Quantity'],
+        price=row['Price'],
+        total=row['Total'],
+    ))
     return df

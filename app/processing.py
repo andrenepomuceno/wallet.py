@@ -23,6 +23,12 @@ scrape_dict = {
         'xpath': '/html/body/div/div/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
         'class': 'Renda Fixa',
         'currency': 'BRL',
+    },
+    "Tesouro Selic 2031": {
+        'url': 'https://taxas-tesouro.com/resgatar/tesouro-selic-2031/',
+        'xpath': '/html/body/div/div/div/div[2]/main/div[1]/div/div[1]/div[4]/div[2]/span',
+        'class': 'Renda Fixa',
+        'currency': 'BRL',
     }
 }
 

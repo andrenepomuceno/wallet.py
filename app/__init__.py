@@ -13,7 +13,9 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'dev-secret-key'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wallet.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'WALLET_DATABASE_URI', 'sqlite:///wallet.db'
+)
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///demo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)

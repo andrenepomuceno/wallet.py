@@ -25,6 +25,44 @@ def format_money(value):
     return str(value)
 app.jinja_env.filters['format_money'] = format_money
 
+
+def _flash_form_errors(form):
+    for field, errors in form.errors.items():
+        for error in errors:
+            flash(f"Error validating field {getattr(form, field).label.text}: {error}")
+
+
+def _handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_id=True):
+    """Validate `form`, dedup against `model` by field values, insert if new.
+
+    `field_map` maps form attribute names to model column names.
+    Returns a redirect Response on success, otherwise None (caller must render).
+    """
+    if not form.validate_on_submit():
+        if form.errors:
+            app.logger.debug('Not submit. Errors: %s', form.errors)
+            _flash_form_errors(form)
+        return None
+
+    values = {col: getattr(form, attr).data for attr, col in field_map.items()}
+    filter_kwargs = dict(values)
+    if with_origin_id:
+        filter_kwargs['origin_id'] = 'FORM'
+
+    if model.query.filter_by(**filter_kwargs).first():
+        app.logger.info('New entry already exists in the database!')
+        flash('Entry already exists in the database.')
+        return None
+
+    insert_kwargs = dict(values)
+    if with_origin_id:
+        insert_kwargs['origin_id'] = 'FORM'
+    db.session.add(model(**insert_kwargs))
+    db.session.commit()
+    app.logger.info('Added new entry to database!')
+    flash('Entry added successfully!')
+    return redirect(url_for(redirect_endpoint))
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     if request.method != 'POST':
@@ -89,49 +127,17 @@ def view_negotiation():
     app.logger.info('view_negotiation')
 
     add_form = B3NegotiationAddForm()
-    if add_form.validate_on_submit():
-        app.logger.info('add_form On submit.')
-
-        new_entry = B3Negotiation(
-            origin_id='FORM',
-            data=add_form.date.data,
-            tipo=add_form.movimentation.data,
-            mercado=add_form.mercado.data,
-            prazo=add_form.prazo.data,
-            instituicao=add_form.instituicao.data,
-            codigo=add_form.codigo.data,
-            quantidade=add_form.quantity.data,
-            preco=add_form.price.data,
-            valor=add_form.total.data,
-        )
-
-        existing_entry = B3Negotiation.query.filter_by(
-            origin_id='FORM',
-            data=add_form.date.data,
-            tipo=add_form.movimentation.data,
-            mercado=add_form.mercado.data,
-            prazo=add_form.prazo.data,
-            instituicao=add_form.instituicao.data,
-            codigo=add_form.codigo.data,
-            quantidade=add_form.quantity.data,
-            preco=add_form.price.data,
-            valor=add_form.total.data,
-        ).first()
-
-        if not existing_entry:
-            db.session.add(new_entry)
-            db.session.commit()
-            app.logger.info('Added new entry to database!')
-            flash('Entry added successfully!')
-            return redirect(url_for('view_negotiation'))
-        
-        app.logger.info('New entry already exists in the database!')
-        flash('Entry already exists in the database.')
-    else:
-        app.logger.debug('Not submit. Errors: %s', add_form.errors)
-        for field, errors in add_form.errors.items():
-            for error in errors:
-                flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
+    response = _handle_manual_entry(
+        B3Negotiation, add_form,
+        field_map={
+            'date': 'data', 'movimentation': 'tipo', 'mercado': 'mercado',
+            'prazo': 'prazo', 'instituicao': 'instituicao', 'codigo': 'codigo',
+            'quantity': 'quantidade', 'price': 'preco', 'total': 'valor',
+        },
+        redirect_endpoint='view_negotiation',
+    )
+    if response is not None:
+        return response
 
     df = process_b3_negotiation_request()
     return render_template('view_negotiation.html', html_title='B3 Negotiation',
@@ -142,55 +148,19 @@ def view_extract():
     app.logger.info('view_extract')
 
     add_form = AvenueExtractAddForm()
-    if add_form.validate_on_submit():
-        app.logger.info('add_form On submit.')
-
-        new_entry = AvenueExtract(
-            origin_id='FORM',
-            data=add_form.data.data,
-            hora=add_form.hora.data,
-            liquidacao=add_form.liquidacao.data,
-            descricao=add_form.descricao.data,
-            valor=add_form.valor.data,
-            saldo=add_form.saldo.data,
-
-            entrada_saida=add_form.entrada_saida.data,
-            produto=add_form.produto.data,
-            movimentacao=add_form.movimentacao.data,
-            quantidade=add_form.quantidade.data,
-            preco_unitario=add_form.preco_unitario.data
-        )
-
-        existing_entry = AvenueExtract.query.filter_by(
-            origin_id='FORM',
-            data=add_form.data.data,
-            hora=add_form.hora.data,
-            liquidacao=add_form.liquidacao.data,
-            descricao=add_form.descricao.data,
-            valor=add_form.valor.data,
-            saldo=add_form.saldo.data,
-
-            entrada_saida=add_form.entrada_saida.data,
-            produto=add_form.produto.data,
-            movimentacao=add_form.movimentacao.data,
-            quantidade=add_form.quantidade.data,
-            preco_unitario=add_form.preco_unitario.data
-        ).first()
-
-        if not existing_entry:
-            db.session.add(new_entry)
-            db.session.commit()
-            app.logger.info('Added new entry to database!')
-            flash('Entry added successfully!')
-            return redirect(url_for('view_extract'))
-        
-        app.logger.info('New entry already exists in the database!')
-        flash('Entry already exists in the database.')
-    else:
-        app.logger.debug('Not submit. Errors: %s', add_form.errors)
-        for field, errors in add_form.errors.items():
-            for error in errors:
-                flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
+    response = _handle_manual_entry(
+        AvenueExtract, add_form,
+        field_map={
+            'data': 'data', 'hora': 'hora', 'liquidacao': 'liquidacao',
+            'descricao': 'descricao', 'valor': 'valor', 'saldo': 'saldo',
+            'entrada_saida': 'entrada_saida', 'produto': 'produto',
+            'movimentacao': 'movimentacao', 'quantidade': 'quantidade',
+            'preco_unitario': 'preco_unitario',
+        },
+        redirect_endpoint='view_extract',
+    )
+    if response is not None:
+        return response
 
     df = process_avenue_extract_request()
     return render_template('view_extract.html', html_title='Avenue Extract',
@@ -201,41 +171,17 @@ def view_generic_extract():
     app.logger.info('view_generic_extract')
 
     add_form = GenericExtractAddForm()
-    if add_form.validate_on_submit():
-        app.logger.info('add_form On submit.')
-
-        existing_entry = GenericExtract.query.filter_by(
-            date=add_form.date.data,
-            asset=add_form.asset.data,
-            movimentation=add_form.movimentation.data,
-            quantity=add_form.quantity.data,
-            price=add_form.price.data,
-            total=add_form.total.data
-        ).first()
-
-        if not existing_entry:
-            new_entry = GenericExtract(
-                origin_id='FORM',
-                date=add_form.date.data,
-                asset=add_form.asset.data,
-                movimentation=add_form.movimentation.data,
-                quantity=add_form.quantity.data,
-                price=add_form.price.data,
-                total=add_form.total.data
-            )
-            db.session.add(new_entry)
-            db.session.commit()
-            app.logger.info('Added new entry to database!')
-            flash('Entry added successfully!')
-            return redirect(url_for('view_generic_extract'))
-        
-        app.logger.info('New entry already exists in the database!')
-        flash('Entry already exists in the database.')
-    else:
-        app.logger.debug('Not submit. Errors: %s', add_form.errors)
-        for field, errors in add_form.errors.items():
-            for error in errors:
-                flash(f"Error validating field {getattr(add_form, field).label.text}: {error}")
+    response = _handle_manual_entry(
+        GenericExtract, add_form,
+        field_map={
+            'date': 'date', 'asset': 'asset', 'movimentation': 'movimentation',
+            'quantity': 'quantity', 'price': 'price', 'total': 'total',
+        },
+        redirect_endpoint='view_generic_extract',
+        with_origin_id=False,
+    )
+    if response is not None:
+        return response
 
     df = process_generic_extract_request()
     return render_template('view_generic.html', html_title='Generic Extract',
