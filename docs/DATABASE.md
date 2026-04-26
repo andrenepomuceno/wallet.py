@@ -6,89 +6,78 @@ Documentation of SQLite schema and access patterns.
 
 ## 📊 Schema
 
-Wallet.py uses SQLite with the tables below (SQLAlchemy models in `app/models/`):
+Wallet.py uses SQLite with the tables below (SQLAlchemy models in `app/models/`).
 
-### 1. b3_movimentation
+All transactional data — regardless of source (B3 movimentation, B3 negotiation,
+Avenue, Generic, or manual entry) — lives in a single unified `transaction`
+table. A startup job (`migrate_legacy_to_transaction()`) copies any pre-existing
+rows from the legacy per-source tables into `transaction` and then drops them.
 
-B3 movement extract (dividends, credits, debits, buys, sells). Column names mirror the original B3 CSV export.
-
-```sql
-CREATE TABLE b3_movimentation (
-    id INTEGER PRIMARY KEY,
-    origin_id VARCHAR,                        -- dedup key
-    entrada_saida VARCHAR,                    -- 'Credito' or 'Debito'
-    data VARCHAR,                             -- 'YYYY-MM-DD'
-    movimentacao VARCHAR,                     -- e.g. 'Compra', 'Venda', 'Dividendo'
-    produto VARCHAR,                          -- Full product name (used to derive asset ticker)
-    instituicao VARCHAR,                      -- Broker name
-    quantidade FLOAT,                         -- Quantity
-    preco_unitario FLOAT,                     -- Unit price
-    valor_operacao FLOAT                      -- Total value
-);
-```
-
-`b3_movimentation_sql_to_df()` maps these columns to the standard DataFrame format (`Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`).
-
-### 2. b3_negotiation
-
-B3 negotiation extract (buys and sells). Column names mirror the original B3 CSV export.
+### 1. transaction (unified)
 
 ```sql
-CREATE TABLE b3_negotiation (
+CREATE TABLE transaction (
     id INTEGER PRIMARY KEY,
-    origin_id VARCHAR,
-    data VARCHAR,                             -- 'YYYY-MM-DD'
-    tipo VARCHAR,                             -- 'Compra' or 'Venda'
-    mercado VARCHAR,                          -- Market type
-    prazo VARCHAR,                            -- Settlement period
-    instituicao VARCHAR,                      -- Broker name
-    codigo VARCHAR,                           -- Asset code (ITUB3, etc.)
-    quantidade FLOAT,
-    preco FLOAT,
-    valor FLOAT
-);
-```
+    origin_id VARCHAR UNIQUE,                 -- dedup key: '<filepath>:<sha256>:<row>:<suffix>'
+                                              -- suffix = ':mov' | ':neg' | ':av' | ':gen'
+                                              -- manual entries use 'FORM:<sha256[:16]>'
 
-### 3. avenue_extract
+    -- Discriminators
+    source VARCHAR NOT NULL,                  -- 'b3' | 'avenue' | 'generic'
+    record_type VARCHAR NOT NULL,             -- 'movimentation' | 'negotiation' | 'extract'
 
-Avenue (US broker) statement export. Column names mirror the original CSV.
+    -- Dates
+    date VARCHAR NOT NULL,                    -- 'YYYY-MM-DD'
+    settlement_date VARCHAR,                  -- Avenue 'liquidação'
+    time VARCHAR,                             -- Avenue 'hora'
 
-```sql
-CREATE TABLE avenue_extract (
-    id INTEGER PRIMARY KEY,
-    origin_id VARCHAR,
-    data VARCHAR,                             -- 'YYYY-MM-DD'
-    hora VARCHAR,                             -- Time of transaction
-    liquidacao VARCHAR,                       -- Settlement date 'YYYY-MM-DD'
-    descricao VARCHAR,                        -- Transaction description
-    valor FLOAT,                              -- Amount in USD
-    saldo FLOAT,                              -- Account balance in USD
-    entrada_saida VARCHAR,                    -- 'Credito' or 'Debito'
-    produto VARCHAR,                          -- Asset name / ticker
-    movimentacao VARCHAR,                     -- 'Compra', 'Venda', 'Dividendos', 'Impostos'
-    quantidade FLOAT,
-    preco_unitario FLOAT                      -- Unit price in USD
-);
-```
+    -- Asset identity
+    asset VARCHAR,                            -- Parsed ticker (PETR4, NVDA, ...)
+    product VARCHAR,                          -- Original product/code/description string
+    institution VARCHAR,                      -- Broker name
 
-### 4. generic_extract
+    -- Movement classification
+    raw_label VARCHAR,                        -- Original CSV label ('Compra', 'Dividendos', 'Buy', ...)
+    category VARCHAR NOT NULL,                -- Canonical: BUY | SELL | DIVIDEND | INTEREST
+                                              --   | TAX | FEE | RENT_WAGE | SPLIT | BONUS
+                                              --   | REIMBURSE | REDEMPTION | AUCTION
+                                              --   | TRANSFER | OTHER
+    direction VARCHAR,                        -- 'Credito' | 'Debito'
 
-Generic custom format (English column names).
-
-```sql
-CREATE TABLE generic_extract (
-    id INTEGER PRIMARY KEY,
-    origin_id VARCHAR,
-    date VARCHAR,                             -- 'YYYY-MM-DD'
-    asset VARCHAR,
-    movimentation VARCHAR,                    -- 'Buy', 'Sell', 'Wages', 'Taxes'
+    -- Numerics (sign convention preserved per source)
     quantity FLOAT,
     price FLOAT,
-    total FLOAT
+    total FLOAT,
+    balance FLOAT,                            -- Avenue saldo
+
+    -- Currency / overflow
+    currency VARCHAR NOT NULL DEFAULT 'BRL',  -- 'BRL' | 'USD'
+    description VARCHAR,                      -- Avenue descrição
+    meta JSON                                 -- mercado, prazo, etc.
 );
+
+CREATE UNIQUE INDEX ix_transaction_origin_id ON transaction (origin_id);
+CREATE INDEX ix_transaction_asset ON transaction (asset);
+CREATE INDEX ix_transaction_source_asset_date ON transaction (source, asset, date);
 ```
 
-### 5. api_config
+`transactions_sql_to_df()` (in `app/models/converters.py`) converts a list of
+`Transaction` rows into the standard DataFrame used by processing
+(`Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`, `Category`,
+`Direction`, `Source`, `RecordType`, `Produto`, `Currency`, plus a few legacy
+aliases used by templates).
+
+### Canonical category mapping
+
+`app/models/category_mapping.py:classify(source, record_type, raw_label, direction, total)`
+maps every observed CSV label to a canonical category. Unknown labels log a
+warning and fall back to `OTHER` so imports never fail on new B3/Avenue
+operation types. Importers, manual-entry routes, and the migration job all go
+through this single function.
+
+### 2. api_config
+
+Stores API keys for external services.
 
 Stores API keys for external services.
 
