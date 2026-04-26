@@ -22,11 +22,12 @@ This document describes the technical structure, data flow, and patterns used in
 [Importing]            [Processing]        [Models/ORM]
 app/importing.py      app/processing/      app/models/
     │                     │                    │
-    ├─ Parse CSV/XLSX     ├─ Query DB         ├─ B3Movimentation
-    ├─ Normalize cols     ├─ Consolidate     ├─ B3Negotiation
-    ├─ Dedup (origin_id)  ├─ Fetch prices    ├─ AvenueExtract
-    └─ Save to DB         ├─ Generate charts └─ GenericExtract
-                          └─ *_sql_to_df()
+    ├─ Parse CSV/XLSX     ├─ Query DB         ├─ Transaction (unified)
+    ├─ Translate row →    ├─ Filter by source │   - source
+    │  Transaction        │  + category        │   - record_type
+    ├─ Dedup (origin_id)  ├─ Fetch prices     │   - category (canonical)
+    └─ Save to DB         ├─ Generate charts  │   - raw_label (preserved)
+                          └─ transactions_sql_to_df()
                     │
                     ▼
         ┌──────────────────────┐
@@ -110,20 +111,28 @@ uploads/
 
 ### SQLAlchemy Models (models/)
 
-#### Transaction Models
+#### Transaction Model (unified)
 
-Each transaction model stores the raw columns from the respective broker CSV export and has an `origin_id` column for deduplication.
+A single `Transaction` ORM (`app/models/transactions.py`) stores every row
+from every source. Discriminator columns identify origin and shape:
 
-| Model | Table | Source |
-|-------|-------|--------|
-| `B3Movimentation` | `b3_movimentation` | B3 movement extract |
-| `B3Negotiation` | `b3_negotiation` | B3 negotiation extract |
-| `AvenueExtract` | `avenue_extract` | Avenue (US) statement |
-| `GenericExtract` | `generic_extract` | Custom generic format |
+| Column | Values |
+|--------|--------|
+| `source` | `'b3'` \| `'avenue'` \| `'generic'` |
+| `record_type` | `'movimentation'` \| `'negotiation'` \| `'extract'` |
+| `category` | Canonical: `BUY`, `SELL`, `DIVIDEND`, `INTEREST`, `TAX`, `FEE`, `RENT_WAGE`, `SPLIT`, `BONUS`, `REIMBURSE`, `REDEMPTION`, `AUCTION`, `TRANSFER`, `OTHER` |
+| `raw_label` | Original CSV string preserved for audit/UI display |
+
+Label → category translation lives in `app/models/category_mapping.py:classify()`
+and is reused by importers, manual-entry routes, and the startup migration job.
 
 Column details: see [Database](DATABASE.md).
 
-Each model has a companion `*_sql_to_df(result)` function that converts ORM objects to a pandas DataFrame with standardized columns: `Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`.
+`transactions_sql_to_df(result)` (in `app/models/converters.py`) converts a
+list of `Transaction` rows into a pandas DataFrame with standardized columns
+(`Date`, `Asset`, `Movimentation`, `Quantity`, `Price`, `Total`, `Category`,
+`Direction`, `Source`, `RecordType`, `Produto`, `Currency`, plus a few legacy
+aliases used by templates).
 
 #### Configuration & Cache Models
 
@@ -169,15 +178,15 @@ User clicks "Consolidate"
 routes/consolidate.py: view_consolidate() → calls processing.process_consolidate_request()
     ↓
 processing package:
-    ├─ Iterates each asset type found in DB
+    ├─ Iterates assets discovered per source via load_products('<source>')
     ├─ For each asset:
-    │   ├─ Query: get_all_transactions(asset_code)
-    │   ├─ Converts SQLAlchemy → pandas via *_sql_to_df()
-    │   ├─ Classifies:
-    │   │   ├─ Buys (Compra)
-    │   │   ├─ Sells (Venda)
-    │   │   ├─ Wages (Dividendo, Credito)
-    │   │   └─ Taxes (Imposto, Debito)
+    │   ├─ Query: Transaction.query.filter_by(source=...).filter(asset.like(...))
+    │   ├─ Converts SQLAlchemy → pandas via transactions_sql_to_df()
+    │   ├─ Classifies by canonical Category column:
+    │   │   ├─ Buys      (Category in {BUY, SPLIT, BONUS})
+    │   │   ├─ Sells     (Category == SELL)
+    │   │   ├─ Wages     (Category in {DIVIDEND, INTEREST, REIMBURSE, AUCTION, REDEMPTION})
+    │   │   └─ Taxes     (Category == TAX)
     │   ├─ Calculates current position (quantity)
     │   ├─ Fetches online price → get_online_info(asset)
     │   ├─ Calculates profitability
@@ -267,101 +276,83 @@ Tries yfinance directly with the raw ticker.
 
 ### 1. Adding a New Data Source
 
-**Step 1: Model (app/models/transactions.py + app/models/converters.py)**
+**Step 1: Row translator (`app/import_translators.py`)**
 ```python
-class NewSource(db.Model):
-    __tablename__ = 'new_source'
-    id = db.Column(db.Integer, primary_key=True)
-    origin_id = db.Column(db.String, unique=True)  # IMPORTANT!
-    date = db.Column(db.String)
-    asset = db.Column(db.String)
-    movimentation = db.Column(db.String)
-    quantity = db.Column(db.Float)
-    price = db.Column(db.Float)
-    total = db.Column(db.Float)
+from app.models import Transaction
+from app.models import category_mapping as cm
 
-def new_source_sql_to_df():
-    """Converts ORM → pandas with standardized columns"""
-    results = db.session.query(NewSource).all()
-    return pd.DataFrame([
-        {
-            'Date': r.date,
-            'Asset': r.asset,
-            'Movimentation': r.movimentation,  # Normalize!
-            'Quantity': r.quantity,
-            'Price': r.price,
-            'Total': r.total
-        }
-        for r in results
-    ])
+def new_source_row(row):
+    raw_label = row.get('movimentation', '')
+    direction = row.get('direction')
+    total = float(row.get('total', 0) or 0)
+    category = cm.classify(
+        source='new_source',
+        record_type='extract',
+        raw_label=raw_label,
+        direction=direction,
+        total=total,
+    )
+    return Transaction(
+        source='new_source',
+        record_type='extract',
+        date=row['date'],
+        asset=row['asset'],
+        product=row.get('product') or row['asset'],
+        raw_label=raw_label,
+        category=category,
+        direction=direction,
+        quantity=row['quantity'],
+        price=row['price'],
+        total=total,
+        currency='BRL',
+    )
 ```
 
-**Step 2: Import (importing.py)**
+If the new source uses labels not yet in the mapping, extend
+`app/models/category_mapping.py`. Unknown labels fall back to `OTHER` with a
+warning — imports never fail on a new label.
+
+**Step 2: Importer (`app/importing.py`)**
 ```python
-def parse_new_source(filepath):
-    """Parse CSV/XLSX from new source"""
-    df = pd.read_csv(filepath)
-    
-    # Normalize columns
-    df.columns = ['date', 'asset', 'qty', 'price', 'total']
-    
-    # Convert dates
+def import_new_source(df, filepath):
     df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-    
-    # Convert numbers
-    for col in ['qty', 'price', 'total']:
+    for col in ('quantity', 'price', 'total'):
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-    
-    # Deduplicate
-    file_hash = gen_hash(filepath)
-    for idx, row in df.iterrows():
-        origin_id = f"{filepath}:{file_hash}:{idx}"
-        
-        # Check duplicate
-        existing = db.session.query(NewSource).filter_by(origin_id=origin_id).first()
-        if existing:
-            continue
-        
-        # Insert
-        entry = NewSource(
-            origin_id=origin_id,
-            date=row['date'],
-            asset=row['asset'],
-            movimentation=normalize_movimentation(row['movimentation']),
-            quantity=round(row['qty'], 8),
-            price=row['price'],
-            total=row['total']
-        )
-        db.session.add(entry)
-    
-    db.session.commit()
+    return _bulk_insert_transactions(
+        df, filepath, new_source_row, suffix=':ns',
+    )
 ```
 
-**Step 3: Processing (app/processing/assets.py and related modules)**
+The `suffix` keeps `origin_id` unique when one CSV produces multiple
+`record_type`s (B3 already uses `:mov` and `:neg`).
+
+**Step 3: Processing (`app/processing/assets.py`)**
 ```python
+from app.models import Transaction, transactions_sql_to_df
+from app.models import category_mapping as cat
+
 def process_new_source_asset_request(asset):
-    """Process consolidation for an asset from new source"""
-    df = new_source_sql_to_df()
-    df = df[df['Asset'].str.contains(asset, case=False, na=False)]
-    
+    rows = (Transaction.query
+            .filter_by(source='new_source')
+            .filter(Transaction.asset.like(f'%{asset}%'))
+            .order_by(Transaction.date.asc())
+            .all())
+    df = transactions_sql_to_df(rows)
     dataframes = {
-        'buys': df[df['Movimentation'] == 'Compra'],
-        'sells': df[df['Movimentation'] == 'Venda'],
-        'wages': df[df['Movimentation'].isin(['Dividendo', 'Credito'])],
-        'taxes': df[df['Movimentation'].isin(['Imposto', 'Debito'])]
+        'buys':  df.loc[df['Category'] == cat.BUY],
+        'sells': df.loc[df['Category'] == cat.SELL],
+        'wages': df.loc[df['Category'].isin([cat.DIVIDEND, cat.INTEREST])],
+        'taxes': df.loc[df['Category'] == cat.TAX],
     }
-    
-    asset_info = consolidate_asset_info(dataframes, asset)
-    return asset_info
+    return consolidate_asset_info(dataframes, {'ticker': asset})
 ```
 
-**Step 4: Route (app/routes/*.py)**
-```python
-@app.route('/view_new_source/<asset>')
-def view_new_source(asset):
-    asset_info = processing.process_new_source_asset_request(asset)
-    return render_template('view_new_source.html', asset_info=asset_info)
-```
+**Step 4: Source loader (`app/processing/consolidate.py`)**
+Add `load_products('new_source')` and a `load_consolidate(...,
+process_new_source_asset_request, 'new_source')` call in
+`process_consolidate_request`.
+
+**Step 5: Route + template** in `app/routes/` and `app/templates/`.
 
 ### 2. Common Precautions
 
