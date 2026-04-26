@@ -1,3 +1,4 @@
+from datetime import datetime
 import pandas as pd
 from app import db
 from app.utils.parsing import parse_b3_ticker
@@ -17,6 +18,53 @@ def get_api_key(provider: str):
     if config is None:
         return None
     return config.api_key
+
+
+class CacheConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(50), unique=True, nullable=False)
+    ttl_seconds = db.Column(db.Integer, nullable=False, default=3600)
+    url_pattern = db.Column(db.String(255), nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<CacheConfig {self.category}={self.ttl_seconds}s>'
+
+
+# Default cache categories. The 'default' category has no url_pattern and is
+# applied as the global expire_after fallback. Other categories map a URL glob
+# pattern (matched by requests_cache) to a TTL in seconds.
+DEFAULT_CACHE_CONFIG = [
+    {'category': 'default',       'ttl_seconds': 3600, 'url_pattern': None},
+    {'category': 'yfinance',      'ttl_seconds': 900,  'url_pattern': '*yahoo.com*'},
+    {'category': 'exchange_rate', 'ttl_seconds': 3600, 'url_pattern': '*exchangerate-api.com*'},
+    {'category': 'scraping',      'ttl_seconds': 3600, 'url_pattern': '*taxas-tesouro.com*'},
+]
+
+
+def seed_default_cache_config():
+    """Insert default CacheConfig rows when missing. Safe to call repeatedly."""
+    changed = False
+    for entry in DEFAULT_CACHE_CONFIG:
+        existing = CacheConfig.query.filter_by(category=entry['category']).first()
+        if existing is None:
+            db.session.add(CacheConfig(**entry))
+            changed = True
+    if changed:
+        db.session.commit()
+
+
+def get_cache_ttls():
+    """Return (default_ttl_seconds, urls_expire_after_dict) from the DB."""
+    default_ttl = 3600
+    urls_expire_after = {}
+    for row in CacheConfig.query.all():
+        if row.category == 'default' or not row.url_pattern:
+            if row.category == 'default':
+                default_ttl = int(row.ttl_seconds)
+            continue
+        urls_expire_after[row.url_pattern] = int(row.ttl_seconds)
+    return default_ttl, urls_expire_after
 
 class B3Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
