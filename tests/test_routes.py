@@ -69,7 +69,7 @@ def test_view_asset_no_data(client, db_session):
     assert client.get('/view/avenue/UNKNOWN').status_code == 404
 
 
-@patch('app.routes.process_history')
+@patch('app.routes.asset.process_history')
 def test_view_history(mock_history, client):
     mock_history.return_value = {
         'history': pd.DataFrame(),
