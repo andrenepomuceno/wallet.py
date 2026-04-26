@@ -26,8 +26,12 @@ def parse_b3_ticker(column):
     return result
 
 def brl_to_float(preco_str):
-    preco_str = preco_str.replace("R$", "").strip()
-    # preco_str = preco_str.replace(".", "").replace(",", ".")
+    if preco_str is None:
+        return None
+    preco_str = str(preco_str).replace("R$", "").strip()
+    # Normalize Brazilian format: "1.234,56" -> "1234.56"
+    if ',' in preco_str:
+        preco_str = preco_str.replace(".", "").replace(",", ".")
     try:
         return float(preco_str)
     except ValueError:

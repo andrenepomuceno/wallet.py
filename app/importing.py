@@ -115,7 +115,15 @@ def import_b3_negotiation(df, filepath):
 
     return df
 
+def _safe_str(x):
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return ''
+    return str(x)
+
+
 def extract_fill(df):
+    df['Descrição'] = df['Descrição'].apply(_safe_str)
+
     def parse_entrada_saida(x):
         if re.match(r'Câmbio|Compra|Dividendos|Estorno', x):
             return 'Credito'

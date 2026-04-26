@@ -232,6 +232,9 @@ def get_online_info(ticker, asset_info = None):
     """Scrape online data for the specified asset"""
     app.logger.info('Scraping data for %s', ticker)
 
+    if asset_info is None:
+        asset_info = {}
+
     ticker_blacklist = ['VVAR3']
     if ticker in ticker_blacklist:
         return asset_info
@@ -678,6 +681,8 @@ def load_consolidate(asset_list, process_asset_func, source):
         if asset == '':
             continue
         asset_info = process_asset_func(asset)
+        if not asset_info.get('valid'):
+            continue
         new_row = pd.DataFrame([asset_info])
         consolidate = pd.concat([consolidate, new_row], ignore_index=True)
 
@@ -708,7 +713,7 @@ def consolidate_group(consolidate):
         asset_class = name[1]
 
         if currency == 'USD':
-            rate = usd_exchange_rate('BRL')
+            rate = usd_exchange_rate('BRL') or 1.0
             currency = 'BRL'
             asset_class += ' USD'
 
@@ -779,18 +784,22 @@ def process_consolidate_request():
     return ret
 
 def adjust_for_splits(df):
-    # df = df.sort_index()
+    """Back-adjust historical Close prices for stock splits.
 
-    adjustment_factor = 1
+    Walks backwards in time. When a split factor F is seen on day D, all
+    closes BEFORE D must be divided by F so they are comparable with
+    post-split prices.
+    """
+    adjustment_factor = 1.0
 
-    # Iterate over the dataframe from the last row to the first
     for index in reversed(df.index):
-        if df.at[index, 'Stock Splits'] != 0:
-            # Update the adjustment factor with the split value
-            adjustment_factor *= df.at[index, 'Stock Splits']
-        
-        # Adjust the closing price
-        df.at[index, 'Close'] *= adjustment_factor
+        # First adjust the current row using the cumulative factor seen so far
+        if adjustment_factor != 1.0:
+            df.at[index, 'Close'] = df.at[index, 'Close'] / adjustment_factor
+
+        split = df.at[index, 'Stock Splits']
+        if split and split != 0:
+            adjustment_factor *= split
 
     return df
 

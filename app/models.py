@@ -162,10 +162,11 @@ def generic_extract_sql_to_df(result):
                                'Price', 'Total'])
     df['Date'] = pd.to_datetime(df['Date'])
 
-    def fill_movimentation(row):
-        if row['Movimentation'] == '':
-            return 'Buy' if row['Total'] >= 0 else 'Sell'
-        return row['Movimentation']
-    df['Movimentation'] = df.apply(fill_movimentation, axis=1)
+    if len(df) > 0:
+        def fill_movimentation(row):
+            if row['Movimentation'] == '' or pd.isna(row['Movimentation']):
+                return 'Buy' if row['Total'] >= 0 else 'Sell'
+            return row['Movimentation']
+        df['Movimentation'] = df.apply(fill_movimentation, axis=1)
 
     return df
