@@ -3,7 +3,13 @@ import hashlib
 from flask import flash
 import pandas as pd
 from app import app, db
-from app.models import AvenueExtract, B3Movimentation, B3Negotiation, GenericExtract
+from app.models import Transaction
+from app.import_translators import (
+    b3_movimentation_row,
+    b3_negotiation_row,
+    avenue_extract_row,
+    generic_extract_row,
+)
 from app.utils.memocache import invalidate_processing_cache
 
 
@@ -24,33 +30,32 @@ def _coerce_date(df, column, fmt):
     df[column] = pd.to_datetime(df[column], format=fmt).dt.strftime('%Y-%m-%d')
 
 
-def _bulk_insert_with_dedup(model, df, filepath, row_to_kwargs):
-    """Generic dedup-aware bulk insert.
+def _bulk_insert_transactions(df, filepath, row_to_kwargs, suffix=''):
+    """Generic dedup-aware bulk insert into the unified Transaction table.
 
-    Iterates `df`, builds a unique `origin_id` per row from filepath+sha256+index,
-    skips rows whose `origin_id` already exists, otherwise calls
-    `row_to_kwargs(row)` and inserts the resulting kwargs into `model`.
-    Flashes a summary and commits once at the end.
+    `suffix` lets two record_types from the same CSV (e.g. B3 mov vs neg)
+    coexist without origin_id collisions.
     """
-    app.logger.info('Inserting data into %s...', model.__name__)
+    app.logger.info('Inserting %d rows into Transaction (suffix=%r)', len(df), suffix)
     file_hash = gen_hash(filepath)
     added = 0
     duplicates = 0
 
+    prefix = f'{filepath}:{file_hash}:'
     existing = {
-        oid for (oid,) in db.session.query(model.origin_id).filter(
-            model.origin_id.like(f'{filepath}:{file_hash}:%')
+        oid for (oid,) in db.session.query(Transaction.origin_id).filter(
+            Transaction.origin_id.like(f'{prefix}%')
         ).all()
     }
 
     for index, row in df.iterrows():
-        origin_id = f'{filepath}:{file_hash}:{index}'
+        origin_id = f'{prefix}{index}{suffix}'
         if origin_id in existing:
             duplicates += 1
             continue
         kwargs = row_to_kwargs(row)
         kwargs['origin_id'] = origin_id
-        db.session.add(model(**kwargs))
+        db.session.add(Transaction(**kwargs))
         added += 1
 
     db.session.commit()
@@ -66,16 +71,7 @@ def import_b3_movimentation(df, filepath):
     _coerce_numeric(df, ['Preço unitário', 'Valor da Operação', 'Quantidade'])
     df['Produto'] = df['Produto'].str.strip()
 
-    _bulk_insert_with_dedup(B3Movimentation, df, filepath, lambda row: dict(
-        entrada_saida=row['Entrada/Saída'],
-        data=row['Data'],
-        movimentacao=row['Movimentação'],
-        produto=row['Produto'],
-        instituicao=row['Instituição'],
-        quantidade=row['Quantidade'],
-        preco_unitario=row['Preço unitário'],
-        valor_operacao=row['Valor da Operação'],
-    ))
+    _bulk_insert_transactions(df, filepath, b3_movimentation_row, suffix=':mov')
     return df
 
 
@@ -84,17 +80,7 @@ def import_b3_negotiation(df, filepath):
     _coerce_date(df, 'Data do Negócio', '%d/%m/%Y')
     _coerce_numeric(df, ['Quantidade', 'Preço', 'Valor'])
 
-    _bulk_insert_with_dedup(B3Negotiation, df, filepath, lambda row: dict(
-        data=row['Data do Negócio'],
-        tipo=row['Tipo de Movimentação'],
-        mercado=row['Mercado'],
-        prazo=row['Prazo/Vencimento'],
-        instituicao=row['Instituição'],
-        codigo=row['Código de Negociação'],
-        quantidade=row['Quantidade'],
-        preco=row['Preço'],
-        valor=row['Valor'],
-    ))
+    _bulk_insert_transactions(df, filepath, b3_negotiation_row, suffix=':neg')
     return df
 
 
@@ -178,19 +164,7 @@ def import_avenue_extract(df, filepath):
 
     df = extract_fill(df)
 
-    _bulk_insert_with_dedup(AvenueExtract, df, filepath, lambda row: dict(
-        data=row['Data'],
-        hora=row['Hora'],
-        liquidacao=row['Liquidação'],
-        descricao=row['Descrição'],
-        valor=row['Valor (U$)'],
-        saldo=row['Saldo da conta (U$)'],
-        entrada_saida=row['Entrada/Saída'],
-        produto=row['Produto'],
-        movimentacao=row['Movimentação'],
-        quantidade=row['Quantidade'],
-        preco_unitario=row['Preço unitário'],
-    ))
+    _bulk_insert_transactions(df, filepath, avenue_extract_row, suffix=':av')
     return df
 
 
@@ -200,12 +174,5 @@ def import_generic_extract(df, filepath):
     _coerce_numeric(df, ['Quantity', 'Price', 'Total'])
     df['Movimentation'] = df['Movimentation'].fillna('')
 
-    _bulk_insert_with_dedup(GenericExtract, df, filepath, lambda row: dict(
-        date=row['Date'],
-        asset=row['Asset'],
-        movimentation=row['Movimentation'],
-        quantity=row['Quantity'],
-        price=row['Price'],
-        total=row['Total'],
-    ))
+    _bulk_insert_transactions(df, filepath, generic_extract_row, suffix=':gen')
     return df

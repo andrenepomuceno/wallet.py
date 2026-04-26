@@ -80,6 +80,63 @@ def process_manual_entry(model, form, field_map, with_origin_id=True):
     }
 
 
+def process_manual_transaction(form, translator, dedup_keys=None):
+    """Validate `form`, build a Transaction via `translator(form_values)`,
+    dedup by `dedup_keys` (Transaction column names), insert if new.
+
+    `translator` receives a dict {form_attr: value} from the form and must
+    return a kwargs dict suitable for `Transaction(**kwargs)`.
+    """
+    from app.models import Transaction
+
+    if not form.validate_on_submit():
+        if form.errors:
+            app.logger.debug('Not submit. Errors: %s', form.errors)
+            return {'success': False, 'errors': collect_form_errors(form), 'inserted': False}
+        return {'success': False, 'errors': [], 'inserted': False}
+
+    form_values = {f.name: f.data for f in form if f.name not in ('csrf_token', 'submit')}
+    kwargs = translator(form_values)
+
+    if dedup_keys:
+        filter_kwargs = {k: kwargs.get(k) for k in dedup_keys}
+        if Transaction.query.filter_by(**filter_kwargs).first():
+            app.logger.info('Manual transaction already exists.')
+            return {
+                'success': False,
+                'errors': ['Entry already exists in the database.'],
+                'inserted': False,
+            }
+
+    if not kwargs.get('origin_id'):
+        # Stable origin_id for FORM rows so re-submits dedup
+        import hashlib
+        token = '|'.join(f'{k}={kwargs.get(k)}' for k in sorted(kwargs))
+        kwargs['origin_id'] = 'FORM:' + hashlib.sha256(token.encode()).hexdigest()[:16]
+
+    db.session.add(Transaction(**kwargs))
+    db.session.commit()
+    invalidate_processing_cache()
+    app.logger.info('Added new manual Transaction.')
+    return {
+        'success': True,
+        'errors': [],
+        'messages': ['Entry added successfully!'],
+        'inserted': True,
+    }
+
+
+def handle_manual_transaction(form, translator, redirect_endpoint, dedup_keys=None):
+    result = process_manual_transaction(form, translator, dedup_keys=dedup_keys)
+    if result.get('success'):
+        for msg in result.get('messages', ['Entry added successfully!']):
+            flash(msg)
+        return redirect(url_for(redirect_endpoint))
+    for error in result.get('errors', []):
+        flash(error)
+    return None
+
+
 def handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_id=True):
     """Validate `form`, dedup against `model` by field values, insert if new.
 

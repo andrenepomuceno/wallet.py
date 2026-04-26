@@ -11,16 +11,19 @@ from .config import (
     get_processing_ttl,
 )
 from .transactions import (
+    Transaction,
     B3Movimentation,
     B3Negotiation,
     AvenueExtract,
     GenericExtract,
 )
+from . import category_mapping
 from .converters import (
     b3_movimentation_sql_to_df,
     b3_negotiation_sql_to_df,
     avenue_extract_sql_to_df,
     generic_extract_sql_to_df,
+    transactions_sql_to_df,
 )
 
 __all__ = [
@@ -28,7 +31,10 @@ __all__ = [
     'DEFAULT_CACHE_CONFIG', 'PROCESSING_CACHE_CATEGORIES',
     'get_api_key', 'seed_default_cache_config',
     'get_cache_ttls', 'get_processing_ttl',
+    'Transaction',
     'B3Movimentation', 'B3Negotiation', 'AvenueExtract', 'GenericExtract',
+    'category_mapping',
     'b3_movimentation_sql_to_df', 'b3_negotiation_sql_to_df',
     'avenue_extract_sql_to_df', 'generic_extract_sql_to_df',
+    'transactions_sql_to_df',
 ]

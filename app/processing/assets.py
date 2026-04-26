@@ -4,11 +4,7 @@ from datetime import datetime
 import pandas as pd
 
 from app import app
-from app.models import (
-    B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract,
-    b3_movimentation_sql_to_df, b3_negotiation_sql_to_df,
-    avenue_extract_sql_to_df, generic_extract_sql_to_df,
-)
+from app.models import Transaction, transactions_sql_to_df, category_mapping as cat
 from app.utils.memocache import ttl_memoize
 
 from .extracts import calc_avg_price, merge_movimentation_negotiation
@@ -172,64 +168,44 @@ def process_b3_asset_request(asset):
 
     asset_info = {'valid': False, 'name': asset, 'source': 'b3'}
     dataframes = {}
-    ticker = asset  # default fallback if DB has no rows
+    ticker = asset
 
-    query = B3Movimentation.query.filter(
-        B3Movimentation.produto.like(f'%{asset}%')).order_by(B3Movimentation.data.asc())
-    result = query.all()
-    movimentation_df = b3_movimentation_sql_to_df(result)
+    base = Transaction.query.filter_by(source='b3').filter(
+        (Transaction.asset.like(f'%{asset}%')) | (Transaction.product.like(f'%{asset}%'))
+    ).order_by(Transaction.date.asc())
+
+    mov_rows = base.filter_by(record_type='movimentation').all()
+    movimentation_df = transactions_sql_to_df(mov_rows)
+
+    empty_cols = pd.DataFrame(columns=columns)
     if len(movimentation_df) > 0:
-        ticker = movimentation_df['Asset'].value_counts().index[0]
-
-        credit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Credito"]
-        debit = movimentation_df.loc[movimentation_df['Entrada/Saída'] == "Debito"]
-
-        buys = credit.loc[
-            (
-                (credit['Movimentation'] == "Compra")
-                | (credit['Movimentation'] == "Desdobro")
-                | (credit['Movimentation'] == "Bonificação em Ativos")
-            )
-        ]
-
-        sells = debit.loc[
-            (
-                (debit['Movimentation'] == "Venda")
-            )
-        ]
+        non_empty = movimentation_df[movimentation_df['Asset'] != '']
+        if len(non_empty) > 0:
+            ticker = non_empty['Asset'].value_counts().index[0]
+        buys = movimentation_df.loc[movimentation_df['Category'].isin(
+            [cat.BUY, cat.SPLIT, cat.BONUS])]
+        sells = movimentation_df.loc[movimentation_df['Category'] == cat.SELL]
     else:
         app.logger.warning('Movimentation data not found for %s', asset)
-        movimentation_df = pd.DataFrame(columns=columns)
-        credit = pd.DataFrame(columns=columns)
-        debit = pd.DataFrame(columns=columns)
-        buys = pd.DataFrame(columns=columns)
-        sells = pd.DataFrame(columns=columns)
+        movimentation_df = empty_cols
+        buys = empty_cols
+        sells = empty_cols
 
     dataframes['movimentation'] = movimentation_df
 
-    query = B3Negotiation.query.filter(
-        B3Negotiation.codigo.like(f'%{asset}%')).order_by(B3Negotiation.data.asc())
-    result = query.all()
-    negotiation_df = b3_negotiation_sql_to_df(result)
+    neg_rows = base.filter_by(record_type='negotiation').all()
+    negotiation_df = transactions_sql_to_df(neg_rows)
     if len(negotiation_df) > 0:
-        ticker = negotiation_df['Asset'].value_counts().index[0]
-
-        negotiation_buys = negotiation_df.loc[
-            (
-                (negotiation_df['Movimentation'] == "Compra")
-            )
-        ]
-
-        negotiation_sells = negotiation_df.loc[
-            (
-                (negotiation_df['Movimentation'] == "Venda")
-            )
-        ]
+        non_empty = negotiation_df[negotiation_df['Asset'] != '']
+        if len(non_empty) > 0:
+            ticker = non_empty['Asset'].value_counts().index[0]
+        negotiation_buys = negotiation_df.loc[negotiation_df['Category'] == cat.BUY]
+        negotiation_sells = negotiation_df.loc[negotiation_df['Category'] == cat.SELL]
     else:
         app.logger.warning('Negotiation data not found for %s!', asset)
-        negotiation_df = pd.DataFrame(columns=columns)
-        negotiation_buys = pd.DataFrame(columns=columns)
-        negotiation_sells = pd.DataFrame(columns=columns)
+        negotiation_df = empty_cols
+        negotiation_buys = empty_cols
+        negotiation_sells = empty_cols
 
     dataframes['negotiation'] = negotiation_df
     asset_info['ticker'] = ticker
@@ -240,31 +216,25 @@ def process_b3_asset_request(asset):
     dataframes['buys'] = buys
     dataframes['sells'] = sells
 
-    taxes = debit.loc[
-        ((debit['Movimentation'] == "Cobrança de Taxa Semestral"))
-    ]
+    if len(movimentation_df) > 0:
+        taxes = movimentation_df.loc[movimentation_df['Category'] == cat.TAX]
+        wages = movimentation_df.loc[movimentation_df['Category'].isin(
+            [cat.DIVIDEND, cat.INTEREST, cat.REIMBURSE, cat.AUCTION, cat.REDEMPTION])]
+        rents_wage = movimentation_df.loc[
+            (movimentation_df['Category'] == cat.RENT_WAGE)
+            & (movimentation_df['Total'] > 0)
+        ]
+    else:
+        taxes = empty_cols
+        wages = empty_cols
+        rents_wage = empty_cols
+
     dataframes['taxes'] = taxes
-
-    wages = credit.loc[
-        ((credit['Movimentation'] == "Dividendo")
-         | (credit['Movimentation'] == "Juros Sobre Capital Próprio")
-         | (credit['Movimentation'] == "Reembolso")
-         | (credit['Movimentation'] == "Rendimento")
-         | (credit['Movimentation'] == "Leilão de Fração")
-         | (credit['Movimentation'] == "Resgate"))
-    ]
     dataframes['wages'] = wages
-
-    rents_wage = credit.loc[(
-        (credit['Movimentation'] == "Empréstimo")
-        & (credit['Total'] > 0)
-    )]
     dataframes['rent_wages'] = rents_wage
 
     consolidate_asset_info(dataframes, asset_info)
-
     asset_info['dataframes'] = dataframes
-
     return asset_info
 
 
@@ -272,56 +242,28 @@ def process_b3_asset_request(asset):
 def process_avenue_asset_request(asset):
     app.logger.info('Processing view_extract_asset_request for "%s".', asset)
 
-    asset_info = {}
+    asset_info = {'valid': False, 'name': asset, 'source': 'avenue'}
     dataframes = {}
 
-    asset_info['valid'] = False
-    asset_info['name'] = asset
-    asset_info['source'] = 'avenue'
-
-    query = AvenueExtract.query.filter(
-        AvenueExtract.produto.like(f'%{asset}%')).order_by(AvenueExtract.data.asc())
-    result = query.all()
-    extract_df = avenue_extract_sql_to_df(result)
+    rows = Transaction.query.filter_by(source='avenue').filter(
+        (Transaction.asset.like(f'%{asset}%')) | (Transaction.product.like(f'%{asset}%'))
+    ).order_by(Transaction.date.asc()).all()
+    extract_df = transactions_sql_to_df(rows)
     if len(extract_df) == 0:
         app.logger.warning('Extract data not found for %s', asset)
         return asset_info
 
-    extract_df['Total'] = abs(extract_df['Total'])
-
+    extract_df['Total'] = extract_df['Total'].abs()
     dataframes['movimentation'] = extract_df
 
-    ticker = extract_df['Asset'].value_counts().index[0]
+    non_empty = extract_df[extract_df['Asset'] != '']
+    ticker = non_empty['Asset'].value_counts().index[0] if len(non_empty) > 0 else asset
     asset_info['ticker'] = ticker
 
-    credit = extract_df.loc[extract_df['Entrada/Saída'] == "Credito"]
-    debit = extract_df.loc[extract_df['Entrada/Saída'] == "Debito"]
-
-    buys = credit.loc[
-        (
-            (credit['Movimentation'] == "Compra")
-            | (credit['Movimentation'] == "Desdobramento")
-        )
-    ]
-    dataframes['buys'] = buys
-
-    sells = debit.loc[
-        (
-            (debit['Movimentation'] == "Venda")
-        )
-    ]
-    dataframes['sells'] = sells
-
-    taxes = debit.loc[
-        (debit['Movimentation'] == "Impostos")
-        | (debit['Movimentation'] == "Corretagem")
-    ]
-    dataframes['taxes'] = taxes
-
-    wages = credit.loc[
-        (credit['Movimentation'] == "Dividendos")
-    ]
-    dataframes['wages'] = wages
+    dataframes['buys'] = extract_df.loc[extract_df['Category'].isin([cat.BUY, cat.SPLIT])]
+    dataframes['sells'] = extract_df.loc[extract_df['Category'] == cat.SELL]
+    dataframes['taxes'] = extract_df.loc[extract_df['Category'].isin([cat.TAX, cat.FEE])]
+    dataframes['wages'] = extract_df.loc[extract_df['Category'] == cat.DIVIDEND]
 
     consolidate_asset_info(dataframes, asset_info)
     asset_info['currency'] = 'USD'
@@ -334,52 +276,28 @@ def process_avenue_asset_request(asset):
 def process_generic_asset_request(asset):
     app.logger.info('Processing view_generic_asset_request for %s.', asset)
 
-    asset_info = {}
+    asset_info = {'valid': False, 'name': asset, 'source': 'generic'}
     dataframes = {}
 
-    asset_info['valid'] = False
-    asset_info['name'] = asset
-    asset_info['source'] = 'generic'
-
-    query = GenericExtract.query.filter(
-        GenericExtract.asset.like(f'%{asset}%')).order_by(GenericExtract.date.asc())
-    result = query.all()
-    extract_df = generic_extract_sql_to_df(result)
+    rows = Transaction.query.filter_by(source='generic').filter(
+        Transaction.asset.like(f'%{asset}%')
+    ).order_by(Transaction.date.asc()).all()
+    extract_df = transactions_sql_to_df(rows)
     if len(extract_df) == 0:
         app.logger.warning('Extract data not found for %s', asset)
         return asset_info
 
     dataframes['movimentation'] = extract_df
 
-    ticker = extract_df['Asset'].value_counts().index[0]
+    non_empty = extract_df[extract_df['Asset'] != '']
+    ticker = non_empty['Asset'].value_counts().index[0] if len(non_empty) > 0 else asset
     asset_info['ticker'] = ticker
 
-    buys = extract_df.loc[
-        (
-            (extract_df['Movimentation'] == "Buy")
-        )
-    ]
-    dataframes['buys'] = buys
-
-    sells = extract_df.loc[
-        (
-            (extract_df['Movimentation'] == "Sell")
-        )
-    ]
-    dataframes['sells'] = sells
-
-    taxes = extract_df.loc[
-        (extract_df['Movimentation'] == "Taxes")
-    ]
-    dataframes['taxes'] = taxes
-
-    wages = extract_df.loc[
-        (extract_df['Movimentation'] == "Wages")
-    ]
-    dataframes['wages'] = wages
+    dataframes['buys'] = extract_df.loc[extract_df['Category'] == cat.BUY]
+    dataframes['sells'] = extract_df.loc[extract_df['Category'] == cat.SELL]
+    dataframes['taxes'] = extract_df.loc[extract_df['Category'] == cat.TAX]
+    dataframes['wages'] = extract_df.loc[extract_df['Category'] == cat.DIVIDEND]
 
     consolidate_asset_info(dataframes, asset_info)
-
     asset_info['dataframes'] = dataframes
-
     return asset_info

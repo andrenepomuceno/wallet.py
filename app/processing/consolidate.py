@@ -2,11 +2,7 @@
 import pandas as pd
 
 from app import app
-from app.models import (
-    B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract,
-    b3_movimentation_sql_to_df, b3_negotiation_sql_to_df,
-    avenue_extract_sql_to_df, generic_extract_sql_to_df,
-)
+from app.models import Transaction
 from app.utils.memocache import ttl_memoize
 from app.utils.scraping import usd_exchange_rate
 
@@ -17,14 +13,11 @@ from .assets import (
 )
 
 
-def load_products(query, sql_to_df_func):
-    result = query.all()
-    df = sql_to_df_func(result)
-    if len(df) <= 0:
-        return []
-
-    products = df['Asset'].unique().tolist()
-    return products
+def load_products(source):
+    """Return distinct non-empty asset tickers in `Transaction` for a source."""
+    rows = Transaction.query.filter_by(source=source).with_entities(
+        Transaction.asset).distinct().all()
+    return [r[0] for r in rows if r[0]]
 
 
 def load_consolidate(asset_list, process_asset_func, source):
@@ -103,16 +96,15 @@ def process_consolidate_request():
     ret = {}
     ret['valid'] = False
 
-    products_neg = load_products(B3Negotiation.query, b3_negotiation_sql_to_df)
-    products_mov = load_products(B3Movimentation.query, b3_movimentation_sql_to_df)
-    b3_products = list(set(products_neg) | set(products_mov))
+    products_neg = load_products('b3')
+    b3_products = list(set(products_neg))
     b3_consolidate = load_consolidate(b3_products, process_b3_asset_request, 'b3')
 
-    avenue_products = load_products(AvenueExtract.query, avenue_extract_sql_to_df)
+    avenue_products = load_products('avenue')
     avenue_consolidate = load_consolidate(avenue_products,
                                           process_avenue_asset_request, 'avenue')
 
-    generic_products = load_products(GenericExtract.query, generic_extract_sql_to_df)
+    generic_products = load_products('generic')
     generic_consolidate = load_consolidate(generic_products,
                                            process_generic_asset_request, 'generic')
 

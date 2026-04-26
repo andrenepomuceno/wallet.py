@@ -2,63 +2,70 @@
 import pandas as pd
 
 from app import app, db
-from app.models import (
-    B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract,
-    b3_movimentation_sql_to_df, b3_negotiation_sql_to_df,
-    avenue_extract_sql_to_df, generic_extract_sql_to_df,
-)
+from app.models import Transaction, transactions_sql_to_df
+
+
+def _filter_post_form(query, request, model=Transaction):
+    """Apply text/numeric filters from a POST form to a Transaction query.
+
+    Form keys are matched against `Transaction` columns directly. Unknown
+    keys are silently ignored. This replaces the old per-source filter.
+    """
+    if request.method != 'POST':
+        return query
+    filters = request.form.to_dict()
+    for key, value in filters.items():
+        if not value:
+            continue
+        column = getattr(model, key, None)
+        if column is None:
+            continue
+        if isinstance(column.type, db.Float):
+            try:
+                query = query.filter(column == float(value))
+            except (TypeError, ValueError):
+                continue
+        else:
+            query = query.filter(column.like(f'%{value}%'))
+    return query
 
 
 def process_b3_movimentation_request(request):
     app.logger.info('process_b3_movimentation_request')
 
-    query = B3Movimentation.query.order_by(B3Movimentation.data.desc())
+    query = Transaction.query.filter_by(
+        source='b3', record_type='movimentation',
+    ).order_by(Transaction.date.desc())
+    query = _filter_post_form(query, request)
 
-    if request.method == 'POST':
-        filters = request.form.to_dict()
-        for key, value in filters.items():
-            if value:
-                column = getattr(B3Movimentation, key, None)
-                if column is not None:
-                    if isinstance(column.type, db.Float):
-                        # Filtragem para campos numéricos
-                        query = query.filter(column == float(value))
-                    else:
-                        # Filtragem para campos textuais e de data
-                        query = query.filter(column.like(f'%{value}%'))
-
-    result = query.all()
-    df = b3_movimentation_sql_to_df(result)
-    return df
+    return transactions_sql_to_df(query.all())
 
 
 def process_b3_negotiation_request():
     app.logger.info('process_b3_negotiation_request')
 
-    query = B3Negotiation.query.order_by(B3Negotiation.data.desc())
-    result = query.all()
-    df = b3_negotiation_sql_to_df(result)
-    return df
+    query = Transaction.query.filter_by(
+        source='b3', record_type='negotiation',
+    ).order_by(Transaction.date.desc())
+    return transactions_sql_to_df(query.all())
 
 
 def process_avenue_extract_request():
     app.logger.info('process_avenue_extract_request')
 
-    query = AvenueExtract.query.order_by(AvenueExtract.data.desc())
-    result = query.all()
-    extract = avenue_extract_sql_to_df(result)
-
-    return extract
+    query = Transaction.query.filter_by(
+        source='avenue',
+    ).order_by(Transaction.date.desc())
+    return transactions_sql_to_df(query.all())
 
 
 def process_generic_extract_request():
     app.logger.info('process_generic_extract_request')
 
-    query = GenericExtract.query.order_by(GenericExtract.date.desc())
-    result = query.all()
-    extract = generic_extract_sql_to_df(result)
-
-    return extract
+    query = Transaction.query.filter_by(
+        source='generic',
+    ).order_by(Transaction.date.desc())
+    return transactions_sql_to_df(query.all())
 
 
 def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentation_type):

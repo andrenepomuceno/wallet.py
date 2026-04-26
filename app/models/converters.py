@@ -4,6 +4,74 @@ import pandas as pd
 from app.utils.parsing import parse_b3_ticker
 
 
+# ---------------------------------------------------------------------------
+# Unified Transaction → DataFrame
+# ---------------------------------------------------------------------------
+
+# Standard processing columns (used downstream by processing/assets.py).
+STD_COLUMNS = [
+    'Date', 'Asset', 'Movimentation', 'Quantity', 'Price', 'Total',
+    'Category', 'Direction', 'Source', 'RecordType', 'Produto', 'Currency',
+    # Avenue-only extras kept for backward compatibility with templates.
+    'Hora', 'Liquidação', 'Descrição', 'Saldo da conta (U$)', 'Valor (U$)',
+    'Entrada/Saída',
+    # B3-negotiation extras
+    'Mercado', 'Prazo/Vencimento', 'Instituição', 'Código de Negociação',
+]
+
+
+def transactions_sql_to_df(result):
+    """Convert a list of `Transaction` rows into the standard DataFrame.
+
+    Columns include both the canonical names (`Date`, `Movimentation`,
+    `Category`, ...) and a handful of legacy aliases (`Produto`,
+    `Entrada/Saída`, `Valor (U$)`, ...) so existing templates and
+    classifiers keep working unchanged.
+    """
+    if not result:
+        return pd.DataFrame(columns=STD_COLUMNS)
+
+    rows = []
+    for t in result:
+        meta = t.meta or {}
+        rows.append({
+            'Date': t.date,
+            'Asset': t.asset or '',
+            'Movimentation': t.raw_label or '',
+            'Quantity': t.quantity if t.quantity is not None else 0.0,
+            'Price': t.price if t.price is not None else 0.0,
+            'Total': t.total if t.total is not None else 0.0,
+            'Category': t.category,
+            'Direction': t.direction,
+            'Source': t.source,
+            'RecordType': t.record_type,
+            'Produto': t.product or t.asset or '',
+            'Currency': t.currency,
+            'Hora': t.time,
+            'Liquidação': t.settlement_date,
+            'Descrição': t.description,
+            'Saldo da conta (U$)': t.balance if t.balance is not None else 0.0,
+            'Valor (U$)': t.total if t.total is not None else 0.0,
+            'Entrada/Saída': t.direction,
+            'Mercado': meta.get('mercado'),
+            'Prazo/Vencimento': meta.get('prazo'),
+            'Instituição': t.institution,
+            'Código de Negociação': t.product if t.record_type == 'negotiation' else None,
+        })
+
+    df = pd.DataFrame(rows)
+    df['Date'] = pd.to_datetime(df['Date'])
+    if 'Liquidação' in df.columns:
+        df['Liquidação'] = pd.to_datetime(df['Liquidação'], errors='coerce')
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Legacy converters (still used by tests and one-shot migration code).
+# Will be removed once Phase 5 deletes the legacy ORM models.
+# ---------------------------------------------------------------------------
+
+
 def b3_movimentation_sql_to_df(result):
     df = pd.DataFrame([(d.entrada_saida, d.data, d.movimentacao, d.produto,
                         d.instituicao, d.quantidade, d.preco_unitario,
