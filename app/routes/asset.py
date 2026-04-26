@@ -65,6 +65,7 @@ def _load_asset_info_or_404(source, asset):
 def _build_news_payload(asset_info, fetch_news=False, analyze_sentiment=False, news_sort='date_desc'):
     news = []
     news_sentiment = None
+    prompt_preview = None
     asset = asset_info['name']
 
     if fetch_news:
@@ -72,7 +73,16 @@ def _build_news_payload(asset_info, fetch_news=False, analyze_sentiment=False, n
         news = search_news(f'{news_query} stock', num=8)
         news = _sort_news(news, news_sort)
 
-        if analyze_sentiment:
+        preview_sentiment = False
+        if analyze_sentiment and isinstance(analyze_sentiment, dict):
+            preview_sentiment = bool(analyze_sentiment.get('preview_only'))
+            analyze_sentiment = True
+
+        if analyze_sentiment and preview_sentiment:
+            preview = analyze_news_sentiment_with_gemini(asset, news, preview_only=True)
+            if preview:
+                prompt_preview = preview.get('prompt')
+        elif analyze_sentiment:
             news_sentiment = analyze_news_sentiment_with_gemini(asset, news)
 
         # Map sentiment output back to each news item for rendering.
@@ -95,6 +105,7 @@ def _build_news_payload(asset_info, fetch_news=False, analyze_sentiment=False, n
         'news_requested': fetch_news,
         'sentiment_requested': analyze_sentiment,
         'news_sort': news_sort,
+        'prompt_preview': prompt_preview,
     }
 
 
@@ -177,7 +188,13 @@ def api_asset_news(source=None, asset=None):
     asset_info = _load_asset_info_or_404(source, asset)
 
     fetch_news = request.args.get('news', '1') == '1'
-    analyze_sentiment = request.args.get('sentiment') == '1'
+    analyze_sentiment_requested = request.args.get('sentiment') == '1'
+    preview_only = request.args.get('preview') == '1'
+    analyze_sentiment = (
+        {'preview_only': True}
+        if (analyze_sentiment_requested and preview_only)
+        else analyze_sentiment_requested
+    )
     news_sort = request.args.get('news_sort', 'date_desc')
     if news_sort not in _ALLOWED_NEWS_SORTS:
         news_sort = 'date_desc'
@@ -189,12 +206,27 @@ def api_asset_news(source=None, asset=None):
         news_sort=news_sort,
     )
 
+    if preview_only:
+        payload['sentiment_requested'] = False
+        payload['sentiment_preview'] = True
+
     return jsonify(payload)
 
 
 @app.route('/api/view/<source>/<asset>/analysis', methods=['GET'])
 def api_asset_analysis(source=None, asset=None):
     asset_info = _load_asset_info_or_404(source, asset)
+    preview_only = request.args.get('preview') == '1'
+
+    if preview_only:
+        preview = analyze_asset_performance_with_gemini(asset_info, preview_only=True)
+        return jsonify({
+            'analysis': None,
+            'analysis_requested': False,
+            'analysis_preview': True,
+            'prompt_preview': (preview or {}).get('prompt') if preview else None,
+        })
+
     analysis = analyze_asset_performance_with_gemini(asset_info)
     return jsonify({'analysis': analysis, 'analysis_requested': True})
 

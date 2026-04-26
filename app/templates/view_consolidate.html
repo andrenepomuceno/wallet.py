@@ -170,8 +170,51 @@
                 }
             }
 
+            async function previewPrompt() {
+                analyzeBtn.disabled = true;
+                content.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Gerando preview do prompt...</div>';
+                try {
+                    const response = await fetch(`${apiUrl}?preview=1`, {headers: {'Accept': 'application/json'}});
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const payload = await response.json();
+                    const promptPreview = payload.prompt_preview || '';
+
+                    content.innerHTML = `
+                        <div class="small fw-bold mb-2">Preview do prompt (consolidate)</div>
+                        <pre class="small mb-3" style="white-space: pre-wrap; max-height: 260px; overflow:auto;">${escapeHtml(promptPreview)}</pre>
+                        <div class="d-flex gap-2">
+                            <button id="confirmConsolidatePromptBtn" type="button" class="btn btn-sm btn-warning">
+                                <i class="bi bi-send"></i> Confirmar e enviar ao Gemini
+                            </button>
+                            <button id="cancelConsolidatePromptBtn" type="button" class="btn btn-sm btn-outline-secondary">
+                                Cancelar
+                            </button>
+                        </div>`;
+
+                    const confirmBtn = document.getElementById('confirmConsolidatePromptBtn');
+                    const cancelBtn = document.getElementById('cancelConsolidatePromptBtn');
+
+                    if (confirmBtn) {
+                        confirmBtn.addEventListener('click', function() {
+                            runAnalysis();
+                        });
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', function() {
+                            content.innerHTML = 'Clique em "Analisar consolidate" para gerar um parecer de performance e diversificacao.';
+                        });
+                    }
+                } catch (error) {
+                    content.innerHTML = '<div class="text-danger small">Falha ao gerar preview do prompt. Tente novamente.</div>';
+                } finally {
+                    analyzeBtn.disabled = false;
+                }
+            }
+
             analyzeBtn.addEventListener('click', function() {
-                runAnalysis();
+                previewPrompt();
             });
         });
     </script>

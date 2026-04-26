@@ -85,6 +85,20 @@ def test_api_consolidate_analysis_success(mock_process, mock_analysis, client):
     assert payload['analysis']['score'] == 71
 
 
+@patch('app.routes.consolidate.analyze_consolidate_performance_with_gemini')
+@patch('app.routes.consolidate.process_consolidate_request')
+def test_api_consolidate_analysis_preview(mock_process, mock_analysis, client):
+    mock_process.return_value = {'valid': True, 'consolidate_by_group': pd.DataFrame()}
+    mock_analysis.return_value = {'prompt': 'preview prompt', 'preview': True}
+
+    resp = client.get('/api/consolidate/analysis?preview=1')
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload['analysis_preview'] is True
+    assert payload['prompt_preview'] == 'preview prompt'
+    mock_analysis.assert_called_once_with(mock_process.return_value, preview_only=True)
+
+
 @patch('app.routes.consolidate.process_consolidate_request')
 def test_api_consolidate_analysis_without_data(mock_process, client):
     mock_process.return_value = {'valid': False}
@@ -136,6 +150,50 @@ def test_api_asset_analysis_success(mock_loader, mock_analysis, client):
     assert payload['analysis_requested'] is True
     assert payload['analysis']['overall'] == 'good'
     assert payload['analysis']['score'] == 74
+
+
+@patch('app.routes.asset.analyze_asset_performance_with_gemini')
+@patch('app.routes.asset._load_asset_info_or_404')
+def test_api_asset_analysis_preview(mock_loader, mock_analysis, client):
+    mock_loader.return_value = {
+        'name': 'PETR4',
+        'source': 'b3',
+        'valid': True,
+        'dataframes': {},
+        'info': {},
+    }
+    mock_analysis.return_value = {'prompt': 'asset prompt', 'preview': True}
+
+    resp = client.get('/api/view/b3/PETR4/analysis?preview=1')
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload['analysis_preview'] is True
+    assert payload['prompt_preview'] == 'asset prompt'
+    mock_analysis.assert_called_once_with(mock_loader.return_value, preview_only=True)
+
+
+@patch('app.routes.asset.analyze_news_sentiment_with_gemini')
+@patch('app.routes.asset.search_news')
+@patch('app.routes.asset._load_asset_info_or_404')
+def test_api_asset_news_sentiment_preview(mock_loader, mock_search_news, mock_sentiment, client):
+    mock_loader.return_value = {
+        'name': 'PETR4',
+        'long_name': 'Petrobras',
+        'ticker': 'PETR4',
+        'source': 'b3',
+        'valid': True,
+    }
+    mock_search_news.return_value = [
+        {'title': 'A', 'link': 'http://x', 'snippet': 's', 'source': 'src', 'date': '2026-01-01'},
+    ]
+    mock_sentiment.return_value = {'prompt': 'news prompt', 'preview': True}
+
+    resp = client.get('/api/view/b3/PETR4/news?news=1&sentiment=1&preview=1')
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload['sentiment_preview'] is True
+    assert payload['prompt_preview'] == 'news prompt'
+    mock_sentiment.assert_called_once()
 
 
 @patch('app.routes.asset.analyze_asset_performance_with_gemini')

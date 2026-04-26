@@ -221,6 +221,7 @@
                 loaded: false,
                 sentimentRequested: false,
                 sort: newsSortSelect.value || 'date_desc',
+                lastNewsPayload: null,
             };
 
             function escapeHtml(str) {
@@ -324,6 +325,49 @@
                     renderAssetAnalysis(payload);
                 } catch (error) {
                     assetAnalysisContent.innerHTML = '<div class="text-danger small">Falha ao analisar o ativo. Tente novamente.</div>';
+                } finally {
+                    assetAnalyzeBtn.disabled = false;
+                }
+            }
+
+            async function previewAssetAnalysis() {
+                assetAnalyzeBtn.disabled = true;
+                assetAnalysisContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Gerando preview do prompt...</div>';
+                try {
+                    const response = await fetch(`${analysisApiUrl}?preview=1`, {
+                        headers: {'Accept': 'application/json'},
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const payload = await response.json();
+                    const promptPreview = payload.prompt_preview || '';
+                    assetAnalysisContent.innerHTML = `
+                        <div class="small fw-bold mb-2">Preview do prompt (ativo)</div>
+                        <pre class="small mb-3" style="white-space: pre-wrap; max-height: 260px; overflow:auto;">${escapeHtml(promptPreview)}</pre>
+                        <div class="d-flex gap-2">
+                            <button id="assetConfirmPromptBtn" type="button" class="btn btn-sm btn-warning">
+                                <i class="bi bi-send"></i> Confirmar e enviar ao Gemini
+                            </button>
+                            <button id="assetCancelPromptBtn" type="button" class="btn btn-sm btn-outline-secondary">
+                                Cancelar
+                            </button>
+                        </div>`;
+
+                    const confirmBtn = document.getElementById('assetConfirmPromptBtn');
+                    const cancelBtn = document.getElementById('assetCancelPromptBtn');
+                    if (confirmBtn) {
+                        confirmBtn.addEventListener('click', function() {
+                            fetchAssetAnalysis();
+                        });
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', function() {
+                            assetAnalysisContent.innerHTML = 'Clique em "Analisar performance do ativo" para gerar um parecer com base nas informacoes consolidadas.';
+                        });
+                    }
+                } catch (error) {
+                    assetAnalysisContent.innerHTML = '<div class="text-danger small">Falha ao gerar preview do prompt. Tente novamente.</div>';
                 } finally {
                     assetAnalyzeBtn.disabled = false;
                 }
@@ -437,10 +481,67 @@
                     state.loaded = true;
                     state.sentimentRequested = !!payload.sentiment_requested;
                     state.sort = payload.news_sort || newsSortSelect.value;
+                    state.lastNewsPayload = payload;
                     newsSortSelect.value = state.sort;
                     renderNews(payload);
                 } catch (error) {
                     newsContent.innerHTML = '<div class="text-danger small">Falha ao carregar noticias. Tente novamente.</div>';
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            async function previewNewsSentimentPrompt() {
+                if (!state.loaded) return;
+
+                setLoading(true);
+                const params = new URLSearchParams({
+                    news: '1',
+                    sentiment: '1',
+                    preview: '1',
+                    news_sort: newsSortSelect.value,
+                });
+
+                try {
+                    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+                        headers: {'Accept': 'application/json'},
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const payload = await response.json();
+                    const promptPreview = payload.prompt_preview || '';
+
+                    newsContent.innerHTML = `
+                        <div class="small fw-bold mb-2">Preview do prompt (sentimento de noticias)</div>
+                        <pre class="small mb-3" style="white-space: pre-wrap; max-height: 260px; overflow:auto;">${escapeHtml(promptPreview)}</pre>
+                        <div class="d-flex gap-2">
+                            <button id="newsConfirmPromptBtn" type="button" class="btn btn-sm btn-warning">
+                                <i class="bi bi-send"></i> Confirmar e enviar ao Gemini
+                            </button>
+                            <button id="newsCancelPromptBtn" type="button" class="btn btn-sm btn-outline-secondary">
+                                Cancelar
+                            </button>
+                        </div>`;
+
+                    const confirmBtn = document.getElementById('newsConfirmPromptBtn');
+                    const cancelBtn = document.getElementById('newsCancelPromptBtn');
+                    if (confirmBtn) {
+                        confirmBtn.addEventListener('click', function() {
+                            fetchNews(true);
+                        });
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', function() {
+                            if (state.lastNewsPayload) {
+                                renderNews(state.lastNewsPayload);
+                            } else {
+                                newsContent.innerHTML = 'Clique em "Buscar noticias" para consultar o Serper sob demanda.';
+                            }
+                        });
+                    }
+                } catch (error) {
+                    newsContent.innerHTML = '<div class="text-danger small">Falha ao gerar preview do prompt. Tente novamente.</div>';
                 } finally {
                     setLoading(false);
                 }
@@ -451,7 +552,7 @@
             });
 
             newsAnalyzeBtn.addEventListener('click', function() {
-                fetchNews(true);
+                previewNewsSentimentPrompt();
             });
 
             newsSortBtn.addEventListener('click', function() {
@@ -469,7 +570,7 @@
             });
 
             assetAnalyzeBtn.addEventListener('click', function() {
-                fetchAssetAnalysis();
+                previewAssetAnalysis();
             });
 
             if ({{ 'true' if news_requested else 'false' }}) {

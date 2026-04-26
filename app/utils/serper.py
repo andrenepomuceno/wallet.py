@@ -77,7 +77,7 @@ def search_news(query, num=10):
     return data.get('news', []) or []
 
 
-def analyze_news_sentiment_with_gemini(asset_name, news):
+def analyze_news_sentiment_with_gemini(asset_name, news, preview_only=False):
     """Analyze sentiment for a list of news items using Gemini.
 
     Returns a dict:
@@ -89,11 +89,6 @@ def analyze_news_sentiment_with_gemini(asset_name, news):
     or None when Gemini API key is unavailable or request fails.
     """
     if not news:
-        return None
-
-    api_key = get_api_key('gemini')
-    if not api_key:
-        app.logger.debug('serper: no gemini API key configured')
         return None
 
     compact_news = []
@@ -117,6 +112,14 @@ def analyze_news_sentiment_with_gemini(asset_name, news):
         'If confidence is low, prefer neutral. Do not include markdown. '
         f'Asset: {asset_name}. News: {json.dumps(compact_news, ensure_ascii=True)}'
     )
+
+    if preview_only:
+        return {'prompt': prompt, 'preview': True}
+
+    api_key = get_api_key('gemini')
+    if not api_key:
+        app.logger.debug('serper: no gemini API key configured')
+        return None
 
     payload = {
         'contents': [{'parts': [{'text': prompt}]}],
@@ -194,13 +197,8 @@ def analyze_news_sentiment_with_gemini(asset_name, news):
         return None
 
 
-def analyze_asset_performance_with_gemini(asset_info):
+def analyze_asset_performance_with_gemini(asset_info, preview_only=False):
     """Generate a qualitative performance analysis for a consolidated asset."""
-    api_key = get_api_key('gemini')
-    if not api_key:
-        app.logger.debug('serper: no gemini API key configured for asset analysis')
-        return None
-
     consolidated = {
         'name': asset_info.get('name'),
         'source': asset_info.get('source'),
@@ -396,6 +394,14 @@ def analyze_asset_performance_with_gemini(asset_info):
         f'Recent activity: {json.dumps(recent_activity, ensure_ascii=True)}.'
     )
 
+    if preview_only:
+        return {'prompt': prompt, 'preview': True}
+
+    api_key = get_api_key('gemini')
+    if not api_key:
+        app.logger.debug('serper: no gemini API key configured for asset analysis')
+        return None
+
     payload = {
         'contents': [{'parts': [{'text': prompt}]}],
         'generationConfig': {'temperature': 0.2, 'responseMimeType': 'application/json'},
@@ -488,13 +494,8 @@ def _safe_float(value, default=0.0):
         return default
 
 
-def analyze_consolidate_performance_with_gemini(consolidate_info):
+def analyze_consolidate_performance_with_gemini(consolidate_info, preview_only=False):
     """Generate a high-level portfolio performance analysis from consolidate data."""
-    api_key = get_api_key('gemini')
-    if not api_key:
-        app.logger.debug('serper: no gemini API key configured for consolidate analysis')
-        return None
-
     by_group_df = consolidate_info.get('consolidate_by_group')
     if by_group_df is None or len(by_group_df) == 0:
         return None
@@ -602,6 +603,14 @@ def analyze_consolidate_performance_with_gemini(consolidate_info):
             f'Derived metrics: {json.dumps(derived_metrics, ensure_ascii=True)}. '
             f'Top positions: {json.dumps(top_positions, ensure_ascii=True)}.'
         )
+
+        if preview_only:
+            return {'prompt': prompt, 'preview': True}
+
+        api_key = get_api_key('gemini')
+        if not api_key:
+            app.logger.debug('serper: no gemini API key configured for consolidate analysis')
+            return None
 
         payload = {
             'contents': [{'parts': [{'text': prompt}]}],

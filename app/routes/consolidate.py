@@ -1,5 +1,5 @@
 """Portfolio consolidate + sold-positions views."""
-from flask import flash, jsonify, redirect, render_template, url_for
+from flask import flash, jsonify, redirect, render_template, request, url_for
 
 from app import app
 from app.processing import process_consolidate_request
@@ -129,9 +129,19 @@ def view_sold():
 @app.route('/api/consolidate/analysis', methods=['GET'])
 def api_consolidate_analysis():
     info = process_consolidate_request()
+    preview_only = request.args.get('preview') == '1'
 
     if not info['valid']:
         return jsonify({'analysis_requested': True, 'analysis': None}), 404
+
+    if preview_only:
+        preview = analyze_consolidate_performance_with_gemini(info, preview_only=True)
+        return jsonify({
+            'analysis': None,
+            'analysis_requested': False,
+            'analysis_preview': True,
+            'prompt_preview': (preview or {}).get('prompt') if preview else None,
+        })
 
     analysis = analyze_consolidate_performance_with_gemini(info)
     return jsonify({'analysis_requested': True, 'analysis': analysis})
