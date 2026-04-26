@@ -26,6 +26,17 @@ def _is_ajax_request(req):
 @app.route('/b3_movimentation', methods=['GET', 'POST'])
 def view_movimentation():
     filter_form = B3MovimentationFilterForm()
+
+    if request.method == 'POST' and _is_ajax_request(request):
+        df = process_b3_movimentation_request(request)
+        table_html = render_template('partials/extract_table.html', df=df)
+        return jsonify({
+            'success': True,
+            'messages': [],
+            'errors': [],
+            'table_html': table_html,
+        })
+
     df = process_b3_movimentation_request(request)
     return render_template('view_movimentation.html', html_title='B3 Movimentation',
                            df=df, filter_form=filter_form)

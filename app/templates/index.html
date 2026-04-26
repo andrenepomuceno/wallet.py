@@ -7,6 +7,7 @@
                 <i class="bi bi-cloud-arrow-up"></i> Import Financial Data
             </div>
             <div class="card-body p-4">
+                <div id="uploadFeedback" class="mb-3"></div>
                 <form id="uploadForm" method="post" enctype="multipart/form-data">
                     <!-- File Drop Area -->
                     <div class="upload-area mb-3" id="dropArea" onclick="document.getElementById('fileInput').click()">
@@ -32,6 +33,7 @@
                         <i class="bi bi-upload"></i> Upload
                     </button>
                 </form>
+                <div id="uploadNextStep" class="mt-3"></div>
             </div>
         </div>
 
@@ -53,6 +55,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var fileName = document.getElementById('fileName');
     var uploadBtn = document.getElementById('uploadBtn');
     var uploadForm = document.getElementById('uploadForm');
+    var uploadFeedback = document.getElementById('uploadFeedback');
+    var uploadNextStep = document.getElementById('uploadNextStep');
 
     fileInput.addEventListener('change', function() {
         if (this.files.length > 0) {
@@ -83,11 +87,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Loading state on submit
-    uploadForm.addEventListener('submit', function() {
+    function renderFeedback(messages, errors) {
+        var html = '';
+        (messages || []).forEach(function(message) {
+            html += '<div class="alert alert-success alert-dismissible fade show py-2" role="alert">' +
+                message +
+                '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+            '</div>';
+        });
+        (errors || []).forEach(function(error) {
+            html += '<div class="alert alert-warning alert-dismissible fade show py-2" role="alert">' +
+                error +
+                '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+            '</div>';
+        });
+        uploadFeedback.innerHTML = html;
+    }
+
+    uploadForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
         uploadBtn.disabled = true;
         uploadBtn.classList.add('btn-loading');
         uploadBtn.innerHTML = '<span class="spinner-border" role="status"></span> Uploading...';
+
+        uploadFeedback.innerHTML = '';
+        uploadNextStep.innerHTML = '';
+
+        try {
+            var response = await fetch('{{ url_for('home') }}', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new FormData(uploadForm)
+            });
+
+            var payload = await response.json();
+            renderFeedback(payload.messages, payload.errors);
+
+            if (payload.success && payload.redirect_url) {
+                uploadNextStep.innerHTML =
+                    '<a href="' + payload.redirect_url + '" class="btn btn-outline-light btn-sm">' +
+                    '<i class="bi bi-arrow-right-circle"></i> Abrir resultado</a>';
+            }
+        } catch (error) {
+            renderFeedback([], ['Falha ao enviar arquivo. Tente novamente.']);
+        } finally {
+            uploadBtn.disabled = fileInput.files.length === 0;
+            uploadBtn.classList.remove('btn-loading');
+            uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Upload';
+        }
     });
 });
 </script>
