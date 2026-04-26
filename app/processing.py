@@ -14,6 +14,7 @@ from app.models import avenue_extract_sql_to_df, generic_extract_sql_to_df
 from app.models import get_api_key
 from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker, brl_to_float
 from app.utils.scraping import scrape_data, usd_exchange_rate, get_yfinance_data
+from app.utils.memocache import ttl_memoize
 import numpy as np
 import requests
 
@@ -453,6 +454,7 @@ def consolidate_asset_info(dataframes, asset_info, until_date=None, date_close_p
 
     return asset_info
 
+@ttl_memoize('asset')
 def process_b3_asset_request(asset):
     app.logger.info('Processing view asset request for %s.', asset)
 
@@ -558,6 +560,7 @@ def process_b3_asset_request(asset):
 
     return asset_info
 
+@ttl_memoize('asset')
 def process_avenue_asset_request(asset):
     app.logger.info('Processing view_extract_asset_request for "%s".', asset)
 
@@ -620,6 +623,7 @@ def process_avenue_asset_request(asset):
     asset_info['dataframes'] = dataframes
     return asset_info
 
+@ttl_memoize('asset')
 def process_generic_asset_request(asset):
     app.logger.info('Processing view_generic_asset_request for %s.', asset)
 
@@ -748,6 +752,7 @@ def consolidate_group(consolidate):
 
     return consolidate_by_group, group_df
 
+@ttl_memoize('consolidate')
 def process_consolidate_request():
     app.logger.info('process_consolidate_request')
 

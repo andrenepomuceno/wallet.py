@@ -60,4 +60,8 @@ class ApiConfigForm(FlaskForm):
         'TTL cotação USD (s)', validators=[Optional(), NumberRange(min=0)])
     cache_scraping_ttl = IntegerField(
         'TTL scraping (s)', validators=[Optional(), NumberRange(min=0)])
+    cache_asset_ttl = IntegerField(
+        'TTL processamento por ativo (s)', validators=[Optional(), NumberRange(min=0)])
+    cache_consolidate_ttl = IntegerField(
+        'TTL consolidado global (s)', validators=[Optional(), NumberRange(min=0)])
     submit = SubmitField('Salvar Configuracoes')

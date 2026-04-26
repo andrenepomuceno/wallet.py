@@ -33,13 +33,20 @@ class CacheConfig(db.Model):
 
 # Default cache categories. The 'default' category has no url_pattern and is
 # applied as the global expire_after fallback. Other categories map a URL glob
-# pattern (matched by requests_cache) to a TTL in seconds.
+# pattern (matched by requests_cache) to a TTL in seconds. Categories without
+# a url_pattern are processing-cache categories (in-process memoization),
+# consumed by app.utils.memocache.
 DEFAULT_CACHE_CONFIG = [
     {'category': 'default',       'ttl_seconds': 3600, 'url_pattern': None},
     {'category': 'yfinance',      'ttl_seconds': 900,  'url_pattern': '*yahoo.com*'},
     {'category': 'exchange_rate', 'ttl_seconds': 3600, 'url_pattern': '*exchangerate-api.com*'},
     {'category': 'scraping',      'ttl_seconds': 3600, 'url_pattern': '*taxas-tesouro.com*'},
+    {'category': 'asset',         'ttl_seconds': 600,  'url_pattern': None},
+    {'category': 'consolidate',   'ttl_seconds': 600,  'url_pattern': None},
 ]
+
+# Categories that belong to the processing-cache layer (not HTTP).
+PROCESSING_CACHE_CATEGORIES = {'asset', 'consolidate'}
 
 
 def seed_default_cache_config():
@@ -55,16 +62,45 @@ def seed_default_cache_config():
 
 
 def get_cache_ttls():
-    """Return (default_ttl_seconds, urls_expire_after_dict) from the DB."""
+    """Return (default_ttl_seconds, urls_expire_after_dict) from the DB.
+    Only HTTP categories (those with a url_pattern) populate the dict; the
+    'default' category provides the global expire_after fallback."""
     default_ttl = 3600
     urls_expire_after = {}
     for row in CacheConfig.query.all():
-        if row.category == 'default' or not row.url_pattern:
-            if row.category == 'default':
-                default_ttl = int(row.ttl_seconds)
+        if row.category == 'default':
+            default_ttl = int(row.ttl_seconds)
+            continue
+        if not row.url_pattern:
+            # Processing-cache category — not an HTTP rule.
             continue
         urls_expire_after[row.url_pattern] = int(row.ttl_seconds)
     return default_ttl, urls_expire_after
+
+
+def get_processing_ttl(category: str, default: int = 600) -> int:
+    """Return the TTL in seconds for a processing-cache category."""
+    row = CacheConfig.query.filter_by(category=category).first()
+    if row is None:
+        return default
+    return int(row.ttl_seconds)
+
+
+class ProcessingCache(db.Model):
+    """Persistent memoization storage for expensive processing functions.
+    Payload is a pickled Python object. Lookups are by (category, key)."""
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(50), nullable=False, index=True)
+    key = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    payload = db.Column(db.LargeBinary, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('category', 'key', name='uq_processing_cache_cat_key'),
+    )
+
+    def __repr__(self):
+        return f'<ProcessingCache {self.category}/{self.key}>'
 
 class B3Movimentation(db.Model):
     id = db.Column(db.Integer, primary_key=True)

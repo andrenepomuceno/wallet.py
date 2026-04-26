@@ -4,6 +4,7 @@ from flask import flash
 import pandas as pd
 from app import app, db
 from app.models import AvenueExtract, B3Movimentation, B3Negotiation, GenericExtract
+from app.utils.memocache import invalidate_processing_cache
 
 
 def gen_hash(filepath):
@@ -53,6 +54,8 @@ def _bulk_insert_with_dedup(model, df, filepath, row_to_kwargs):
         added += 1
 
     db.session.commit()
+    if added > 0:
+        invalidate_processing_cache()
     flash(f'Rows Added: {added}')
     flash(f'Duplicated rows discarded: {duplicates}')
 

@@ -4,6 +4,7 @@ from flask import render_template, request, redirect, url_for, flash, abort
 from app import app, db, UPLOADS_FOLDER
 from app.models import B3Negotiation, GenericExtract, AvenueExtract, ApiConfig, CacheConfig, get_api_key
 from app.utils.scraping import rebuild_request_cache, clear_request_cache
+from app.utils.memocache import invalidate_processing_cache
 from app.importing import import_b3_movimentation, import_b3_negotiation, import_avenue_extract
 from app.importing import import_generic_extract
 from app.processing import plot_price_history, process_generic_asset_request
@@ -61,6 +62,7 @@ def _handle_manual_entry(model, form, field_map, redirect_endpoint, with_origin_
         insert_kwargs['origin_id'] = 'FORM'
     db.session.add(model(**insert_kwargs))
     db.session.commit()
+    invalidate_processing_cache()
     app.logger.info('Added new entry to database!')
     flash('Entry added successfully!')
     return redirect(url_for(redirect_endpoint))
@@ -194,7 +196,11 @@ _CACHE_FIELD_TO_CATEGORY = {
     'cache_yfinance_ttl': 'yfinance',
     'cache_exchange_ttl': 'exchange_rate',
     'cache_scraping_ttl': 'scraping',
+    'cache_asset_ttl': 'asset',
+    'cache_consolidate_ttl': 'consolidate',
 }
+
+_HTTP_CACHE_CATEGORIES = {'default', 'yfinance', 'exchange_rate', 'scraping'}
 
 
 @app.route('/config/api', methods=['GET', 'POST'])
@@ -215,6 +221,7 @@ def view_api_config():
             flash(f'Chave {provider.capitalize()} salva com sucesso!')
 
         cache_changed = False
+        http_cache_changed = False
         for field_name, category in _CACHE_FIELD_TO_CATEGORY.items():
             value = getattr(form, field_name).data
             if value is None:
@@ -225,11 +232,14 @@ def view_api_config():
             if row.ttl_seconds != int(value):
                 row.ttl_seconds = int(value)
                 cache_changed = True
+                if category in _HTTP_CACHE_CATEGORIES:
+                    http_cache_changed = True
 
         db.session.commit()
 
-        if cache_changed:
+        if http_cache_changed:
             rebuild_request_cache()
+        if cache_changed:
             flash('TTLs de cache atualizados.')
 
         return redirect(url_for('view_api_config'))
@@ -254,6 +264,13 @@ def view_cache_clear():
         flash('Cache de requisicoes limpo.')
     else:
         flash('Falha ao limpar o cache de requisicoes.')
+    return redirect(url_for('view_api_config'))
+
+
+@app.route('/config/cache/clear/processing', methods=['POST'])
+def view_processing_cache_clear():
+    deleted = invalidate_processing_cache()
+    flash(f'Cache de processamento limpo ({deleted} entradas).')
     return redirect(url_for('view_api_config'))
 
 def view_asset_helper(asset_info):
