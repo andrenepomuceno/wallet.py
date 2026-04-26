@@ -11,9 +11,7 @@ from app.importing import (
     import_avenue_extract,
     import_generic_extract,
 )
-from app.models import (
-    B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract,
-)
+from app.models import Transaction
 
 
 pytestmark = pytest.mark.usefixtures("request_ctx")
@@ -90,11 +88,14 @@ def test_import_b3_movimentation(db_session, tmp_csv):
     _write_csv(tmp_csv, df)
     df_loaded = pd.read_csv(tmp_csv)
     import_b3_movimentation(df_loaded, tmp_csv)
-    assert B3Movimentation.query.count() == 1
+    rows = Transaction.query.filter_by(source='b3', record_type='movimentation').all()
+    assert len(rows) == 1
+    assert rows[0].asset == 'PETR4'
+    assert rows[0].category == 'BUY'
     # Re-import same file: dedup
     df_loaded2 = pd.read_csv(tmp_csv)
     import_b3_movimentation(df_loaded2, tmp_csv)
-    assert B3Movimentation.query.count() == 1
+    assert Transaction.query.filter_by(source='b3', record_type='movimentation').count() == 1
 
 
 def test_import_b3_negotiation(db_session, tmp_csv):
@@ -106,7 +107,10 @@ def test_import_b3_negotiation(db_session, tmp_csv):
     }])
     _write_csv(tmp_csv, df)
     import_b3_negotiation(pd.read_csv(tmp_csv), tmp_csv)
-    assert B3Negotiation.query.count() == 1
+    rows = Transaction.query.filter_by(source='b3', record_type='negotiation').all()
+    assert len(rows) == 1
+    assert rows[0].asset == 'HGLG11'
+    assert rows[0].category == 'BUY'
 
 
 def test_import_avenue_extract_old_format(db_session, tmp_csv):
@@ -117,10 +121,11 @@ def test_import_avenue_extract_old_format(db_session, tmp_csv):
     }])
     _write_csv(tmp_csv, df)
     import_avenue_extract(pd.read_csv(tmp_csv), tmp_csv)
-    rows = AvenueExtract.query.all()
+    rows = Transaction.query.filter_by(source='avenue').all()
     assert len(rows) == 1
-    assert rows[0].produto == 'NVDA'
-    assert rows[0].movimentacao == 'Compra'
+    assert rows[0].asset == 'NVDA'
+    assert rows[0].raw_label == 'Compra'
+    assert rows[0].category == 'BUY'
 
 
 def test_import_avenue_extract_new_format(db_session, tmp_csv):
@@ -131,9 +136,9 @@ def test_import_avenue_extract_new_format(db_session, tmp_csv):
     }])
     _write_csv(tmp_csv, df)
     import_avenue_extract(pd.read_csv(tmp_csv), tmp_csv)
-    rows = AvenueExtract.query.all()
+    rows = Transaction.query.filter_by(source='avenue').all()
     assert len(rows) == 1
-    assert rows[0].produto == 'AAPL'
+    assert rows[0].asset == 'AAPL'
 
 
 def test_import_generic_extract(db_session, tmp_csv):
@@ -143,4 +148,7 @@ def test_import_generic_extract(db_session, tmp_csv):
     }])
     _write_csv(tmp_csv, df)
     import_generic_extract(pd.read_csv(tmp_csv), tmp_csv)
-    assert GenericExtract.query.count() == 1
+    rows = Transaction.query.filter_by(source='generic').all()
+    assert len(rows) == 1
+    assert rows[0].asset == 'AAA'
+    assert rows[0].category == 'BUY'

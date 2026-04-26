@@ -4,9 +4,7 @@ import numpy as np
 from unittest.mock import patch
 
 from app import db
-from app.models import (
-    B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract,
-)
+from app.models import Transaction
 from app.processing import (
     calc_avg_price,
     consolidate_asset_info,
@@ -147,17 +145,19 @@ def test_consolidate_total_handles_zero_liquid():
 @patch('app.processing.get_online_info')
 def test_process_b3_asset_request(mock_online, db_session):
     mock_online.side_effect = lambda t, info: info.update({'last_close_price': 50.0}) or info
-    db.session.add(B3Movimentation(
-        origin_id='m1', entrada_saida='Credito', data='2024-01-15',
-        movimentacao='Compra', produto='PETR4 - PETROBRAS',
-        instituicao='X', quantidade=100, preco_unitario=10.0,
-        valor_operacao=1000.0,
+    db.session.add(Transaction(
+        origin_id='m1', source='b3', record_type='movimentation',
+        date='2024-01-15', asset='PETR4', product='PETR4 - PETROBRAS',
+        institution='X', raw_label='Compra', category='BUY',
+        direction='Credito', quantity=100, price=10.0, total=1000.0,
+        currency='BRL',
     ))
-    db.session.add(B3Movimentation(
-        origin_id='m2', entrada_saida='Credito', data='2024-02-15',
-        movimentacao='Dividendo', produto='PETR4 - PETROBRAS',
-        instituicao='X', quantidade=0, preco_unitario=0,
-        valor_operacao=25.0,
+    db.session.add(Transaction(
+        origin_id='m2', source='b3', record_type='movimentation',
+        date='2024-02-15', asset='PETR4', product='PETR4 - PETROBRAS',
+        institution='X', raw_label='Dividendo', category='DIVIDEND',
+        direction='Credito', quantity=0, price=0, total=25.0,
+        currency='BRL',
     ))
     db.session.commit()
     info = process_b3_asset_request('PETR4')
@@ -170,11 +170,14 @@ def test_process_b3_asset_request(mock_online, db_session):
 @patch('app.processing.get_online_info')
 def test_process_avenue_asset_request(mock_online, db_session):
     mock_online.side_effect = lambda t, info: info.update({'last_close_price': 220.0}) or info
-    db.session.add(AvenueExtract(
-        origin_id='a1', data='2024-03-01', hora='', liquidacao='2024-03-03',
-        descricao='Compra de 5 NVDA a $ 200,00 cada', valor=-1000.0, saldo=0.0,
-        entrada_saida='Credito', produto='NVDA', movimentacao='Compra',
-        quantidade=5, preco_unitario=200.0,
+    db.session.add(Transaction(
+        origin_id='a1', source='avenue', record_type='extract',
+        date='2024-03-01', settlement_date='2024-03-03', time='',
+        asset='NVDA', product='NVDA',
+        description='Compra de 5 NVDA a $ 200,00 cada',
+        raw_label='Compra', category='BUY', direction='Credito',
+        quantity=5, price=200.0, total=-1000.0, balance=0.0,
+        currency='USD',
     ))
     db.session.commit()
     info = process_avenue_asset_request('NVDA')
@@ -187,9 +190,11 @@ def test_process_avenue_asset_request(mock_online, db_session):
 @patch('app.processing.get_online_info')
 def test_process_generic_asset_request(mock_online, db_session):
     mock_online.side_effect = lambda t, info: info.update({'last_close_price': 7.0}) or info
-    db.session.add(GenericExtract(
-        origin_id='g1', date='2024-01-01', asset='AAA',
-        movimentation='Buy', quantity=10, price=5.0, total=50.0,
+    db.session.add(Transaction(
+        origin_id='g1', source='generic', record_type='extract',
+        date='2024-01-01', asset='AAA', product='AAA',
+        raw_label='Buy', category='BUY', direction='Credito',
+        quantity=10, price=5.0, total=50.0, currency='BRL',
     ))
     db.session.commit()
     info = process_generic_asset_request('AAA')
@@ -214,13 +219,14 @@ def test_process_request_helpers_empty(db_session):
 
 
 def test_load_products_and_consolidate(db_session):
-    db.session.add(GenericExtract(
-        origin_id='g1', date='2024-01-01', asset='AAA',
-        movimentation='Buy', quantity=10, price=5.0, total=50.0,
+    db.session.add(Transaction(
+        origin_id='g1', source='generic', record_type='extract',
+        date='2024-01-01', asset='AAA', product='AAA',
+        raw_label='Buy', category='BUY', direction='Credito',
+        quantity=10, price=5.0, total=50.0, currency='BRL',
     ))
     db.session.commit()
-    from app.models import generic_extract_sql_to_df
-    products = load_products(GenericExtract.query, generic_extract_sql_to_df)
+    products = load_products('generic')
     assert 'AAA' in products
 
     with patch('app.processing.get_online_info') as mock_online:
