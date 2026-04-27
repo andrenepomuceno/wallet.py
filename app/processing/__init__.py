@@ -15,6 +15,7 @@ from .extracts import (
     process_b3_negotiation_request,
     process_avenue_extract_request,
     process_generic_extract_request,
+    process_all_transactions_request,
     merge_movimentation_negotiation,
     calc_avg_price,
 )

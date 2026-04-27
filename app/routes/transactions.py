@@ -24,6 +24,7 @@ from app.processing import (
     process_b3_movimentation_request,
     process_b3_negotiation_request,
     process_generic_extract_request,
+    process_all_transactions_request,
 )
 
 from ._helpers import handle_manual_transaction, process_manual_transaction
@@ -190,3 +191,23 @@ def view_generic_extract():
     df = process_generic_extract_request()
     return render_template('view_generic.html', html_title='Generic Extract',
                            df=df, add_form=add_form)
+
+
+@app.route('/transactions', methods=['GET', 'POST'])
+def view_transactions():
+    """Unified view: every row from the `transaction` table."""
+    app.logger.info('view_transactions')
+
+    if request.method == 'POST' and _is_ajax_request(request):
+        df = process_all_transactions_request(request)
+        table_html = render_template('partials/extract_table.html', df=df)
+        return jsonify({
+            'success': True,
+            'messages': [],
+            'errors': [],
+            'table_html': table_html,
+        })
+
+    df = process_all_transactions_request(request)
+    return render_template('view_transactions.html',
+                           html_title='All Transactions', df=df)

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import 'table.html' as table %}
+{% block content %}
+    <div class="page-header d-flex align-items-center gap-3">
+        <h1><i class="bi bi-database"></i> All Transactions</h1>
+        <span class="badge bg-secondary">{{ df|length }} rows</span>
+    </div>
+
+    <p class="text-muted small mb-3">
+        Unified view of every row in the <code>transaction</code> table
+        (all sources and record types). Use the column controls to hide or
+        reorder fields.
+    </p>
+
+    <div id="extractTableContainer">
+        <div class="card">
+            <div class="card-body p-0">
+                {{ table.render(df, True, True) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

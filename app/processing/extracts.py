@@ -68,6 +68,20 @@ def process_generic_extract_request():
     return transactions_sql_to_df(query.all())
 
 
+def process_all_transactions_request(request=None):
+    """Return every row from the unified `transaction` table as a DataFrame.
+
+    Supports the same generic POST-form filtering as the per-source views
+    so any `Transaction` column can be filtered from the UI.
+    """
+    app.logger.info('process_all_transactions_request')
+
+    query = Transaction.query.order_by(Transaction.date.desc())
+    if request is not None:
+        query = _filter_post_form(query, request)
+    return transactions_sql_to_df(query.all())
+
+
 def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentation_type):
     df_merged = pd.DataFrame()
     if movimentation_df is None or negotiation_df is None:
