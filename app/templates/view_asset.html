@@ -267,7 +267,11 @@
             function renderAssetAnalysis(payload) {
                 const analysis = payload.analysis;
                 if (!analysis) {
+                    const errMsg = payload.analysis_error
+                        ? `<div class="text-danger small mb-2"><strong>Erro:</strong> ${escapeHtml(payload.analysis_error)}</div>`
+                        : '';
                     assetAnalysisContent.innerHTML = `
+                        ${errMsg}
                         <div class="text-muted small">
                             Nao foi possivel gerar a analise do ativo. Verifique se a chave Gemini esta configurada em
                             <a href="{{ url_for('view_api_config') }}">API Config</a>.

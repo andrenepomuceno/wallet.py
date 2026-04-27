@@ -13,6 +13,7 @@ GEMINI_MODEL_CANDIDATES = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-f
 
 
 def _post_gemini_generate_content(api_key, payload):
+    last_error = None
     for model in GEMINI_MODEL_CANDIDATES:
         endpoint = (
             'https://generativelanguage.googleapis.com/v1beta/models/'
@@ -24,15 +25,21 @@ def _post_gemini_generate_content(api_key, payload):
         except requests.HTTPError as e:
             status_code = getattr(getattr(e, 'response', None), 'status_code', None)
             if status_code == 404:
+                last_error = f'model {model}: HTTP 404'
                 continue
-            app.logger.warning('serper: gemini request failed (status=%s)', status_code)
-            return None
+            body = ''
+            try:
+                body = e.response.text[:300] if e.response is not None else ''
+            except Exception:
+                pass
+            app.logger.warning('serper: gemini request failed (status=%s) body=%s', status_code, body)
+            return {'error': f'HTTP {status_code}: {body or "no body"}'}
         except Exception as e:
-            app.logger.warning('serper: gemini request failed (%s)', type(e).__name__)
-            return None
+            app.logger.exception('serper: gemini request failed (%s): %s', type(e).__name__, e)
+            return {'error': f'{type(e).__name__}: {e}'}
 
-    app.logger.warning('serper: no compatible Gemini model available')
-    return None
+    app.logger.warning('serper: no compatible Gemini model available (last_error=%s)', last_error)
+    return {'error': last_error or 'no compatible Gemini model available'}
 
 
 def _extract_json_object(raw_text):
@@ -409,23 +416,32 @@ def analyze_asset_performance_with_gemini(asset_info, preview_only=False):
 
     try:
         gemini_result = _post_gemini_generate_content(api_key, payload)
-        if not gemini_result:
-            return None
+        if not gemini_result or 'data' not in gemini_result:
+            err = (gemini_result or {}).get('error', 'unknown error')
+            app.logger.warning('asset analysis: gemini call failed: %s', err)
+            return {'error': err}
 
         response_data = gemini_result['data']
         model_used = gemini_result.get('model')
         candidates = response_data.get('candidates', [])
         if not candidates:
-            return None
+            block = (response_data.get('promptFeedback') or {}).get('blockReason')
+            err = f'no candidates returned (blockReason={block})' if block else 'no candidates returned'
+            app.logger.warning('asset analysis: %s; raw=%s', err, str(response_data)[:300])
+            return {'error': err}
 
         parts = candidates[0].get('content', {}).get('parts', [])
         if not parts:
-            return None
+            finish = candidates[0].get('finishReason')
+            err = f'empty content parts (finishReason={finish})'
+            app.logger.warning('asset analysis: %s', err)
+            return {'error': err}
 
         raw_text = parts[0].get('text', '')
         json_text = _extract_json_object(raw_text)
         if json_text is None:
-            return None
+            app.logger.warning('asset analysis: could not extract JSON from response: %r', raw_text[:300])
+            return {'error': 'invalid JSON in response', 'raw_response': raw_text}
 
         parsed = json.loads(json_text)
 
@@ -479,12 +495,13 @@ def analyze_asset_performance_with_gemini(asset_info, preview_only=False):
             'model': model_used,
         }
     except Exception as e:
-        app.logger.warning(
-            'serper.analyze_asset_performance_with_gemini failed for %r (%s)',
+        app.logger.exception(
+            'serper.analyze_asset_performance_with_gemini failed for %r (%s): %s',
             asset_info.get('name'),
             type(e).__name__,
+            e,
         )
-        return None
+        return {'error': f'{type(e).__name__}: {e}'}
 
 
 def _safe_float(value, default=0.0):

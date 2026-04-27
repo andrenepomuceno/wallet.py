@@ -228,6 +228,13 @@ def api_asset_analysis(source=None, asset=None):
         })
 
     analysis = analyze_asset_performance_with_gemini(asset_info)
+    # analysis is either a result dict (with 'overall'/'score') or an error dict
+    if isinstance(analysis, dict) and 'error' in analysis and 'overall' not in analysis:
+        return jsonify({
+            'analysis': None,
+            'analysis_requested': True,
+            'analysis_error': analysis.get('error'),
+        })
     return jsonify({'analysis': analysis, 'analysis_requested': True})
 
 
