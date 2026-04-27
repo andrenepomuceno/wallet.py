@@ -1,15 +1,25 @@
-Flask
-SQLAlchemy
-Flask-SQLAlchemy
-Flask-WTF
-openpyxl
-pandas
-yfinance
-yfinance_cache
-lxml
-requests
-requests_cache
-plotly
-numpy
-pytest
-pytest-cov
+# Core web framework
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.1
+SQLAlchemy==2.0.25
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.3
+openpyxl==3.1.2
+
+# Market data
+yfinance==1.2.0
+
+# HTTP / scraping
+requests==2.31.0
+requests-cache==1.2.1
+lxml==5.1.0
+
+# Charts
+plotly==5.24.0
+
+# Dev / testing
+pytest==9.0.3
+pytest-cov==7.1.0
