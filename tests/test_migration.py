@@ -93,3 +93,33 @@ def test_migration_is_idempotent(db_session):
     assert s1['generic_extract'] == (1, 0)
     assert s2['generic_extract'] == (0, 1)  # second pass: already migrated
     assert Transaction.query.count() == 1
+
+
+def test_migration_preserves_duplicate_form_origin_ids(db_session):
+    """Legacy `process_manual_entry` reused the literal 'FORM' as origin_id
+    for every manual transaction. The migration must NOT drop those as
+    duplicates — each row has to land in `transaction`."""
+    db.session.add_all([
+        GenericExtract(origin_id='FORM', date='2024-08-08', asset='BTC',
+                       movimentation='Buy', quantity=0.001, price=500_000.0, total=500.0),
+        GenericExtract(origin_id='FORM', date='2025-07-31', asset='ETH',
+                       movimentation='Sell', quantity=0.045, price=19767.71, total=899.01),
+        GenericExtract(origin_id='FORM', date='2024-09-01', asset='BTC',
+                       movimentation='Buy', quantity=0.002, price=400_000.0, total=800.0),
+    ])
+    db.session.commit()
+
+    summary = migrate_legacy_to_transaction(drop_legacy=False)
+
+    assert summary['generic_extract'] == (3, 0)
+    assert Transaction.query.count() == 3
+
+    # All three are present, with distinct origin_ids
+    rows = Transaction.query.order_by(Transaction.date.asc()).all()
+    oids = [t.origin_id for t in rows]
+    assert len(set(oids)) == 3, f'oids must be unique, got {oids}'
+
+    # The ETH sell specifically must survive
+    eth_sell = Transaction.query.filter_by(asset='ETH', category='SELL').first()
+    assert eth_sell is not None
+    assert eth_sell.total == 899.01

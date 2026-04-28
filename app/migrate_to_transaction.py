@@ -111,15 +111,26 @@ def _migrate_table(model, suffix, dict_fn, translator, existing):
     rows = model.query.all()
     added = 0
     skipped = 0
+    # Track origin_ids inserted during THIS pass separately so re-runs against
+    # the same DB stay idempotent (those rows are skipped), while in-pass
+    # collisions — caused by legacy code reusing the literal 'FORM' as
+    # origin_id for every manual entry — get disambiguated by appending the
+    # legacy row id.
+    pre_existing = set(existing)
     for r in rows:
-        # Avenue/Generic legacy origin_id was 'filepath:hash:idx' or 'FORM'.
-        # We append the suffix so re-runs don't collide and so it lines up
-        # with the new importer convention.
         legacy_oid = r.origin_id or f'legacy-{model.__name__}-{r.id}'
-        new_oid = legacy_oid if legacy_oid.endswith(suffix) else legacy_oid + suffix
-        if new_oid in existing:
+        base_oid = legacy_oid if legacy_oid.endswith(suffix) else legacy_oid + suffix
+        if base_oid in pre_existing:
             skipped += 1
             continue
+        new_oid = base_oid
+        if new_oid in existing:
+            # In-pass collision: another legacy row already migrated under the
+            # same (non-unique) origin_id. Make this one unique.
+            new_oid = f'{base_oid}:{r.id}'
+            if new_oid in existing:
+                skipped += 1
+                continue
         try:
             kwargs = translator(dict_fn(r))
         except Exception as exc:  # pragma: no cover — defensive
