@@ -7,6 +7,8 @@ between a configurable start date and today. Reuses
 per-asset history view.
 """
 from datetime import datetime, timedelta
+import logging
+import re
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -16,6 +18,7 @@ from dateutil.relativedelta import relativedelta
 
 from app import app
 from app.utils.memocache import ttl_memoize
+from app.utils.parsing import is_b3_fii_ticker, is_b3_stock_ticker
 from app.utils.scraping import usd_exchange_rate
 
 from .assets import (
@@ -26,6 +29,7 @@ from .assets import (
 )
 from .consolidate import load_products
 from .history import adjust_for_splits
+from .prices import scrape_dict
 
 
 RANGE_KEYS = ('1m', '3m', '6m', 'ytd', '1y', '2y', '5y', 'all')
@@ -35,6 +39,50 @@ _SOURCE_PROCESSORS = {
     'avenue': process_avenue_asset_request,
     'generic': process_generic_asset_request,
 }
+
+_CRYPTO_TICKERS = ('BTC', 'ETH')
+
+# Tickers we know yfinance has no data for. Hitting yfinance for these only
+# produces "$X: possibly delisted" noise. We keep these assets in the
+# portfolio totals using their average buy price as a flat valuation.
+_FIXED_INCOME_PATTERNS = re.compile(
+    r'^(TESOURO|CDB|LCI|LCA|LCD|RDB|DEB|CRA|CRI|POUP)\b',
+    re.IGNORECASE,
+)
+
+
+def _is_fixed_income_like(name_or_ticker):
+    if not name_or_ticker:
+        return False
+    s = str(name_or_ticker).strip()
+    if s in scrape_dict:
+        return True
+    return bool(_FIXED_INCOME_PATTERNS.match(s))
+
+
+def _resolve_yfinance_ticker(asset_info):
+    """Return a best-guess yfinance ticker without making any network call.
+
+    Falls back to pattern-based suffixing (``.SA`` for B3, ``-USD`` for crypto)
+    so historical price fetching also works for sold positions whose
+    ``yfinance_ticker`` was never populated by ``get_online_info``.
+    Returns ``None`` for assets that have no yfinance representation
+    (fixed income, scraped tickers, blanks).
+    """
+    cached = asset_info.get('yfinance_ticker')
+    if cached:
+        return cached
+    raw = asset_info.get('ticker') or asset_info.get('name') or ''
+    raw = str(raw).strip()
+    if not raw:
+        return None
+    if _is_fixed_income_like(raw):
+        return None
+    if is_b3_stock_ticker(raw) or is_b3_fii_ticker(raw):
+        return f'{raw}.SA'
+    if raw in _CRYPTO_TICKERS:
+        return f'{raw}-USD'
+    return raw
 
 
 def _resolve_date_range(range_key, earliest_buy=None):
@@ -85,6 +133,13 @@ def _load_all_assets():
             # 'BRL'/'Sold' on past snapshots when the position is zeroed.
             info['_currency'] = info.get('currency', 'BRL')
             info['_asset_class'] = info.get('asset_class', '')
+            info['_yfinance_ticker'] = _resolve_yfinance_ticker(info)
+            info['_skip_yfinance'] = info['_yfinance_ticker'] is None
+            info['_fallback_price'] = float(info.get('avg_price') or 0.0)
+            # Crypto closes come from yfinance in USD even though we report
+            # the asset in BRL — flag for per-snapshot FX conversion.
+            yf_t = info['_yfinance_ticker'] or ''
+            info['_is_crypto_usd'] = yf_t.endswith('-USD')
             assets.append(info)
     return assets
 
@@ -182,7 +237,17 @@ def _aggregate_snapshot(assets, when, price_map, usdbrl_series, fallback_rate):
         close_series = price_map.get(id(a))
         close_price = _lookup_price(close_series, when)
         if close_price is None:
-            close_price = 0.0
+            # Fixed income / scraped assets have no historical price feed.
+            # Use their average buy price so position_total tracks cost
+            # (no synthetic gain or loss across the period).
+            close_price = a.get('_fallback_price') or 0.0
+
+        # Crypto closes come in USD on yfinance — convert to BRL before
+        # consolidate_asset_info so not_realized_gain is in the asset's
+        # reported currency (BRL for BTC/ETH).
+        if a.get('_is_crypto_usd') and close_price:
+            usdbrl = _lookup_price(usdbrl_series, when) or fallback_rate
+            close_price = close_price * usdbrl
 
         # Build a shallow copy so consolidate_asset_info doesn't pollute the
         # cached asset record across iterations.
@@ -372,27 +437,39 @@ def process_portfolio_history(scope='total', class_filter=None, source_filter=No
     if start_date >= end_date:
         start_date = end_date - timedelta(days=1)
 
-    # Pre-fetch yfinance close history per asset.
+    # Pre-fetch yfinance close history per asset. Silence the noisy yfinance
+    # logger for the duration of this loop — delisted/missing tickers raise
+    # benign errors that we already handle by returning None.
     price_map = {}
-    for a in selected:
-        ticker = a.get('yfinance_ticker') or a.get('ticker') or a.get('name')
-        price_map[id(a)] = _fetch_close_history(ticker, start_date) if ticker else None
+    yf_logger = logging.getLogger('yfinance')
+    prev_level = yf_logger.level
+    yf_logger.setLevel(logging.CRITICAL)
+    try:
+        for a in selected:
+            if a.get('_skip_yfinance'):
+                price_map[id(a)] = None
+                continue
+            ticker = a.get('_yfinance_ticker') or _resolve_yfinance_ticker(a)
+            price_map[id(a)] = _fetch_close_history(ticker, start_date) if ticker else None
 
-    # USD/BRL historical series (best-effort).
-    usdbrl_series = None
-    if any(a.get('_currency') == 'USD' for a in selected):
-        try:
-            data = yf.Ticker('BRL=X').history(
-                start=start_date - timedelta(days=10), auto_adjust=False)
-            if data is not None and not data.empty and 'Close' in data.columns:
-                series = data['Close'].copy()
-                try:
-                    series.index = series.index.tz_localize(None)
-                except (TypeError, AttributeError):
-                    pass
-                usdbrl_series = series
-        except Exception as e:  # noqa: BLE001
-            app.logger.warning('dashboard: USD/BRL history failed: %s', e)
+        # USD/BRL historical series (best-effort).
+        usdbrl_series = None
+        if any(a.get('_currency') == 'USD' or a.get('_is_crypto_usd')
+               for a in selected):
+            try:
+                data = yf.Ticker('BRL=X').history(
+                    start=start_date - timedelta(days=10), auto_adjust=False)
+                if data is not None and not data.empty and 'Close' in data.columns:
+                    series = data['Close'].copy()
+                    try:
+                        series.index = series.index.tz_localize(None)
+                    except (TypeError, AttributeError):
+                        pass
+                    usdbrl_series = series
+            except Exception as e:  # noqa: BLE001
+                app.logger.warning('dashboard: USD/BRL history failed: %s', e)
+    finally:
+        yf_logger.setLevel(prev_level)
     fallback_rate = usd_exchange_rate('BRL') or 1.0
 
     sample_dates = _build_sample_dates(start_date, end_date, step_days)
