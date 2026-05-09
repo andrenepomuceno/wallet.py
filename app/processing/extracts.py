@@ -73,13 +73,30 @@ def process_all_transactions_request(request=None):
 
     Supports the same generic POST-form filtering as the per-source views
     so any `Transaction` column can be filtered from the UI.
+    Prepends an 'Actions' column with edit/delete buttons (HTML).
     """
     app.logger.info('process_all_transactions_request')
 
     query = Transaction.query.order_by(Transaction.date.desc())
     if request is not None:
         query = _filter_post_form(query, request)
-    return transactions_sql_to_df(query.all())
+    rows = query.all()
+    df = transactions_sql_to_df(rows)
+
+    if not df.empty:
+        import html as _html
+        def _actions(tx_id):
+            return (
+                f'<button class="btn btn-xs btn-outline-primary py-0 px-1 tx-edit-btn" '
+                f'data-id="{tx_id}" title="Edit">'
+                f'<i class="bi bi-pencil"></i></button> '
+                f'<button class="btn btn-xs btn-outline-danger py-0 px-1 tx-delete-btn" '
+                f'data-id="{tx_id}" title="Delete">'
+                f'<i class="bi bi-trash"></i></button>'
+            )
+        df.insert(0, 'Actions', [_actions(t.id) for t in rows])
+
+    return df
 
 
 def merge_movimentation_negotiation(movimentation_df, negotiation_df, movimentation_type):

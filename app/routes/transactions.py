@@ -7,7 +7,7 @@ translators used by the importer.
 """
 from flask import jsonify, render_template, request
 
-from app import app
+from app import app, db
 from app.forms import (
     AvenueExtractAddForm,
     B3MovimentationFilterForm,
@@ -19,6 +19,8 @@ from app.import_translators import (
     b3_negotiation_row,
     generic_extract_row,
 )
+from app.models import Transaction
+from app.models.category_mapping import ALL_CATEGORIES
 from app.processing import (
     process_avenue_extract_request,
     process_b3_movimentation_request,
@@ -26,6 +28,7 @@ from app.processing import (
     process_generic_extract_request,
     process_all_transactions_request,
 )
+from app.utils.memocache import invalidate_processing_cache
 
 from ._helpers import handle_manual_transaction, process_manual_transaction
 
@@ -210,4 +213,83 @@ def view_transactions():
 
     df = process_all_transactions_request(request)
     return render_template('view_transactions.html',
-                           html_title='All Transactions', df=df)
+                           html_title='All Transactions', df=df,
+                           all_categories=sorted(ALL_CATEGORIES))
+
+
+# ---------------------------------------------------------------------------
+# Transaction edit API
+# ---------------------------------------------------------------------------
+
+_EDITABLE_FIELDS = {
+    'date', 'asset', 'product', 'raw_label', 'category',
+    'direction', 'quantity', 'price', 'total', 'currency', 'description',
+}
+
+_FLOAT_FIELDS = {'quantity', 'price', 'total'}
+
+
+@app.route('/api/transaction/<int:tx_id>', methods=['GET'])
+def api_transaction_get(tx_id):
+    tx = Transaction.query.get_or_404(tx_id)
+    return jsonify({
+        'id': tx.id,
+        'date': tx.date or '',
+        'asset': tx.asset or '',
+        'product': tx.product or '',
+        'raw_label': tx.raw_label or '',
+        'category': tx.category or '',
+        'direction': tx.direction or '',
+        'quantity': tx.quantity if tx.quantity is not None else 0.0,
+        'price': tx.price if tx.price is not None else 0.0,
+        'total': tx.total if tx.total is not None else 0.0,
+        'currency': tx.currency or 'BRL',
+        'description': tx.description or '',
+        'source': tx.source,
+        'record_type': tx.record_type,
+    })
+
+
+@app.route('/api/transaction/<int:tx_id>', methods=['POST'])
+def api_transaction_update(tx_id):
+    tx = Transaction.query.get_or_404(tx_id)
+    data = request.get_json(silent=True) or {}
+
+    errors = []
+    for field, value in data.items():
+        if field not in _EDITABLE_FIELDS:
+            continue
+        if field in _FLOAT_FIELDS:
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                errors.append(f"'{field}' must be a number.")
+                continue
+        setattr(tx, field, value)
+
+    if errors:
+        return jsonify({'success': False, 'errors': errors}), 400
+
+    try:
+        db.session.commit()
+        invalidate_processing_cache()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error('Transaction update failed: %s', e)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/transaction/<int:tx_id>/delete', methods=['POST'])
+def api_transaction_delete(tx_id):
+    tx = Transaction.query.get_or_404(tx_id)
+    try:
+        db.session.delete(tx)
+        db.session.commit()
+        invalidate_processing_cache()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error('Transaction delete failed: %s', e)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+    return jsonify({'success': True})

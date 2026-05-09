@@ -350,3 +350,85 @@ def test_view_rebalance_post_any_sum_accepted(mock_consolidate, mock_rebalance, 
         'w_fiis': '40.0',
     }, follow_redirects=False)
     assert resp.status_code in (200, 302)
+
+
+# ---------------------------------------------------------------------------
+# Transaction edit / delete API
+# ---------------------------------------------------------------------------
+
+def _make_tx(db_session):
+    """Insert a minimal Transaction and return it."""
+    from app.models import Transaction
+    tx = Transaction(
+        origin_id='test:edit:1',
+        source='generic',
+        record_type='movimentation',
+        date='2024-01-15',
+        asset='TEST3',
+        raw_label='Compra',
+        category='BUY',
+        direction='Debito',
+        quantity=10.0,
+        price=50.0,
+        total=500.0,
+        currency='BRL',
+    )
+    db_session.add(tx)
+    db_session.commit()
+    return tx
+
+
+def test_api_transaction_get(client, db_session):
+    tx = _make_tx(db_session)
+    resp = client.get(f'/api/transaction/{tx.id}')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['asset'] == 'TEST3'
+    assert data['category'] == 'BUY'
+    assert data['quantity'] == 10.0
+
+
+def test_api_transaction_get_not_found(client, db_session):
+    resp = client.get('/api/transaction/999999')
+    assert resp.status_code == 404
+
+
+def test_api_transaction_update(client, db_session):
+    tx = _make_tx(db_session)
+    resp = client.post(
+        f'/api/transaction/{tx.id}',
+        json={'asset': 'UPDATED3', 'quantity': '20.0'},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+    from app.models import Transaction
+    updated = Transaction.query.get(tx.id)
+    assert updated.asset == 'UPDATED3'
+    assert updated.quantity == 20.0
+
+
+def test_api_transaction_update_invalid_float(client, db_session):
+    tx = _make_tx(db_session)
+    resp = client.post(
+        f'/api/transaction/{tx.id}',
+        json={'quantity': 'not-a-number'},
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()['success'] is False
+
+
+def test_api_transaction_delete(client, db_session):
+    tx = _make_tx(db_session)
+    tx_id = tx.id
+    resp = client.post(f'/api/transaction/{tx_id}/delete')
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+    from app.models import Transaction
+    assert Transaction.query.get(tx_id) is None
+
+
+def test_api_transaction_delete_not_found(client, db_session):
+    resp = client.post('/api/transaction/999999/delete')
+    assert resp.status_code == 404
