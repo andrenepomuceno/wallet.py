@@ -1,5 +1,11 @@
 """API/cache configuration views."""
-from flask import flash, redirect, render_template, url_for
+import io
+import os
+import shutil
+import zipfile
+from datetime import datetime
+
+from flask import flash, redirect, render_template, request, send_file, url_for
 
 from app import app, db
 from app.forms import ApiConfigForm
@@ -90,3 +96,101 @@ def view_processing_cache_clear():
     deleted = invalidate_processing_cache()
     flash(f'Cache de processamento limpo ({deleted} entradas).')
     return redirect(url_for('view_api_config'))
+
+
+# ---------------------------------------------------------------------------
+# DB export / import
+# ---------------------------------------------------------------------------
+
+def _db_path():
+    """Return the filesystem path to the SQLite database file."""
+    uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    if not uri.startswith('sqlite:'):
+        return None
+    # sqlite:///relative.db  →  instance/relative.db
+    # sqlite:////abs/path.db →  /abs/path.db
+    raw = uri[len('sqlite:///'):]
+    if os.path.isabs(raw):
+        return raw
+    return os.path.join(app.instance_path, raw)
+
+
+_SQLITE_MAGIC = b'SQLite format 3\x00'
+
+
+@app.route('/db/export')
+def view_db_export():
+    """Download the SQLite database as a zip archive."""
+    path = _db_path()
+    if not path or not os.path.isfile(path):
+        flash('Database file not found.')
+        return redirect(url_for('view_transactions'))
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.write(path, arcname=os.path.basename(path))
+    buf.seek(0)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    download_name = f'wallet_{timestamp}.db.zip'
+    return send_file(
+        buf,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=download_name,
+    )
+
+
+@app.route('/db/import', methods=['POST'])
+def view_db_import():
+    """Replace the current database with an uploaded zip containing a .db file."""
+    uploaded = request.files.get('db_zip')
+    if not uploaded or not uploaded.filename:
+        flash('No file selected.')
+        return redirect(url_for('view_transactions'))
+
+    if not uploaded.filename.lower().endswith('.zip'):
+        flash('Please upload a .zip file.')
+        return redirect(url_for('view_transactions'))
+
+    path = _db_path()
+    if not path:
+        flash('Non-SQLite databases are not supported for import.')
+        return redirect(url_for('view_transactions'))
+
+    try:
+        data = uploaded.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            db_entries = [n for n in zf.namelist() if n.lower().endswith('.db')]
+            if len(db_entries) != 1:
+                flash(f'The zip must contain exactly one .db file (found {len(db_entries)}).')
+                return redirect(url_for('view_transactions'))
+
+            db_bytes = zf.read(db_entries[0])
+
+        if not db_bytes.startswith(_SQLITE_MAGIC):
+            flash('The extracted file is not a valid SQLite database.')
+            return redirect(url_for('view_transactions'))
+
+        # Back up current DB before replacing
+        if os.path.isfile(path):
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_path = path.replace('.db', f'_backup_{timestamp}.db')
+            shutil.copy2(path, backup_path)
+            app.logger.info('DB backed up to %s', backup_path)
+
+        # Dispose connection pool, replace file, re-open on next request
+        db.engine.dispose()
+        with open(path, 'wb') as f:
+            f.write(db_bytes)
+
+        invalidate_processing_cache()
+        flash('Database imported successfully. A backup of the previous DB was saved.')
+    except zipfile.BadZipFile:
+        flash('The uploaded file is not a valid zip archive.')
+    except Exception as e:
+        app.logger.error('DB import failed: %s', e)
+        flash(f'Import failed: {e}')
+
+    return redirect(url_for('view_transactions'))
+
