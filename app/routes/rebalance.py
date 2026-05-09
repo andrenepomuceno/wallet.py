@@ -7,7 +7,7 @@ from app import app
 from app.forms import PortfolioTargetForm
 from app.processing import process_consolidate_request, process_rebalance_request
 from app.processing.rebalance import save_targets
-from app.utils.memocache import invalidate_processing_cache
+from app.utils.memocache import get_cached, invalidate_processing_cache
 
 
 def _build_target_form(asset_classes, saved_targets):
@@ -59,7 +59,10 @@ def _parse_weights(form, asset_classes) -> tuple[dict, list]:
 
 @app.route('/rebalance', methods=['GET', 'POST'])
 def view_rebalance():
-    info = process_consolidate_request()
+    # Use stale cache if available to avoid slow recompute on every page load.
+    info, hit = get_cached('consolidate', 'process_consolidate_request')
+    if not hit:
+        info = process_consolidate_request()
 
     if not info['valid']:
         flash('Nenhum dado encontrado. Faça upload de um extrato primeiro.')

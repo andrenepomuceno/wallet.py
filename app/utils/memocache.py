@@ -134,3 +134,25 @@ def invalidate_processing_cache(category=None):
         db.session.rollback()
         app.logger.error('invalidate_processing_cache failed: %s', e)
         return 0
+
+
+def get_cached(category, func_or_name, *args, **kwargs):
+    """Return the cached payload for func(*args, **kwargs) ignoring TTL expiry.
+
+    Useful for pages that prefer stale data over a slow recompute.
+    *func_or_name* can be the callable itself or its name as a string.
+    Returns ``(value, True)`` if any cache row exists, ``(None, False)``
+    otherwise.
+    """
+    func_name = func_or_name if isinstance(func_or_name, str) else func_or_name.__name__
+    key = _build_key(func_name, args, kwargs)
+    from app.models import ProcessingCache
+    row = ProcessingCache.query.filter_by(category=category, key=key).first()
+    if row is None:
+        return None, False
+    try:
+        return pickle.loads(row.payload), True
+    except Exception as e:
+        app.logger.warning('memocache get_cached: failed to unpickle %s/%s: %s',
+                           category, key, e)
+        return None, False
