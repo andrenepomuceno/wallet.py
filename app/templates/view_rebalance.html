@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% import 'table.html' as table %}
+{% block content %}
+
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h1><i class="bi bi-arrows-angle-contract"></i> Rebalanceamento de Carteira</h1>
+    {% if rebalance_info.usd_brl %}
+    <span class="badge bg-secondary fs-6">USD/BRL: {{ "%.4f"|format(rebalance_info.usd_brl) }}</span>
+    {% endif %}
+</div>
+
+{% if not rebalance_info.targets %}
+<div class="alert alert-info d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-info-circle-fill"></i>
+    <span>Defina os pesos-alvo para cada classe de ativos no formulário abaixo para visualizar o comparativo ideal vs atual.</span>
+</div>
+{% endif %}
+
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{# KPI Summary cards                                                             #}
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{% if rebalance_info.valid %}
+{% set s = rebalance_info.summary %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value">{{ s.total_portfolio_brl | format_money }}</div>
+            <div class="kpi-label">Carteira Total (BRL)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value {{ 'text-positive' if s.alignment_score >= 90 else ('text-negative' if s.alignment_score < 70 else '') }}">
+                {{ "%.1f"|format(s.alignment_score) }}%
+            </div>
+            <div class="kpi-label">Score de Alinhamento</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value {{ 'text-negative' if s.turnover_brl > 0 else '' }}">
+                {{ s.turnover_brl | format_money }}
+            </div>
+            <div class="kpi-label">Turnover Mínimo (BRL)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value {{ 'text-negative' if s.classes_out_of_target > 0 else 'text-positive' }}">
+                {{ s.classes_out_of_target }}
+            </div>
+            <div class="kpi-label">Classes Fora do Alvo</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{# Comparison table: per class                                                   #}
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{% if rebalance_info.valid and rebalance_info.class_df is defined and rebalance_info.class_df|length > 0 %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-bar-chart-steps"></i> Comparativo por Classe — Ideal vs Atual</div>
+    <div class="card-body p-0">
+        <div class="table-container">
+            <table class="table table-sm table-striped table-hover mb-0"
+                   data-toggle="table"
+                   data-sticky-header="true"
+                   data-fixed-columns="true"
+                   data-fixed-number="1">
+                <thead>
+                    <tr>
+                        {% for col in rebalance_info.class_df.columns %}
+                        <th data-sortable="true">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rebalance_info.class_df.itertuples(index=False) %}
+                    {% set action = row[-1] %}
+                    <tr class="{{ 'table-success' if action == 'BUY' else ('table-danger' if action == 'SELL' else '') }}">
+                        {% for item in row %}
+                        <td>
+                            {%- if item is number and item != item -%}
+                                —
+                            {%- elif item == 'BUY' -%}
+                                <span class="badge bg-success"><i class="bi bi-arrow-up-circle"></i> BUY</span>
+                            {%- elif item == 'SELL' -%}
+                                <span class="badge bg-danger"><i class="bi bi-arrow-down-circle"></i> SELL</span>
+                            {%- elif item == 'HOLD' -%}
+                                <span class="badge bg-secondary"><i class="bi bi-pause-circle"></i> HOLD</span>
+                            {%- else -%}
+                                {{ item }}
+                            {%- endif -%}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{# Suggestions table: per asset                                                  #}
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{% if rebalance_info.valid and rebalance_info.asset_df is defined and rebalance_info.asset_df|length > 0 %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-list-check"></i> Sugestões por Ativo</div>
+    <div class="card-body p-0">
+        <div class="table-container">
+            <table class="table table-sm table-striped table-hover mb-0"
+                   data-toggle="table"
+                   data-sticky-header="true"
+                   data-fixed-columns="true"
+                   data-fixed-number="1">
+                <thead>
+                    <tr>
+                        {% for col in rebalance_info.asset_df.columns %}
+                        <th data-sortable="true">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rebalance_info.asset_df.itertuples(index=False) %}
+                    {% set action = row[4] %}
+                    <tr class="{{ 'table-success' if action == 'BUY' else ('table-danger' if action == 'SELL' else '') }}">
+                        {% for item in row %}
+                        <td>
+                            {%- if item is none or (item is number and item != item) -%}
+                                —
+                            {%- elif item == 'BUY' -%}
+                                <span class="badge bg-success"><i class="bi bi-arrow-up-circle"></i> BUY</span>
+                            {%- elif item == 'SELL' -%}
+                                <span class="badge bg-danger"><i class="bi bi-arrow-down-circle"></i> SELL</span>
+                            {%- else -%}
+                                {{ item }}
+                            {%- endif -%}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if rebalance_info.valid and rebalance_info.targets and
+      (rebalance_info.asset_df is not defined or rebalance_info.asset_df|length == 0) %}
+<div class="alert alert-success d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-check-circle-fill"></i>
+    <span>Carteira alinhada com os pesos-alvo — nenhuma ação necessária.</span>
+</div>
+{% endif %}
+
+{# ──────────────────────────────────────────────────────────────────────────── #}
+{# Target weights form                                                            #}
+{# ──────────────────────────────────────────────────────────────────────────── #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-sliders"></i> Definir Pesos-Alvo por Classe</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                onclick="toggleDisplay('rebalanceForm')">
+            <i class="bi bi-pencil-square"></i> Editar Pesos
+        </button>
+    </div>
+    <div id="rebalanceForm" style="display: none;">
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                Informe o percentual-alvo para cada classe. A soma deve ser exatamente <strong>100%</strong>.
+                Classes não listadas aqui serão consideradas com peso 0%.
+            </p>
+            <form method="POST" action="{{ url_for('view_rebalance') }}">
+                {{ form.hidden_tag() }}
+                <div class="row g-3">
+                    {% for cls in asset_classes %}
+                    {% set field_name = 'w_' + cls | replace(' ', '_') | replace('-', '_') | lower %}
+                    {% set field = form[field_name] if field_name in form._fields else none %}
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label class="form-label fw-semibold small">{{ cls }}</label>
+                        {% if field %}
+                        {{ field(class="form-control form-control-sm",
+                                 placeholder="0.0",
+                                 step="0.01", min="0", max="100", type="number") }}
+                        {% else %}
+                        <input type="number" class="form-control form-control-sm"
+                               name="w_{{ cls | replace(' ', '_') | replace('-', '_') | lower }}"
+                               placeholder="0.0" step="0.01" min="0" max="100" value="0">
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-3 d-flex align-items-center gap-3">
+                    {{ form.submit(class="btn btn-warning btn-sm") }}
+                    <span id="weightSum" class="text-muted small">Soma: <strong id="weightSumValue">—</strong></span>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const inputs = document.querySelectorAll('#rebalanceForm input[type="number"]');
+        const sumEl = document.getElementById('weightSumValue');
+
+        function updateSum() {
+            let total = 0;
+            inputs.forEach(function (inp) {
+                total += parseFloat(inp.value) || 0;
+            });
+            const rounded = Math.round(total * 100) / 100;
+            sumEl.textContent = rounded.toFixed(2) + '%';
+            sumEl.style.color = Math.abs(rounded - 100) < 0.02 ? 'var(--bs-success)' : 'var(--bs-danger)';
+        }
+
+        inputs.forEach(function (inp) {
+            inp.addEventListener('input', updateSum);
+        });
+        updateSum();
+    });
+</script>
+
+{% endblock %}

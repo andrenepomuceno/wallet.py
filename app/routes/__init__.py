@@ -6,6 +6,7 @@ from . import transactions  # noqa: F401
 from . import admin  # noqa: F401
 from . import asset  # noqa: F401
 from . import consolidate  # noqa: F401
+from . import rebalance  # noqa: F401
 
 # Re-exports for backwards compatibility with code that imports symbols from
 # `app.routes` directly (e.g. `from app.routes import format_money`) or patches

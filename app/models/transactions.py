@@ -6,6 +6,8 @@ per-source legacy models (`B3Movimentation`, `B3Negotiation`,
 the one-shot `migrate_legacy_to_transaction()` and dropped after a
 successful migration.
 """
+from datetime import datetime
+
 from sqlalchemy import Index
 
 from app import db
@@ -53,6 +55,26 @@ class Transaction(db.Model):
 
     def __repr__(self):
         return f'<Transaction {self.id} {self.source}/{self.record_type} {self.asset} {self.category}>'
+
+
+# ---------------------------------------------------------------------------
+# Portfolio rebalancing — target weights by asset class
+# ---------------------------------------------------------------------------
+
+
+class PortfolioTarget(db.Model):
+    """Stores the user-defined ideal weight (%) for each asset class."""
+    __tablename__ = 'portfolio_target'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_class = db.Column(db.String, unique=True, index=True, nullable=False)
+    target_weight = db.Column(db.Float, nullable=False)   # 0.0 – 100.0
+    enabled = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
+                           onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f'<PortfolioTarget {self.asset_class} {self.target_weight}%>'
 
 
 # ---------------------------------------------------------------------------

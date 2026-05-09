@@ -12,6 +12,7 @@ from .config import (
 )
 from .transactions import (
     Transaction,
+    PortfolioTarget,
     B3Movimentation,
     B3Negotiation,
     AvenueExtract,
@@ -31,7 +32,7 @@ __all__ = [
     'DEFAULT_CACHE_CONFIG', 'PROCESSING_CACHE_CATEGORIES',
     'get_api_key', 'seed_default_cache_config',
     'get_cache_ttls', 'get_processing_ttl',
-    'Transaction',
+    'Transaction', 'PortfolioTarget',
     'B3Movimentation', 'B3Negotiation', 'AvenueExtract', 'GenericExtract',
     'category_mapping',
     'b3_movimentation_sql_to_df', 'b3_negotiation_sql_to_df',

@@ -244,3 +244,179 @@ def test_load_products_and_consolidate(db_session):
 ])
 def test_extract_json_object(raw, expected):
     assert _extract_json_object(raw) == expected
+
+
+# ---------------------------------------------------------------------------
+# Rebalancing logic tests
+# ---------------------------------------------------------------------------
+
+from app.processing.rebalance import (
+    compute_class_comparison,
+    compute_asset_suggestions,
+    compute_summary,
+    _classes_from_consolidate,
+    _total_portfolio_brl,
+)
+
+
+def _make_consolidate_info(classes):
+    """Build a minimal consolidate info dict for rebalance tests.
+
+    `classes` is a list of (asset_class, position_brl, relative_position_pct).
+    """
+    import pandas as pd
+
+    rows = []
+    for cls, pos, rel in classes:
+        rows.append({
+            'asset_class': cls,
+            'position': float(pos),
+            'relative_position': float(rel),
+            'currency': 'BRL',
+        })
+    # Add mandatory Total row
+    rows.insert(0, {
+        'asset_class': 'Total',
+        'position': sum(r['position'] for r in rows),
+        'relative_position': 100.0,
+        'currency': 'BRL',
+    })
+    by_group_df = pd.DataFrame(rows)
+
+    # Build group_df with single asset per class
+    group_df = []
+    for cls, pos, rel in classes:
+        asset_df = pd.DataFrame([{
+            'name': cls[:4].upper(),
+            'position_total': float(pos),
+            'last_close_price': 10.0,
+            'currency': 'BRL',
+            'asset_class': cls,
+        }])
+        group_df.append({'name': cls, 'df': asset_df, 'consolidate': {'position': pos}})
+
+    return {
+        'valid': True,
+        'consolidate_by_group': by_group_df,
+        'group_df': group_df,
+        'usd_brl': 5.0,
+    }
+
+
+def test_classes_from_consolidate_filters_total_and_sold():
+    info = _make_consolidate_info([
+        ('Stocks', 10000, 50.0),
+        ('FIIs', 8000, 40.0),
+        ('Sold Stocks', 2000, 10.0),
+    ])
+    rows = _classes_from_consolidate(info)
+    names = [r['asset_class'] for r in rows]
+    assert 'Stocks' in names
+    assert 'FIIs' in names
+    assert 'Total' not in names
+    assert 'Sold Stocks' not in names
+
+
+def test_total_portfolio_brl():
+    info = _make_consolidate_info([('Stocks', 6000, 60.0), ('FIIs', 4000, 40.0)])
+    rows = _classes_from_consolidate(info)
+    assert _total_portfolio_brl(rows) == pytest.approx(10000.0)
+
+
+def test_compute_class_comparison_basic():
+    info = _make_consolidate_info([('Stocks', 6000, 60.0), ('FIIs', 4000, 40.0)])
+    targets = {'Stocks': 50.0, 'FIIs': 50.0}
+    df = compute_class_comparison(info, targets)
+    assert len(df) == 2
+    stocks = df[df['asset_class'] == 'Stocks'].iloc[0]
+    assert stocks['current_weight_pct'] == pytest.approx(60.0)
+    assert stocks['target_weight_pct'] == pytest.approx(50.0)
+    assert stocks['deviation_pct'] == pytest.approx(-10.0)
+    assert stocks['action'] == 'SELL'
+
+    fiis = df[df['asset_class'] == 'FIIs'].iloc[0]
+    assert fiis['action'] == 'BUY'
+
+
+def test_compute_class_comparison_hold_within_threshold():
+    """Deviations smaller than _MIN_DEVIATION_BRL should result in HOLD."""
+    # 1000 BRL total; 50/50 split with a 1-BRL imbalance → below threshold
+    info = _make_consolidate_info([('A', 500.5, 50.05), ('B', 499.5, 49.95)])
+    targets = {'A': 50.0, 'B': 50.0}
+    df = compute_class_comparison(info, targets)
+    assert all(df['action'] == 'HOLD')
+
+
+def test_compute_class_comparison_target_weights_sum_independent():
+    """The function accepts any target dict; sum validation is the route's job."""
+    info = _make_consolidate_info([('Stocks', 10000, 100.0)])
+    targets = {'Stocks': 100.0}
+    df = compute_class_comparison(info, targets)
+    assert len(df) == 1
+    assert df.iloc[0]['action'] == 'HOLD'
+
+
+def test_compute_asset_suggestions_proportional():
+    """Asset delta should split proportionally to current position_total."""
+    import pandas as pd
+
+    # Class A has two assets with 75/25 split → deltas should match 75/25
+    asset_df_a = pd.DataFrame([
+        {'name': 'AA', 'position_total': 750.0, 'last_close_price': 10.0, 'currency': 'BRL', 'asset_class': 'A'},
+        {'name': 'AB', 'position_total': 250.0, 'last_close_price': 10.0, 'currency': 'BRL', 'asset_class': 'A'},
+    ])
+    info = {
+        'valid': True,
+        'consolidate_by_group': pd.DataFrame([
+            {'asset_class': 'A', 'position': 1000.0, 'relative_position': 50.0},
+        ]),
+        'group_df': [{'name': 'A', 'df': asset_df_a, 'consolidate': {'position': 1000.0}}],
+        'usd_brl': 5.0,
+    }
+    class_df = pd.DataFrame([{
+        'asset_class': 'A',
+        'current_value_brl': 1000.0,
+        'current_weight_pct': 50.0,
+        'target_weight_pct': 60.0,
+        'deviation_pct': 10.0,
+        'target_value_brl': 1200.0,
+        'deviation_value_brl': 200.0,
+        'action': 'BUY',
+    }])
+    asset_suggestions = compute_asset_suggestions(info, class_df)
+    assert len(asset_suggestions) == 2
+    aa = asset_suggestions[asset_suggestions['asset'] == 'AA'].iloc[0]
+    ab = asset_suggestions[asset_suggestions['asset'] == 'AB'].iloc[0]
+    # 75% of 200 = 150; 25% of 200 = 50
+    assert aa['delta_brl'] == pytest.approx(150.0, abs=1.0)
+    assert ab['delta_brl'] == pytest.approx(50.0, abs=1.0)
+    # estimated_qty = delta_brl / last_close_price = 150/10 = 15
+    assert aa['estimated_qty'] == pytest.approx(15.0, abs=0.01)
+
+
+def test_compute_summary_kpis():
+    import pandas as pd
+
+    class_df = pd.DataFrame([
+        {'asset_class': 'A', 'deviation_pct': 10.0, 'deviation_value_brl': 500.0, 'action': 'BUY'},
+        {'asset_class': 'B', 'deviation_pct': -10.0, 'deviation_value_brl': -500.0, 'action': 'SELL'},
+    ])
+    summary = compute_summary(class_df, 5000.0, {'A': 60.0, 'B': 40.0})
+    # turnover = sum(abs) / 2 = 1000 / 2 = 500
+    assert summary['turnover_brl'] == pytest.approx(500.0)
+    # alignment_score = 100 - (10 + 10) / 2 = 90
+    assert summary['alignment_score'] == pytest.approx(90.0)
+    assert summary['classes_out_of_target'] == 2
+    assert summary['most_overweight'] == 'B'
+    assert summary['most_underweight'] == 'A'
+
+
+def test_process_rebalance_request_no_targets():
+    """With no targets saved, process_rebalance_request should still return valid."""
+    from app.processing.rebalance import process_rebalance_request
+    info = _make_consolidate_info([('Stocks', 5000, 50.0), ('FIIs', 5000, 50.0)])
+    result = process_rebalance_request(info)
+    assert result['valid'] is True
+    assert 'class_df' in result
+    assert 'asset_df' in result
+    assert 'summary' in result

@@ -38,6 +38,14 @@ from .history import (
     plot_history,
     process_history,
 )
+from .rebalance import (
+    load_targets,
+    save_targets,
+    compute_class_comparison,
+    compute_asset_suggestions,
+    compute_summary,
+    process_rebalance_request,
+)
 
 __all__ = [
     # prices
@@ -55,4 +63,8 @@ __all__ = [
     'consolidate_group', 'process_consolidate_request',
     # history
     'plot_price_history', 'adjust_for_splits', 'plot_history', 'process_history',
+    # rebalance
+    'load_targets', 'save_targets',
+    'compute_class_comparison', 'compute_asset_suggestions', 'compute_summary',
+    'process_rebalance_request',
 ]

@@ -1,3 +1,4 @@
+import pytest
 import pandas as pd
 from app.models import (
     B3Movimentation, B3Negotiation, AvenueExtract, GenericExtract, ApiConfig,
@@ -83,3 +84,59 @@ def test_api_config_get_set(db_session):
     db.session.add(ApiConfig(provider='gemini', api_key='sk-test'))
     db.session.commit()
     assert get_api_key('gemini') == 'sk-test'
+
+
+# ---------------------------------------------------------------------------
+# PortfolioTarget model
+# ---------------------------------------------------------------------------
+
+def test_portfolio_target_create(db_session):
+    from app import db
+    from app.models import PortfolioTarget
+    db.session.add(PortfolioTarget(asset_class='Stocks', target_weight=60.0))
+    db.session.add(PortfolioTarget(asset_class='FIIs', target_weight=40.0))
+    db.session.commit()
+
+    rows = PortfolioTarget.query.all()
+    assert len(rows) == 2
+    stocks = PortfolioTarget.query.filter_by(asset_class='Stocks').first()
+    assert stocks.target_weight == 60.0
+    assert stocks.enabled is True
+
+
+def test_portfolio_target_unique_asset_class(db_session):
+    """Inserting two rows with the same asset_class must raise an IntegrityError."""
+    from app import db
+    from app.models import PortfolioTarget
+    from sqlalchemy.exc import IntegrityError
+    db.session.add(PortfolioTarget(asset_class='Stocks', target_weight=50.0))
+    db.session.commit()
+    db.session.add(PortfolioTarget(asset_class='Stocks', target_weight=70.0))
+    with pytest.raises(IntegrityError):
+        db.session.commit()
+    db.session.rollback()
+
+
+def test_save_targets_upsert(db_session):
+    """save_targets should insert new and update existing rows."""
+    from app.processing.rebalance import save_targets
+    from app.models import PortfolioTarget
+    save_targets({'Stocks': 70.0, 'FIIs': 30.0})
+    assert PortfolioTarget.query.filter_by(asset_class='Stocks').first().target_weight == 70.0
+
+    save_targets({'Stocks': 60.0, 'FIIs': 40.0})
+    assert PortfolioTarget.query.filter_by(asset_class='Stocks').first().target_weight == 60.0
+    assert PortfolioTarget.query.count() == 2
+
+
+def test_load_targets_only_enabled(db_session):
+    """load_targets must return only enabled=True rows."""
+    from app import db
+    from app.models import PortfolioTarget
+    from app.processing.rebalance import load_targets
+    db.session.add(PortfolioTarget(asset_class='Bonds', target_weight=20.0, enabled=True))
+    db.session.add(PortfolioTarget(asset_class='Crypto', target_weight=5.0, enabled=False))
+    db.session.commit()
+    targets = load_targets()
+    assert 'Bonds' in targets
+    assert 'Crypto' not in targets

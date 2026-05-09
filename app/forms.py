@@ -49,6 +49,16 @@ class B3NegotiationAddForm(FlaskForm):
     total = FloatField('Total', default=0)
     submit = SubmitField('Submit')
 
+class PortfolioTargetForm(FlaskForm):
+    """Dynamic form for setting target weights per asset class.
+
+    Fields are added at runtime by the route before rendering; this base class
+    carries only the submit button so WTForms CSRF protection still applies.
+    The route adds one FloatField per asset_class after instantiating this form.
+    """
+    submit = SubmitField('Salvar Pesos')
+
+
 class ApiConfigForm(FlaskForm):
     gemini_api_key = PasswordField('Gemini API Key', validators=[Optional()])
     serper_api_key = PasswordField('Serper API Key', validators=[Optional()])

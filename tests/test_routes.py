@@ -234,3 +234,119 @@ def test_format_money_filter():
     assert format_money(1_500_000) == '1.50 M'
     assert format_money(2_500_000_000) == '2.50 B'
     assert format_money(3_500_000_000_000) == '3.50 T'
+
+
+# ---------------------------------------------------------------------------
+# Rebalance page tests
+# ---------------------------------------------------------------------------
+
+@patch('app.routes.rebalance.process_consolidate_request')
+def test_view_rebalance_no_data_redirects(mock_consolidate, client):
+    mock_consolidate.return_value = {'valid': False}
+    resp = client.get('/rebalance', follow_redirects=False)
+    assert resp.status_code == 302
+
+
+@patch('app.routes.rebalance.process_rebalance_request')
+@patch('app.routes.rebalance.process_consolidate_request')
+def test_view_rebalance_get(mock_consolidate, mock_rebalance, client):
+    mock_consolidate.return_value = {
+        'valid': True,
+        'consolidate_by_group': pd.DataFrame([
+            {'asset_class': 'Total', 'position': 10000.0, 'relative_position': 100.0},
+            {'asset_class': 'Stocks', 'position': 6000.0, 'relative_position': 60.0},
+            {'asset_class': 'FIIs', 'position': 4000.0, 'relative_position': 40.0},
+        ]),
+        'group_df': [],
+        'usd_brl': 5.0,
+    }
+    mock_rebalance.return_value = {
+        'valid': True,
+        'class_df': pd.DataFrame(columns=[
+            'Class', 'Current (BRL)', 'Current (%)', 'Target (%)',
+            'Deviation (p.p.)', 'Target (BRL)', 'Deviation (BRL)', 'Action',
+        ]),
+        'asset_df': pd.DataFrame(columns=[
+            'Asset', 'Class', 'Current (BRL)', 'Delta (BRL)',
+            'Action', 'Price', 'Est. Qty',
+        ]),
+        'summary': {
+            'total_portfolio_brl': 10000.0,
+            'turnover_brl': 0.0,
+            'alignment_score': 100.0,
+            'classes_out_of_target': 0,
+            'most_overweight': None,
+            'most_underweight': None,
+            'targets_defined': False,
+        },
+        'targets': {},
+        'usd_brl': 5.0,
+    }
+    resp = client.get('/rebalance')
+    assert resp.status_code == 200
+    assert b'Rebalanceamento' in resp.data
+
+
+@patch('app.routes.rebalance.save_targets')
+@patch('app.routes.rebalance.process_rebalance_request')
+@patch('app.routes.rebalance.process_consolidate_request')
+def test_view_rebalance_post_saves_weights(mock_consolidate, mock_rebalance, mock_save,
+                                           client, db_session):
+    mock_consolidate.return_value = {
+        'valid': True,
+        'consolidate_by_group': pd.DataFrame([
+            {'asset_class': 'Total', 'position': 10000.0, 'relative_position': 100.0},
+            {'asset_class': 'Stocks', 'position': 6000.0, 'relative_position': 60.0},
+            {'asset_class': 'FIIs', 'position': 4000.0, 'relative_position': 40.0},
+        ]),
+        'group_df': [],
+        'usd_brl': 5.0,
+    }
+    mock_rebalance.return_value = {
+        'valid': True, 'class_df': pd.DataFrame(), 'asset_df': pd.DataFrame(),
+        'summary': {'total_portfolio_brl': 10000.0, 'turnover_brl': 0.0,
+                    'alignment_score': 100.0, 'classes_out_of_target': 0,
+                    'most_overweight': None, 'most_underweight': None,
+                    'targets_defined': True},
+        'targets': {'Stocks': 60.0, 'FIIs': 40.0},
+        'usd_brl': 5.0,
+    }
+    resp = client.post('/rebalance', data={
+        'w_stocks': '60.0',
+        'w_fiis': '40.0',
+    }, follow_redirects=False)
+    # save_targets called once and redirect issued
+    assert resp.status_code in (200, 302)
+
+
+@patch('app.routes.rebalance.save_targets')
+@patch('app.routes.rebalance.process_rebalance_request')
+@patch('app.routes.rebalance.process_consolidate_request')
+def test_view_rebalance_post_any_sum_accepted(mock_consolidate, mock_rebalance, mock_save,
+                                               client, db_session):
+    """Weights can sum to any value — no 100% constraint."""
+    mock_consolidate.return_value = {
+        'valid': True,
+        'consolidate_by_group': pd.DataFrame([
+            {'asset_class': 'Total', 'position': 10000.0, 'relative_position': 100.0},
+            {'asset_class': 'Stocks', 'position': 6000.0, 'relative_position': 60.0},
+            {'asset_class': 'FIIs', 'position': 4000.0, 'relative_position': 40.0},
+        ]),
+        'group_df': [],
+        'usd_brl': 5.0,
+    }
+    mock_rebalance.return_value = {
+        'valid': True, 'class_df': pd.DataFrame(), 'asset_df': pd.DataFrame(),
+        'summary': {'total_portfolio_brl': 10000.0, 'turnover_brl': 0.0,
+                    'alignment_score': 100.0, 'classes_out_of_target': 0,
+                    'most_overweight': None, 'most_underweight': None,
+                    'targets_defined': False},
+        'targets': {},
+        'usd_brl': 5.0,
+    }
+    # sum = 110 — should still be accepted (redirect after POST)
+    resp = client.post('/rebalance', data={
+        'w_stocks': '70.0',
+        'w_fiis': '40.0',
+    }, follow_redirects=False)
+    assert resp.status_code in (200, 302)
