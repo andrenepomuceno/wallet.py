@@ -51,7 +51,7 @@ def _parse_weights(form, asset_classes) -> tuple[dict, list]:
         if val is None:
             val = 0.0
         if val < 0 or val > 100:
-            errors.append(f"Peso de '{cls}' fora do intervalo 0–100.")
+            errors.append(f"Weight for '{cls}' must be between 0 and 100.")
         weights[cls] = round(float(val), 4)
 
     return weights, errors
@@ -65,7 +65,7 @@ def view_rebalance():
         info = process_consolidate_request()
 
     if not info['valid']:
-        flash('Nenhum dado encontrado. Faça upload de um extrato primeiro.')
+        flash('No data found. Please upload a statement first.')
         return redirect(url_for('home'))
 
     rebalance_info = process_rebalance_request(info)
@@ -92,7 +92,7 @@ def view_rebalance():
         else:
             save_targets(weights)
             invalidate_processing_cache()
-            flash('Pesos salvos com sucesso!')
+            flash('Weights saved successfully!')
             return redirect(url_for('view_rebalance'))
 
     return render_template(

@@ -284,7 +284,7 @@ def test_view_rebalance_get(mock_consolidate, mock_rebalance, client):
     }
     resp = client.get('/rebalance')
     assert resp.status_code == 200
-    assert b'Rebalanceamento' in resp.data
+    assert b'Rebalancing' in resp.data
 
 
 @patch('app.routes.rebalance.save_targets')

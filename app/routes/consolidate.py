@@ -29,7 +29,11 @@ _BY_GROUP_RENAMES = {
 _GROUP_DF_COLUMNS = [
     'name', 'url', 'currency', 'last_close_price', 'last_close_variation',
     'position', 'position_total', 'avg_price',
-    'cost', 'wages_sum', 'rent_wages_sum', 'taxes_sum', 'liquid_cost', 'realized_gain',
+    'cost', 'wages_sum',
+    # 'rent_wages_sum',
+    'taxes_sum',
+    # 'liquid_cost',
+    'realized_gain',
     'not_realized_gain', 'capital_gain', 'rentability',
     'rentability_by_year', 'age_years',
 ]

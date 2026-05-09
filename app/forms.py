@@ -13,11 +13,11 @@ class GenericExtractAddForm(FlaskForm):
     submit = SubmitField('Submit')
 
 class B3MovimentationFilterForm(FlaskForm):
-    entrada_saida = StringField('Entrada/Saída')
+    entrada_saida = StringField('Direction')
     data = StringField('Date')
     movimentacao = StringField('Movimentation')
     produto = StringField('Produto')
-    instituicao = StringField('Instituição')
+    instituicao = StringField('Institution')
     quantidade = FloatField('Quantity')
     preco_unitario = FloatField('Price')
     valor_operacao = FloatField('Total')
@@ -26,24 +26,24 @@ class B3MovimentationFilterForm(FlaskForm):
 class AvenueExtractAddForm(FlaskForm):
     data = StringField('Data', validators=[DataRequired()], default=pd.to_datetime("today").date)
     hora = StringField('Hora', validators=[DataRequired()], default=pd.to_datetime("today").time)
-    liquidacao = StringField('Liquidação', validators=[DataRequired()], default=pd.to_datetime("today").date)
-    descricao = StringField('Descrição', default='')
+    liquidacao = StringField('Settlement', validators=[DataRequired()], default=pd.to_datetime("today").date)
+    descricao = StringField('Description', default='')
     valor = FloatField('Valor (U$)', default=0)
     saldo = FloatField('Saldo em Conta (U$)', default=0)
-    entrada_saida = StringField('Entrada/Saída', default='Credito')
+    entrada_saida = StringField('Direction', default='Credit')
     produto = StringField('Produto')
-    movimentacao = StringField('Movimentação', validators=[DataRequired()], default='Compra')
+    movimentacao = StringField('Operation', validators=[DataRequired()], default='Purchase')
     quantidade = FloatField('Quantidade', default=0)
-    preco_unitario = FloatField('Preço Unitário', default=0)
+    preco_unitario = FloatField('Unit Price', default=0)
     submit = SubmitField('Submit')
 
 class B3NegotiationAddForm(FlaskForm):
     date = StringField('Date', validators=[DataRequired()], default=pd.to_datetime("today").date)
     movimentation = StringField('Movimentation', validators=[DataRequired()], default='Compra')
-    mercado = StringField('Mercado', validators=[DataRequired()], default='Mercado à Vista')
+    mercado = StringField('Market', validators=[DataRequired()], default='Spot Market')
     prazo = StringField('Prazo/Vencimento', validators=[DataRequired()], default='-')
-    instituicao = StringField('Instituição', validators=[DataRequired()], default='')
-    codigo = StringField('Código de Negociação', validators=[DataRequired()], default='')
+    instituicao = StringField('Institution', validators=[DataRequired()], default='')
+    codigo = StringField('Trading Code', validators=[DataRequired()], default='')
     quantity = FloatField('Quantity', default=0)
     price = FloatField('Price', default=0)
     total = FloatField('Total', default=0)
@@ -63,11 +63,11 @@ class ApiConfigForm(FlaskForm):
     gemini_api_key = PasswordField('Gemini API Key', validators=[Optional()])
     serper_api_key = PasswordField('Serper API Key', validators=[Optional()])
     cache_default_ttl = IntegerField(
-        'TTL padrão (s)', validators=[Optional(), NumberRange(min=0)])
+        'Default TTL (s)', validators=[Optional(), NumberRange(min=0)])
     cache_yfinance_ttl = IntegerField(
         'TTL Yahoo Finance (s)', validators=[Optional(), NumberRange(min=0)])
     cache_exchange_ttl = IntegerField(
-        'TTL cotação USD (s)', validators=[Optional(), NumberRange(min=0)])
+        'USD Quote TTL (s)', validators=[Optional(), NumberRange(min=0)])
     cache_scraping_ttl = IntegerField(
         'TTL scraping (s)', validators=[Optional(), NumberRange(min=0)])
     cache_serper_ttl = IntegerField(

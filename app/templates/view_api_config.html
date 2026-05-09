@@ -5,26 +5,26 @@
     <div class="col-12 col-lg-7">
         <div class="card mt-3">
             <div class="card-header">
-                <i class="bi bi-key"></i> Configuracao de API
+                <i class="bi bi-key"></i> API Configuration
             </div>
             <div class="card-body">
                 <p class="text-muted mb-3">
-                    Cadastre suas chaves de API. Gemini habilita fallback inteligente
-                    na resolucao de tickers; Serper busca noticias recentes do ativo.
+                    Register your API keys. Gemini enables intelligent ticker fallback;
+                    Serper fetches recent asset news.
                 </p>
 
                 <div class="alert {% if has_gemini_key %}alert-success{% else %}alert-warning{% endif %}">
                     {% if has_gemini_key %}
-                    Chave Gemini configurada.
+                    Gemini key configured.
                     {% else %}
-                    Nenhuma chave Gemini configurada.
+                    No Gemini key configured.
                     {% endif %}
                 </div>
                 <div class="alert {% if has_serper_key %}alert-success{% else %}alert-warning{% endif %}">
                     {% if has_serper_key %}
-                    Chave Serper configurada.
+                    Serper key configured.
                     {% else %}
-                    Nenhuma chave Serper configurada.
+                    No Serper key configured.
                     {% endif %}
                 </div>
 
@@ -36,11 +36,11 @@
                             {% if has_gemini_key %}
                             <span class="badge bg-success"><i class="bi bi-check-circle"></i> Instalada</span>
                             {% else %}
-                            <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Nao instalada</span>
+                            <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Not installed</span>
                             {% endif %}
                         </div>
-                        {{ form.gemini_api_key(class='form-control', placeholder='Cole aqui sua Gemini API Key') }}
-                        <div class="form-text">A chave nao e exibida por seguranca. Preencha somente para criar/atualizar.</div>
+                        {{ form.gemini_api_key(class='form-control', placeholder='Paste your Gemini API Key here') }}
+                        <div class="form-text">The key is not shown for security. Fill in only to create/update.</div>
                     </div>
                     <div class="mb-3">
                         <div class="d-flex align-items-center gap-2 mb-1">
@@ -48,18 +48,18 @@
                             {% if has_serper_key %}
                             <span class="badge bg-success"><i class="bi bi-check-circle"></i> Instalada</span>
                             {% else %}
-                            <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Nao instalada</span>
+                            <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Not installed</span>
                             {% endif %}
                         </div>
-                        {{ form.serper_api_key(class='form-control', placeholder='Cole aqui sua Serper API Key') }}
-                        <div class="form-text">Habilita busca de noticias do ativo via serper.dev.</div>
+                        {{ form.serper_api_key(class='form-control', placeholder='Paste your Serper API Key here') }}
+                        <div class="form-text">Enables asset news search via serper.dev.</div>
                     </div>
 
                     <hr>
-                    <h5><i class="bi bi-hdd-stack"></i> Cache de Requisicoes</h5>
+                    <h5><i class="bi bi-hdd-stack"></i> HTTP Request Cache</h5>
                     <p class="text-muted small mb-3">
-                        Tempo de vida (TTL) das respostas HTTP em cache, em segundos.
-                        Vazio = manter valor atual. Use 0 para desabilitar o cache da categoria.
+                        TTL of cached HTTP responses, in seconds.
+                        Leave blank to keep the current value. Use 0 to disable cache for the category.
                     </p>
                     <div class="row g-2 mb-3">
                         <div class="col-12 col-md-6">
@@ -89,11 +89,10 @@
                     </div>
 
                     <hr>
-                    <h5><i class="bi bi-cpu"></i> Cache de Processamento</h5>
+                    <h5><i class="bi bi-cpu"></i> Processing Cache</h5>
                     <p class="text-muted small mb-3">
-                        Memoiza o resultado das funcoes de processamento (por ativo e
-                        consolidado global) em SQLite. Invalidado automaticamente em
-                        novos imports.
+                        Memoizes the output of processing functions (per asset and global consolidate)
+                        in SQLite. Automatically invalidated on new imports.
                     </p>
                     <div class="row g-2 mb-3">
                         <div class="col-12 col-md-6">
@@ -111,12 +110,12 @@
 
                 <form method="post" action="{{ url_for('view_cache_clear') }}" class="mt-3 d-inline">
                     <button type="submit" class="btn btn-outline-warning">
-                        <i class="bi bi-trash"></i> Limpar cache HTTP
+                        <i class="bi bi-trash"></i> Clear HTTP Cache
                     </button>
                 </form>
                 <form method="post" action="{{ url_for('view_processing_cache_clear') }}" class="mt-3 d-inline">
                     <button type="submit" class="btn btn-outline-warning">
-                        <i class="bi bi-trash"></i> Limpar cache de processamento
+                        <i class="bi bi-trash"></i> Clear Processing Cache
                     </button>
                 </form>
             </div>

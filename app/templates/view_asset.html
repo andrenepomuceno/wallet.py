@@ -143,13 +143,13 @@
 
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-robot"></i> Analise do Ativo (Gemini)</span>
+            <span><i class="bi bi-robot"></i> Asset Analysis (Gemini)</span>
             <button id="assetAnalyzeBtn" class="btn btn-sm btn-warning" type="button">
-                <i class="bi bi-stars"></i> Analisar performance do ativo
+                <i class="bi bi-stars"></i> Analyse Asset Performance
             </button>
         </div>
         <div id="assetAnalysisContent" class="card-body text-muted small">
-            Clique em "Analisar performance do ativo" para gerar um parecer com base nas informacoes consolidadas.
+            Click "Analyse Asset Performance" to generate a report based on the consolidated data.
         </div>
     </div>
 
@@ -158,13 +158,13 @@
             <span><i class="bi bi-newspaper"></i> News</span>
             <div class="d-flex gap-2">
                 <button id="newsFetchBtn" class="btn btn-sm btn-primary" type="button">
-                    <i class="bi bi-search"></i> Buscar noticias (Serper)
+                    <i class="bi bi-search"></i> Fetch News (Serper)
                 </button>
                 <button id="newsAnalyzeBtn" class="btn btn-sm btn-warning" type="button" disabled>
-                    <i class="bi bi-stars"></i> Analisar sentimento (Gemini)
+                    <i class="bi bi-stars"></i> Analyse Sentiment (Gemini)
                 </button>
                 <button id="newsHideBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>
-                    <i class="bi bi-x-lg"></i> Ocultar
+                    <i class="bi bi-x-lg"></i> Hide
                 </button>
                 <button class="btn btn-sm btn-outline-info"
                         type="button"
@@ -172,7 +172,7 @@
                         data-bs-target="#newsBody"
                         aria-expanded="true"
                         aria-controls="newsBody">
-                    <i class="bi bi-arrows-collapse"></i> Expandir/Comprimir
+                    <i class="bi bi-arrows-collapse"></i> Expand/Collapse
                 </button>
             </div>
         </div>
@@ -180,23 +180,23 @@
             <div class="card-body border-bottom">
                 <div class="row g-2 align-items-end">
                     <div class="col-12 col-md-4">
-                        <label class="form-label form-label-sm mb-1" for="newsSortSelect">Ordenar noticias</label>
+                        <label class="form-label form-label-sm mb-1" for="newsSortSelect">Sort news</label>
                         <select id="newsSortSelect" class="form-select form-select-sm">
-                            <option value="date_desc" {% if news_sort == 'date_desc' %}selected{% endif %}>Mais recentes primeiro</option>
-                            <option value="date_asc" {% if news_sort == 'date_asc' %}selected{% endif %}>Mais antigas primeiro</option>
-                            <option value="source_asc" {% if news_sort == 'source_asc' %}selected{% endif %}>Fonte (A-Z)</option>
-                            <option value="title_asc" {% if news_sort == 'title_asc' %}selected{% endif %}>Titulo (A-Z)</option>
+                            <option value="date_desc" {% if news_sort == 'date_desc' %}selected{% endif %}>Newest first</option>
+                            <option value="date_asc" {% if news_sort == 'date_asc' %}selected{% endif %}>Oldest first</option>
+                            <option value="source_asc" {% if news_sort == 'source_asc' %}selected{% endif %}>Source (A-Z)</option>
+                            <option value="title_asc" {% if news_sort == 'title_asc' %}selected{% endif %}>Title (A-Z)</option>
                         </select>
                     </div>
                     <div class="col-12 col-md-auto">
                         <button id="newsSortBtn" type="button" class="btn btn-sm btn-outline-light" disabled>
-                            <i class="bi bi-sort-down"></i> Aplicar ordenacao
+                            <i class="bi bi-sort-down"></i> Apply sort
                         </button>
                     </div>
                 </div>
             </div>
             <div id="newsContent" class="card-body text-muted small">
-                Clique em "Buscar noticias" para consultar o Serper sob demanda.
+                Click "Fetch News" to query Serper on demand.
             </div>
         </div>
     </div>
@@ -236,30 +236,30 @@
 
             function sentimentBadge(sentiment) {
                 if (sentiment === 'positive') {
-                    return '<span class="badge bg-success">Positivo</span>';
+                    return '<span class="badge bg-success">Positive</span>';
                 }
                 if (sentiment === 'negative') {
-                    return '<span class="badge bg-danger">Negativo</span>';
+                    return '<span class="badge bg-danger">Negative</span>';
                 }
-                return '<span class="badge bg-secondary">Neutro</span>';
+                return '<span class="badge bg-secondary">Neutral</span>';
             }
 
             function analysisBadge(overall) {
                 if (overall === 'great') {
-                    return '<span class="badge bg-success">Excelente</span>';
+                    return '<span class="badge bg-success">Great</span>';
                 }
                 if (overall === 'good') {
-                    return '<span class="badge bg-info text-dark">Boa</span>';
+                    return '<span class="badge bg-info text-dark">Good</span>';
                 }
                 if (overall === 'weak') {
-                    return '<span class="badge bg-danger">Fraca</span>';
+                    return '<span class="badge bg-danger">Weak</span>';
                 }
-                return '<span class="badge bg-secondary">Mista</span>';
+                return '<span class="badge bg-secondary">Mixed</span>';
             }
 
             function renderTextList(items) {
                 if (!items || !items.length) {
-                    return '<li class="text-muted">Sem itens.</li>';
+                    return '<li class="text-muted">No items.</li>';
                 }
                 return items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
             }
@@ -273,7 +273,7 @@
                     assetAnalysisContent.innerHTML = `
                         ${errMsg}
                         <div class="text-muted small">
-                            Nao foi possivel gerar a analise do ativo. Verifique se a chave Gemini esta configurada em
+                            Could not generate asset analysis. Check that the Gemini key is configured in
                             <a href="{{ url_for('view_api_config') }}">API Config</a>.
                         </div>`;
                     return;
@@ -282,34 +282,34 @@
                 const confidencePct = Math.round((analysis.confidence || 0) * 100);
                 assetAnalysisContent.innerHTML = `
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                        <strong>Parecer:</strong>
+                        <strong>Assessment:</strong>
                         ${analysisBadge(analysis.overall)}
                         <span class="badge bg-dark">Score: ${escapeHtml(analysis.score)}</span>
-                        <span class="badge bg-light text-dark">Confianca: ${confidencePct}%</span>
-                        <span class="badge bg-light text-dark">Horizonte: ${escapeHtml(analysis.time_horizon || 'medium')}</span>
-                        ${analysis.model ? `<small class="opacity-75">Modelo: ${escapeHtml(analysis.model)}</small>` : ''}
+                        <span class="badge bg-light text-dark">Confidence: ${confidencePct}%</span>
+                        <span class="badge bg-light text-dark">Horizon: ${escapeHtml(analysis.time_horizon || 'medium')}</span>
+                        ${analysis.model ? `<small class="opacity-75">Model: ${escapeHtml(analysis.model)}</small>` : ''}
                     </div>
                     ${analysis.performance_summary ? `<p class="mb-3">${escapeHtml(analysis.performance_summary)}</p>` : ''}
                     <div class="row g-3">
                         <div class="col-12 col-lg-4">
-                            <div class="small fw-bold mb-1">Pontos fortes</div>
+                            <div class="small fw-bold mb-1">Strengths</div>
                             <ul class="small mb-0 ps-3">${renderTextList(analysis.strengths)}</ul>
                         </div>
                         <div class="col-12 col-lg-4">
-                            <div class="small fw-bold mb-1">Riscos</div>
-                            <ul class="small mb-0 ps-3">${renderTextList(analysis.risks)}</ul>
+                            <div class="small fw-bold mb-1">Risks</div>
+                            <ul class="small mb-0 ps-3">${renderTextList(analysis.risks)}</ul></div>
                         </div>
                         <div class="col-12 col-lg-4">
-                            <div class="small fw-bold mb-1">Proximos passos</div>
+                            <div class="small fw-bold mb-1">Next steps</div>
                             <ul class="small mb-0 ps-3">${renderTextList(analysis.next_steps)}</ul>
                         </div>
                     </div>
                     <details class="mt-3">
-                        <summary class="small">Ver prompt e resposta do Gemini</summary>
+                        <summary class="small">View Gemini prompt and response</summary>
                         <div class="mt-2">
                             <div class="small fw-bold">Prompt</div>
                             <pre class="small mb-2" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(analysis.prompt || '')}</pre>
-                            <div class="small fw-bold">Resposta</div>
+                            <div class="small fw-bold">Response</div>
                             <pre class="small mb-0" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(analysis.raw_response || '')}</pre>
                         </div>
                     </details>`;
@@ -317,7 +317,7 @@
 
             async function fetchAssetAnalysis() {
                 assetAnalyzeBtn.disabled = true;
-                assetAnalysisContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Analisando desempenho do ativo...</div>';
+                assetAnalysisContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Analysing asset performance...</div>';
                 try {
                     const response = await fetch(analysisApiUrl, {
                         headers: {'Accept': 'application/json'},
@@ -328,7 +328,7 @@
                     const payload = await response.json();
                     renderAssetAnalysis(payload);
                 } catch (error) {
-                    assetAnalysisContent.innerHTML = '<div class="text-danger small">Falha ao analisar o ativo. Tente novamente.</div>';
+                    assetAnalysisContent.innerHTML = '<div class="text-danger small">Failed to analyse the asset. Please try again.</div>';
                 } finally {
                     assetAnalyzeBtn.disabled = false;
                 }
@@ -336,7 +336,7 @@
 
             async function previewAssetAnalysis() {
                 assetAnalyzeBtn.disabled = true;
-                assetAnalysisContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Gerando preview do prompt...</div>';
+                assetAnalysisContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Generating prompt preview...</div>';
                 try {
                     const response = await fetch(`${analysisApiUrl}?preview=1`, {
                         headers: {'Accept': 'application/json'},
@@ -347,14 +347,14 @@
                     const payload = await response.json();
                     const promptPreview = payload.prompt_preview || '';
                     assetAnalysisContent.innerHTML = `
-                        <div class="small fw-bold mb-2">Preview do prompt (ativo)</div>
+                        <div class="small fw-bold mb-2">Prompt preview (asset)</div>
                         <pre class="small mb-3" style="white-space: pre-wrap; max-height: 260px; overflow:auto;">${escapeHtml(promptPreview)}</pre>
                         <div class="d-flex gap-2">
                             <button id="assetConfirmPromptBtn" type="button" class="btn btn-sm btn-warning">
-                                <i class="bi bi-send"></i> Confirmar e enviar ao Gemini
+                                <i class="bi bi-send"></i> Confirm and send to Gemini
                             </button>
                             <button id="assetCancelPromptBtn" type="button" class="btn btn-sm btn-outline-secondary">
-                                Cancelar
+                                Cancel
                             </button>
                         </div>`;
 
@@ -367,11 +367,11 @@
                     }
                     if (cancelBtn) {
                         cancelBtn.addEventListener('click', function() {
-                            assetAnalysisContent.innerHTML = 'Clique em "Analisar performance do ativo" para gerar um parecer com base nas informacoes consolidadas.';
+                            assetAnalysisContent.innerHTML = 'Click "Analyse Asset Performance" to generate a report based on the consolidated data.';
                         });
                     }
                 } catch (error) {
-                    assetAnalysisContent.innerHTML = '<div class="text-danger small">Falha ao gerar preview do prompt. Tente novamente.</div>';
+                    assetAnalysisContent.innerHTML = '<div class="text-danger small">Failed to generate prompt preview. Please try again.</div>';
                 } finally {
                     assetAnalyzeBtn.disabled = false;
                 }
@@ -385,7 +385,7 @@
                 if (!news.length) {
                     newsContent.innerHTML = `
                         <div class="text-muted small">
-                            Nenhuma noticia encontrada. Verifique se a chave Serper esta configurada em
+                            No news found. Check that the Serper key is configured in
                             <a href="{{ url_for('view_api_config') }}">API Config</a>.
                         </div>`;
                     return;
@@ -397,17 +397,17 @@
                         html += `
                             <div class="card-body border-bottom">
                                 <div class="d-flex align-items-center gap-2 mb-2">
-                                    <strong>Sentimento (Gemini):</strong>
+                                    <strong>Sentiment (Gemini):</strong>
                                     ${sentimentBadge(sentiment.overall)}
                                     ${sentiment.model ? `<small class="opacity-75">Modelo: ${escapeHtml(sentiment.model)}</small>` : ''}
                                 </div>
                                 ${sentiment.summary ? `<p class="mb-0 small text-muted">${escapeHtml(sentiment.summary)}</p>` : ''}
                                 <details class="mt-2">
-                                    <summary class="small">Ver prompt e resposta do Gemini</summary>
+                                    <summary class="small">View Gemini prompt and response</summary>
                                     <div class="mt-2">
                                         <div class="small fw-bold">Prompt</div>
                                         <pre class="small mb-2" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(sentiment.prompt || '')}</pre>
-                                        <div class="small fw-bold">Resposta</div>
+                                        <div class="small fw-bold">Response</div>
                                         <pre class="small mb-0" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(sentiment.raw_response || '')}</pre>
                                     </div>
                                 </details>
@@ -415,16 +415,16 @@
                     } else {
                         html += `
                             <div class="card-body border-bottom text-muted small">
-                                Nao foi possivel gerar analise de sentimento com Gemini.
-                                Verifique se a chave Gemini esta configurada em
+                                Could not generate Gemini sentiment analysis.
+                                Check that the Gemini key is configured in
                                 <a href="{{ url_for('view_api_config') }}">API Config</a>.
                             </div>`;
                     }
                 } else {
                     html += `
                         <div class="card-body border-bottom text-muted small">
-                            A analise de sentimento nao e automatica. Clique em
-                            <strong>Analisar sentimento (Gemini)</strong> para executar.
+                            Sentiment analysis is not automatic. Click
+                            <strong>Analyse Sentiment (Gemini)</strong> to run.
                         </div>`;
                 }
 
@@ -460,7 +460,7 @@
                 newsHideBtn.disabled = loading || !state.loaded;
                 newsSortBtn.disabled = loading || !state.loaded;
                 if (loading) {
-                    newsContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Carregando...</div>';
+                    newsContent.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</div>';
                 }
             }
 
@@ -489,7 +489,7 @@
                     newsSortSelect.value = state.sort;
                     renderNews(payload);
                 } catch (error) {
-                    newsContent.innerHTML = '<div class="text-danger small">Falha ao carregar noticias. Tente novamente.</div>';
+                    newsContent.innerHTML = '<div class="text-danger small">Failed to load news. Please try again.</div>';
                 } finally {
                     setLoading(false);
                 }
@@ -517,14 +517,14 @@
                     const promptPreview = payload.prompt_preview || '';
 
                     newsContent.innerHTML = `
-                        <div class="small fw-bold mb-2">Preview do prompt (sentimento de noticias)</div>
+                        <div class="small fw-bold mb-2">Prompt preview (news sentiment)</div>
                         <pre class="small mb-3" style="white-space: pre-wrap; max-height: 260px; overflow:auto;">${escapeHtml(promptPreview)}</pre>
                         <div class="d-flex gap-2">
                             <button id="newsConfirmPromptBtn" type="button" class="btn btn-sm btn-warning">
-                                <i class="bi bi-send"></i> Confirmar e enviar ao Gemini
+                                <i class="bi bi-send"></i> Confirm and send to Gemini
                             </button>
                             <button id="newsCancelPromptBtn" type="button" class="btn btn-sm btn-outline-secondary">
-                                Cancelar
+                                Cancel
                             </button>
                         </div>`;
 
@@ -540,12 +540,12 @@
                             if (state.lastNewsPayload) {
                                 renderNews(state.lastNewsPayload);
                             } else {
-                                newsContent.innerHTML = 'Clique em "Buscar noticias" para consultar o Serper sob demanda.';
+                                newsContent.innerHTML = 'Click "Fetch News" to query Serper on demand.';
                             }
                         });
                     }
                 } catch (error) {
-                    newsContent.innerHTML = '<div class="text-danger small">Falha ao gerar preview do prompt. Tente novamente.</div>';
+                    newsContent.innerHTML = '<div class="text-danger small">Failed to generate prompt preview. Please try again.</div>';
                 } finally {
                     setLoading(false);
                 }
@@ -570,7 +570,7 @@
                 newsAnalyzeBtn.disabled = true;
                 newsHideBtn.disabled = true;
                 newsSortBtn.disabled = true;
-                newsContent.innerHTML = 'Clique em "Buscar noticias" para consultar o Serper sob demanda.';
+                newsContent.innerHTML = 'Click "Fetch News" to query Serper on demand.';
             });
 
             assetAnalyzeBtn.addEventListener('click', function() {

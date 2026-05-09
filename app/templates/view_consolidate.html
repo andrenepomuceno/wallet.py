@@ -43,13 +43,13 @@
 
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-robot"></i> Analise de Performance (Gemini)</span>
+            <span><i class="bi bi-robot"></i> Performance Analysis (Gemini)</span>
             <button id="consolidateAnalyzeBtn" class="btn btn-sm btn-warning" type="button">
-                <i class="bi bi-stars"></i> Analisar consolidate
+                <i class="bi bi-stars"></i> Analyse Portfolio
             </button>
         </div>
         <div id="consolidateAnalysisContent" class="card-body text-muted small">
-            Clique em "Analisar consolidate" para gerar um parecer de performance e diversificacao.
+            Click "Analyse Portfolio" to generate a performance and diversification report.
         </div>
     </div>
 
@@ -93,15 +93,15 @@
             }
 
             function analysisBadge(overall) {
-                if (overall === 'great') return '<span class="badge bg-success">Excelente</span>';
-                if (overall === 'good') return '<span class="badge bg-info text-dark">Boa</span>';
-                if (overall === 'weak') return '<span class="badge bg-danger">Fraca</span>';
-                return '<span class="badge bg-secondary">Mista</span>';
+                if (overall === 'great') return '<span class="badge bg-success">Great</span>';
+                if (overall === 'good') return '<span class="badge bg-info text-dark">Good</span>';
+                if (overall === 'weak') return '<span class="badge bg-danger">Weak</span>';
+                return '<span class="badge bg-secondary">Mixed</span>';
             }
 
             function renderTextList(items) {
                 if (!items || !items.length) {
-                    return '<li class="text-muted">Sem itens.</li>';
+                    return '<li class="text-muted">No items.</li>';
                 }
                 return items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
             }
@@ -111,7 +111,7 @@
                 if (!analysis) {
                     content.innerHTML = `
                         <div class="text-muted small">
-                            Nao foi possivel gerar a analise do consolidate. Verifique se a chave Gemini esta configurada em
+                            Could not generate portfolio analysis. Check that the Gemini key is configured in
                             <a href="{{ url_for('view_api_config') }}">API Config</a>.
                         </div>`;
                     return;
@@ -120,34 +120,34 @@
                 const confidencePct = Math.round((analysis.confidence || 0) * 100);
                 content.innerHTML = `
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                        <strong>Parecer:</strong>
+                        <strong>Assessment:</strong>
                         ${analysisBadge(analysis.overall)}
                         <span class="badge bg-dark">Score: ${escapeHtml(analysis.score)}</span>
-                        <span class="badge bg-light text-dark">Confianca: ${confidencePct}%</span>
-                        ${analysis.model ? `<small class="opacity-75">Modelo: ${escapeHtml(analysis.model)}</small>` : ''}
+                        <span class="badge bg-light text-dark">Confidence: ${confidencePct}%</span>
+                        ${analysis.model ? `<small class="opacity-75">Model: ${escapeHtml(analysis.model)}</small>` : ''}
                     </div>
                     ${analysis.performance_summary ? `<p class="mb-2">${escapeHtml(analysis.performance_summary)}</p>` : ''}
                     ${analysis.allocation_summary ? `<p class="mb-3 small text-muted">${escapeHtml(analysis.allocation_summary)}</p>` : ''}
                     <div class="row g-3">
                         <div class="col-12 col-lg-4">
-                            <div class="small fw-bold mb-1">Pontos fortes</div>
+                            <div class="small fw-bold mb-1">Strengths</div>
                             <ul class="small mb-0 ps-3">${renderTextList(analysis.strengths)}</ul>
                         </div>
                         <div class="col-12 col-lg-4">
-                            <div class="small fw-bold mb-1">Riscos</div>
+                            <div class="small fw-bold mb-1">Risks</div>
                             <ul class="small mb-0 ps-3">${renderTextList(analysis.risks)}</ul>
                         </div>
                         <div class="col-12 col-lg-4">
-                            <div class="small fw-bold mb-1">Proximos passos</div>
+                            <div class="small fw-bold mb-1">Next steps</div>
                             <ul class="small mb-0 ps-3">${renderTextList(analysis.next_steps)}</ul>
                         </div>
                     </div>
                     <details class="mt-3">
-                        <summary class="small">Ver prompt e resposta do Gemini</summary>
+                        <summary class="small">View Gemini prompt and response</summary>
                         <div class="mt-2">
                             <div class="small fw-bold">Prompt</div>
                             <pre class="small mb-2" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(analysis.prompt || '')}</pre>
-                            <div class="small fw-bold">Resposta</div>
+                            <div class="small fw-bold">Response</div>
                             <pre class="small mb-0" style="white-space: pre-wrap; max-height: 220px; overflow:auto;">${escapeHtml(analysis.raw_response || '')}</pre>
                         </div>
                     </details>`;
@@ -155,7 +155,7 @@
 
             async function runAnalysis() {
                 analyzeBtn.disabled = true;
-                content.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Analisando consolidate...</div>';
+                content.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Analysing portfolio...</div>';
                 try {
                     const response = await fetch(apiUrl, {headers: {'Accept': 'application/json'}});
                     if (!response.ok) {
@@ -164,7 +164,7 @@
                     const payload = await response.json();
                     renderAnalysis(payload);
                 } catch (error) {
-                    content.innerHTML = '<div class="text-danger small">Falha ao analisar consolidate. Tente novamente.</div>';
+                    content.innerHTML = '<div class="text-danger small">Failed to analyse portfolio. Please try again.</div>';
                 } finally {
                     analyzeBtn.disabled = false;
                 }
@@ -172,7 +172,7 @@
 
             async function previewPrompt() {
                 analyzeBtn.disabled = true;
-                content.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Gerando preview do prompt...</div>';
+                content.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Generating prompt preview...</div>';
                 try {
                     const response = await fetch(`${apiUrl}?preview=1`, {headers: {'Accept': 'application/json'}});
                     if (!response.ok) {
@@ -182,14 +182,14 @@
                     const promptPreview = payload.prompt_preview || '';
 
                     content.innerHTML = `
-                        <div class="small fw-bold mb-2">Preview do prompt (consolidate)</div>
+                        <div class="small fw-bold mb-2">Prompt preview (portfolio)</div>
                         <pre class="small mb-3" style="white-space: pre-wrap; max-height: 260px; overflow:auto;">${escapeHtml(promptPreview)}</pre>
                         <div class="d-flex gap-2">
                             <button id="confirmConsolidatePromptBtn" type="button" class="btn btn-sm btn-warning">
-                                <i class="bi bi-send"></i> Confirmar e enviar ao Gemini
+                                <i class="bi bi-send"></i> Confirm and send to Gemini
                             </button>
                             <button id="cancelConsolidatePromptBtn" type="button" class="btn btn-sm btn-outline-secondary">
-                                Cancelar
+                                Cancel
                             </button>
                         </div>`;
 
@@ -203,11 +203,11 @@
                     }
                     if (cancelBtn) {
                         cancelBtn.addEventListener('click', function() {
-                            content.innerHTML = 'Clique em "Analisar consolidate" para gerar um parecer de performance e diversificacao.';
+                            content.innerHTML = 'Click "Analyse Portfolio" to generate a performance and diversification report.';
                         });
                     }
                 } catch (error) {
-                    content.innerHTML = '<div class="text-danger small">Falha ao gerar preview do prompt. Tente novamente.</div>';
+                    content.innerHTML = '<div class="text-danger small">Failed to generate prompt preview. Please try again.</div>';
                 } finally {
                     analyzeBtn.disabled = false;
                 }
