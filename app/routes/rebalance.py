@@ -10,7 +10,7 @@ from app.processing.rebalance import save_targets
 from app.utils.memocache import get_cached, invalidate_processing_cache
 
 
-def _build_target_form(asset_classes, saved_targets):
+def _build_target_form(asset_classes, saved_targets, prepopulate=True):
     """Dynamically add one FloatField per asset class to PortfolioTargetForm."""
     for cls in asset_classes:
         field_name = _class_to_field(cls)
@@ -25,11 +25,12 @@ def _build_target_form(asset_classes, saved_targets):
                 ),
             )
     form = PortfolioTargetForm()
-    # Pre-populate with saved values
-    for cls in asset_classes:
-        field = getattr(form, _class_to_field(cls), None)
-        if field is not None and cls in saved_targets:
-            field.data = saved_targets[cls]
+    # Pre-populate with saved values only on GET (not POST, which has its own data)
+    if prepopulate:
+        for cls in asset_classes:
+            field = getattr(form, _class_to_field(cls), None)
+            if field is not None and cls in saved_targets:
+                field.data = saved_targets[cls]
     return form
 
 
@@ -82,7 +83,7 @@ def view_rebalance():
             asset_classes.append(cls)
     asset_classes = sorted(set(asset_classes))
 
-    form = _build_target_form(asset_classes, saved_targets)
+    form = _build_target_form(asset_classes, saved_targets, prepopulate=(request.method == 'GET'))
 
     if request.method == 'POST' and form.validate_on_submit():
         weights, errors = _parse_weights(form, asset_classes)
@@ -91,7 +92,7 @@ def view_rebalance():
                 flash(err)
         else:
             save_targets(weights)
-            invalidate_processing_cache()
+            invalidate_processing_cache(category='asset')
             flash('Weights saved successfully!')
             return redirect(url_for('view_rebalance'))
 

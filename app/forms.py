@@ -56,7 +56,7 @@ class PortfolioTargetForm(FlaskForm):
     carries only the submit button so WTForms CSRF protection still applies.
     The route adds one FloatField per asset_class after instantiating this form.
     """
-    submit = SubmitField('Salvar Pesos')
+    submit = SubmitField('Save Weights')
 
 
 class ApiConfigForm(FlaskForm):
