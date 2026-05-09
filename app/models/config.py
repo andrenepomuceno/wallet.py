@@ -45,10 +45,11 @@ DEFAULT_CACHE_CONFIG = [
     {'category': 'gemini',        'ttl_seconds': 900,  'url_pattern': '*generativelanguage.googleapis.com*'},
     {'category': 'asset',         'ttl_seconds': 600,  'url_pattern': None},
     {'category': 'consolidate',   'ttl_seconds': 600,  'url_pattern': None},
+    {'category': 'dashboard',     'ttl_seconds': 900,  'url_pattern': None},
 ]
 
 # Categories that belong to the processing-cache layer (not HTTP).
-PROCESSING_CACHE_CATEGORIES = {'asset', 'consolidate'}
+PROCESSING_CACHE_CATEGORIES = {'asset', 'consolidate', 'dashboard'}
 
 
 def seed_default_cache_config():

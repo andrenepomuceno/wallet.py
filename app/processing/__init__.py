@@ -46,6 +46,13 @@ from .rebalance import (
     compute_summary,
     process_rebalance_request,
 )
+from .dashboard import (
+    process_portfolio_history,
+    compute_period_kpis,
+    plot_portfolio_value,
+    plot_annual_returns,
+    RANGE_KEYS,
+)
 
 __all__ = [
     # prices
@@ -67,4 +74,7 @@ __all__ = [
     'load_targets', 'save_targets',
     'compute_class_comparison', 'compute_asset_suggestions', 'compute_summary',
     'process_rebalance_request',
+    # dashboard
+    'process_portfolio_history', 'compute_period_kpis',
+    'plot_portfolio_value', 'plot_annual_returns', 'RANGE_KEYS',
 ]

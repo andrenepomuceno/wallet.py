@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block content %}
+{% set kpis = info.get('kpis', {}) %}
+{% set plots = info.get('plots', {}) %}
+{% set available_classes = info.get('available_classes', []) %}
+{% set available_assets = info.get('available_assets', []) %}
+
+<div class="page-header d-flex align-items-center justify-content-between">
+    <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+    <span class="badge bg-secondary fs-6">
+        {% if scope == 'total' %}Total Portfolio{% endif %}
+        {% if scope == 'class' and class_filter %}Class: {{ class_filter }}{% endif %}
+        {% if scope == 'asset' and asset_filter %}Asset: {{ source_filter }}/{{ asset_filter }}{% endif %}
+        &middot; {{ range_key|upper }}
+    </span>
+</div>
+
+<!-- Filter form -->
+<form class="card mb-4" method="get" action="{{ url_for('view_dashboard') }}">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Scope</label>
+                <select class="form-select form-select-sm" name="scope" onchange="this.form.submit()">
+                    <option value="total" {% if scope == 'total' %}selected{% endif %}>Total</option>
+                    <option value="class" {% if scope == 'class' %}selected{% endif %}>By Class</option>
+                    <option value="asset" {% if scope == 'asset' %}selected{% endif %}>By Asset</option>
+                </select>
+            </div>
+            {% if scope == 'class' %}
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Asset Class</label>
+                <select class="form-select form-select-sm" name="class">
+                    <option value="">— select —</option>
+                    {% for c in available_classes %}
+                    <option value="{{ c }}" {% if c == class_filter %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            {% if scope == 'asset' %}
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">Asset</label>
+                <select class="form-select form-select-sm" name="asset_combo"
+                        onchange="
+                            var v = this.value.split('|');
+                            document.getElementById('source_input').value = v[0] || '';
+                            document.getElementById('asset_input').value = v[1] || '';
+                        ">
+                    <option value="">— select —</option>
+                    {% for src, name in available_assets %}
+                    <option value="{{ src }}|{{ name }}"
+                        {% if src == source_filter and name == asset_filter %}selected{% endif %}>
+                        {{ src }} / {{ name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" id="source_input" name="source" value="{{ source_filter or '' }}">
+                <input type="hidden" id="asset_input" name="asset" value="{{ asset_filter or '' }}">
+            </div>
+            {% endif %}
+            <div class="col-md-auto">
+                <label class="form-label small text-muted mb-1 d-block">Range</label>
+                <div class="btn-group btn-group-sm" role="group" aria-label="range">
+                    {% for r in range_keys %}
+                    <button type="submit" name="range" value="{{ r }}"
+                            class="btn {% if r == range_key %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        {{ r|upper }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-auto">
+                <button type="submit" class="btn btn-sm btn-success">
+                    <i class="bi bi-arrow-clockwise"></i> Apply
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% if info.get('valid') %}
+<!-- KPI cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value">{{ "%.2f"|format(kpis.get('end_value', 0)) }}</div>
+            <div class="kpi-label">Current Value (BRL)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value">{{ "%.2f"|format(kpis.get('end_cost', 0)) }}</div>
+            <div class="kpi-label">Liquid Cost</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value {% if kpis.get('absolute_return', 0) >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                {{ "%.2f"|format(kpis.get('absolute_return', 0)) }}
+            </div>
+            <div class="kpi-label">Absolute Profit (Value − Cost)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value {% if kpis.get('period_change', 0) >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                {{ "%.2f"|format(kpis.get('period_change', 0)) }}
+                <span class="fs-6">({{ "%.2f"|format(kpis.get('period_pct', 0)) }}%)</span>
+            </div>
+            <div class="kpi-label">Period Change</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value {% if kpis.get('simple_return_pct', 0) >= 0 %}text-positive{% else %}text-negative{% endif %}">
+                {{ "%.2f"|format(kpis.get('simple_return_pct', 0)) }}%
+            </div>
+            <div class="kpi-label">Simple Return (Capital Gain / Cost)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-value">{{ "%.2f"|format(kpis.get('wages_sum', 0)) }}</div>
+            <div class="kpi-label">Wages (Dividends + Interest)</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main chart: portfolio value vs cost -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-graph-up"></i> Portfolio Value vs. Liquid Cost</div>
+    <div class="card-body">
+        {% if plots.get('value') %}
+            {{ plots['value'] | safe }}
+        {% else %}
+            <p class="text-muted">No history data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Annual returns -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-bar-chart-line"></i> Annual Returns</div>
+    <div class="card-body">
+        {% if plots.get('annual') %}
+            {{ plots['annual'] | safe }}
+        {% else %}
+            <p class="text-muted">Need at least one full year of history to compute annual returns.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    No data for the current selection. Try a different scope, class or asset.
+</div>
+{% endif %}
+{% endblock %}

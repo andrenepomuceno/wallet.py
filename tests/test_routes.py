@@ -227,6 +227,48 @@ def test_view_history(mock_history, client):
     assert resp.status_code == 200
 
 
+@patch('app.routes.dashboard.process_portfolio_history')
+def test_view_dashboard_renders(mock_proc, client):
+    mock_proc.return_value = {
+        'valid': True,
+        'history': pd.DataFrame([
+            {'date': pd.Timestamp('2024-01-02'), 'position_total': 100.0,
+             'liquid_cost': 80.0, 'cost': 80.0, 'wages_sum': 0.0,
+             'capital_gain': 20.0, 'realized_gain': 0.0,
+             'not_realized_gain': 20.0, 'rentability': 25.0},
+            {'date': pd.Timestamp('2024-06-02'), 'position_total': 120.0,
+             'liquid_cost': 80.0, 'cost': 80.0, 'wages_sum': 0.0,
+             'capital_gain': 40.0, 'realized_gain': 0.0,
+             'not_realized_gain': 40.0, 'rentability': 50.0},
+        ]),
+        'kpis': {'start_value': 100.0, 'end_value': 120.0,
+                 'start_cost': 80.0, 'end_cost': 80.0,
+                 'absolute_return': 40.0, 'period_change': 20.0,
+                 'period_pct': 20.0, 'simple_return_pct': 50.0,
+                 'wages_sum': 0.0, 'annual_returns': {2024: 20.0}},
+        'plots': {'value': '<div>chart</div>', 'annual': '<div>bars</div>'},
+        'available_classes': ['Equity'],
+        'available_assets': [('b3', 'PETR4')],
+    }
+    resp = client.get('/dashboard?range=1y')
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'Dashboard' in body
+    assert '<div>chart</div>' in body
+
+
+@patch('app.routes.dashboard.process_portfolio_history')
+def test_view_dashboard_no_data_redirects(mock_proc, client):
+    mock_proc.return_value = {
+        'valid': False,
+        'available_classes': [],
+        'available_assets': [],
+        'kpis': {}, 'plots': {'value': '', 'annual': ''},
+    }
+    resp = client.get('/dashboard', follow_redirects=False)
+    assert resp.status_code == 302
+
+
 def test_format_money_filter():
     from app.routes import format_money
     assert format_money(500) == '500'
